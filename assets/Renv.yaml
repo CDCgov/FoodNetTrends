@@ -1,0 +1,17 @@
+name: r_environment
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - r-base=4.3.2
+  - r-argparse
+  - r-tidyverse
+  - r-dplyr
+  - r-haven
+  - r-gtools
+  - r-brms
+  - r-reshape2
+  - r-ggplot2
+  - r-tidybayes
+  - r-HDInterval

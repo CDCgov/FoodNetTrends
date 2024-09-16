@@ -1,75 +1,74 @@
-# CDCgov GitHub Organization Open Source Project Template
+## Introduction
 
-**Template for clearance: This project serves as a template to aid projects in starting up and moving through clearance procedures. To start, create a new repository and implement the required [open practices](open_practices.md), train on and agree to adhere to the organization's [rules of behavior](rules_of_behavior.md), and [send a request through the create repo form](https://forms.office.com/Pages/ResponsePage.aspx?id=aQjnnNtg_USr6NJ2cHf8j44WSiOI6uNOvdWse4I-C2NUNk43NzMwODJTRzA4NFpCUk1RRU83RTFNVi4u) using language from this template as a Guide.**
+**cdc/spline** is a bioinformatics pipeline that performs spline modeling.
 
-**General disclaimer** This repository was created for use by CDC programs to collaborate on public health related projects in support of the [CDC mission](https://www.cdc.gov/about/organization/mission.htm).  GitHub is not hosted by the CDC, but is a third party website used by CDC and its partners to share information and collaborate on software. CDC use of GitHub does not imply an endorsement of any one particular service, product, or enterprise. 
+TODO: Write steps
+1. Does thing1
+2. Does thing2
 
-## Access Request, Repo Creation Request
+## Usage
+Run the pipeline by giving the following parameters:
 
-* [CDC GitHub Open Project Request Form](https://forms.office.com/Pages/ResponsePage.aspx?id=aQjnnNtg_USr6NJ2cHf8j44WSiOI6uNOvdWse4I-C2NUNk43NzMwODJTRzA4NFpCUk1RRU83RTFNVi4u) _[Requires a CDC Office365 login, if you do not have a CDC Office365 please ask a friend who does to submit the request on your behalf. If you're looking for access to the CDCEnt private organization, please use the [GitHub Enterprise Cloud Access Request form](https://forms.office.com/Pages/ResponsePage.aspx?id=aQjnnNtg_USr6NJ2cHf8j44WSiOI6uNOvdWse4I-C2NUQjVJVDlKS1c0SlhQSUxLNVBaOEZCNUczVS4u).]_
+    - outdir: absolute path to the output dir location
+      - Example: /path/to/output/test240706
+   - mmwrFile: absolute path to the MMWR file
+      - Example: /path/to/mmwr9623_Jan2024.sas7bdat
+	- censusFile_B: absolute path to the bacterial census file
+      - Example: /path/to/cen9623.sas7bdat
+	- censusFile_P: absolute path to the pathogenic census file
+      - Example: /path/to/cen9623_para.sas7bdat
+	- travel: list of travel status to include
+      - Example: "NO,UNKNOWN,YES"
+	- cidt: list of CIDT variables
+      - Example: "CIDT+,CX+,PARASITIC"
+	- projID: unique project identifier
+      - Example: "20240706"
 
-## Related documents
+There are two ways to run the pipeline
 
-* [Open Practices](open_practices.md)
-* [Rules of Behavior](rules_of_behavior.md)
-* [Thanks and Acknowledgements](thanks.md)
-* [Disclaimer](DISCLAIMER.md)
-* [Contribution Notice](CONTRIBUTING.md)
-* [Code of Conduct](code-of-conduct.md)
+1. Directly calls Nextflow
+```bash
+module load nextflow singularity conda
 
-## Overview
+nextflow run main.nf \
+	-entry CDC_SPLINE \
+	-profile singularity,conda \
+	-with-conda \
+	-work-dir /path/to/output/work \
+	--outdir /path/to/output \
+	--mmwrFile "/path/to/mmwr9623_Jan2024.sas7bdat" \
+	--censusFile_B "/path/to/cen9623.sas7bdat" \
+	--censusFile_P "/path/to/cen9623_para.sas7bdat" \
+	--travel "NO,UNKNOWN,YES" \
+	--cidt "CIDT+,CX+,PARASITIC" \
+	--projID "20240706"
+```
 
-Describe the purpose of your project. Add additional sections as necessary to help collaborators and potential collaborators understand and use your project.
-  
-## Public Domain Standard Notice
-This repository constitutes a work of the United States Government and is not
-subject to domestic copyright protection under 17 USC § 105. This repository is in
-the public domain within the United States, and copyright and related rights in
-the work worldwide are waived through the [CC0 1.0 Universal public domain dedication](https://creativecommons.org/publicdomain/zero/1.0/).
-All contributions to this repository will be released under the CC0 dedication. By
-submitting a pull request you are agreeing to comply with this waiver of
-copyright interest.
+2. Utilize the `run_workflow.sh` script.
+   A. Update the `run_workflow.sh` script `outDir` and `dataDir` paths.
+   B. Run the script
+      ```bash
+      bash run_workflow.sh run
+      ```
 
-## License Standard Notice
-The repository utilizes code licensed under the terms of the Apache Software
-License and therefore is licensed under ASL v2 or later.
+## Credits
 
-This source code in this repository is free: you can redistribute it and/or modify it under
-the terms of the Apache Software License version 2, or (at your option) any
-later version.
+This pipeline was originally written by the SciComp .
 
-This source code in this repository is distributed in the hope that it will be useful, but WITHOUT ANY
-WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
-PARTICULAR PURPOSE. See the Apache Software License for more details.
+`Spline` was largely developed by [OAMD's](https://www.cdc.gov/amd/index.html) SciComp Team, based on the scripts from [TBD](https://www.cdc.gov). Detailed contributions can be found in our [user-guides]().
 
-You should have received a copy of the Apache Software License along with this
-program. If not, see http://www.apache.org/licenses/LICENSE-2.0.html
+## Contributions and Support
 
-The source code forked from other open source projects will inherit its license.
+If you would like to contribute to this pipeline, please see the [contributing guidelines](.github/CONTRIBUTING.md).
 
-## Privacy Standard Notice
-This repository contains only non-sensitive, publicly available data and
-information. All material and community participation is covered by the
-[Disclaimer](DISCLAIMER.md)
-and [Code of Conduct](code-of-conduct.md).
-For more information about CDC's privacy policy, please visit [http://www.cdc.gov/other/privacy.html](https://www.cdc.gov/other/privacy.html).
+## Citations
 
-## Contributing Standard Notice
-Anyone is encouraged to contribute to the repository by [forking](https://help.github.com/articles/fork-a-repo)
-and submitting a pull request. (If you are new to GitHub, you might start with a
-[basic tutorial](https://help.github.com/articles/set-up-git).) By contributing
-to this project, you grant a world-wide, royalty-free, perpetual, irrevocable,
-non-exclusive, transferable license to all users under the terms of the
-[Apache Software License v2](http://www.apache.org/licenses/LICENSE-2.0.html) or
-later.
+An extensive list of references for the tools used by the pipeline can be found in the [`CITATIONS.md`](CITATIONS.md) file.
 
-All comments, messages, pull requests, and other submissions received through
-CDC including this GitHub page may be subject to applicable federal law, including but not limited to the Federal Records Act, and may be archived. Learn more at [http://www.cdc.gov/other/privacy.html](http://www.cdc.gov/other/privacy.html).
+This pipeline uses code and infrastructure developed and maintained by the [nf-core](https://nf-co.re) community, reused here under the [MIT license](https://github.com/nf-core/tools/blob/master/LICENSE).
 
-## Records Management Standard Notice
-This repository is not a source of government records, but is a copy to increase
-collaboration and collaborative potential. All government records will be
-published through the [CDC web site](http://www.cdc.gov).
-
-## Additional Standard Notices
-Please refer to [CDC's Template Repository](https://github.com/CDCgov/template) for more information about [contributing to this repository](https://github.com/CDCgov/template/blob/main/CONTRIBUTING.md), [public domain notices and disclaimers](https://github.com/CDCgov/template/blob/main/DISCLAIMER.md), and [code of conduct](https://github.com/CDCgov/template/blob/main/code-of-conduct.md).
+> **The nf-core framework for community-curated bioinformatics pipelines.**
+>
+> Philip Ewels, Alexander Peltzer, Sven Fillinger, Harshil Patel, Johannes Alneberg, Andreas Wilm, Maxime Ulysse Garcia, Paolo Di Tommaso & Sven Nahnsen.
+>
+> _Nat Biotechnol._ 2020 Feb 13. doi: [10.1038/s41587-020-0439-x](https://dx.doi.org/10.1038/s41587-020-0439-x).

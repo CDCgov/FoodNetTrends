@@ -1,0 +1,65 @@
+
+R version 4.2.2 (2022-10-31) -- "Innocent and Trusting"
+Copyright (C) 2022 The R Foundation for Statistical Computing
+Platform: x86_64-conda-linux-gnu (64-bit)
+
+R is free software and comes with ABSOLUTELY NO WARRANTY.
+You are welcome to redistribute it under certain conditions.
+Type 'license()' or 'licence()' for distribution details.
+
+  Natural language support but running in an English locale
+
+R is a collaborative project with many contributors.
+Type 'contributors()' for more information and
+'citation()' on how to cite R or R packages in publications.
+
+Type 'demo()' for some demos, 'help()' for on-line help, or
+'help.start()' for an HTML browser interface to help.
+Type 'q()' to quit R.
+
+[Previously saved workspace restored]
+
+> #############
+> # Code for Running on Spaceballs
+> # chmod u+x mmwr_03132023.sh
+> # nohup ./mmwr_03132023.sh OR bash mmwr_02222023.sh OR ./mmwr_02222023.sh
+> # tail -f nohup.out
+> 
+> #############
+> # Code for Running on Aspen
+> # qsub filename.sh
+> 
+> #############
+> # Code for loading the conda environment and neccessary modules when running on Spaceballs or Linux
+> # conda activate brms
+> # module load R 
+> # module load make
+> # module load gcc
+> # module load boost
+> # module load jags
+> # module load rstan
+> # R
+> 
+> 
+> # Conda commands
+> ## List All conda Environments
+> ### conda env list
+> ## Create a conda Environment
+> ### conda create -n [name]insert name]
+> ## Create a conda environment based on a frozen package set
+> ### conda install --file=packages.txt will install those packages in your local environment.
+> ## Delete a conda Environment
+> ### conda remove -n rbartmachine --all
+> ## Install an R package
+> ### conda install -y -c conda-mlr conda-batchtools
+> Rprof(filename = "/scicomp/groups-pure/OID/NCEZID/DFWED/EDEB/foodnet/trends/mmwroutput/profile_output.out") 
+> 
+> #############
+> # load libraries
+> # library(rlang)
+> # library(ggplot2)
+> library(brms)
+Loading required package: Rcpp
+Error: package or namespace load failed for ‘brms’ in loadNamespace(i, c(lib.loc, .libPaths()), versionCheck = vI[[i]]):
+ there is no package called ‘ggplot2’
+Execution halted
