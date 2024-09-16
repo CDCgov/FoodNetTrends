@@ -53,9 +53,7 @@ nextflow run main.nf \
 
 ## Credits
 
-This pipeline was originally written by the SciComp .
-
-`Spline` was largely developed by [OAMD's](https://www.cdc.gov/amd/index.html) SciComp Team, based on the scripts from [TBD](https://www.cdc.gov). Detailed contributions can be found in our [user-guides]().
+The Spline pipeline was largely developed by Samantha Sevilla and OAMD's SciComp Team with support Daniel Weller (CDC/DFWED/EDEB), based on R scripts developed by Daniel Weller (CDC/DFWED/EDEB) with support from Beau Bruce (CDC/DFWED/EDEB) and Erica Billig Rose (CDC/DFWED/EDEB). Detailed contributions can be found in our user-guides. 
 
 ## Contributions and Support
 
