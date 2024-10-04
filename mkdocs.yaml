@@ -1,6 +1,7 @@
 site_name: "CDC FoodNet Trends Documentation"
 nav:
   - Home: index.md
-  - Usage: usage.md
-  - Output: output.md
+  - Background: background.md
+  - User Guide: user_guide.md
+  - FAQ: faq.md
 theme: readthedocs
