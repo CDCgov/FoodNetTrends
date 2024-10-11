@@ -5,7 +5,9 @@
 - [Getting Started](#getting-started)
 - [Preparing Files](#preparing-files)
 - [Running the Pipeline](#running-the-pipeline)
-- [Test Data](#test-data)
+  - [Required Parameters](#required-parameters)
+  - [Method 1: Running Directly with Nextflow](#method-1-running-directly-with-nextflow)
+  - [Method 2: Using the `run_workflow.sh` Script](#method-2-using-the-run_workflowsh-script)
 - [Interpreting Output](#interpreting-output)
 - [Advanced Configuration and Optimization](#advanced-configuration-and-optimization)
 
@@ -16,201 +18,120 @@ To use the FoodNet enhanced model pipeline, you will need:
 - **R (version 4.3.2)** with the `brms` and `tidybayes` packages.
 - **Nextflow (version 24.04.2)** for running the pipeline.
 - Access to the **FoodNet surveillance dataset**.
+- **Singularity** or **Docker** for containerization (Singularity is used in the examples).
 
 For a detailed list of software and dependencies, please refer to the [GitHub repository](https://github.com/CDCgov/FoodNetTrends).
 
-We highly recommend the use of Docker or Singularity containers for full pipeline reproducibility. If these are not possible, Conda is also supported. See the [Profiles](#-profile) section for more information.
+We highly recommend using Docker or Singularity containers for full pipeline reproducibility. If these are not possible, Conda is also supported. See the [`-profile`](#-profile) section for more information.
 
 ## Preparing Files
 
-Data preparation is crucial for accurate modeling. FoodNetTrends is designed for the following:
+Data preparation is crucial for accurate modeling. The FoodNet enhanced model requires the following inputs:
 
-- **Site-level data aggregated annually**.
-- Data formatted for Bayesian analysis using the `brms` package.
-- **Metadata** regarding county-year levels for accurate site identification.
+- **MMWR Data File** (`mmwrFile`): The MMWR (Morbidity and Mortality Weekly Report) data file in SAS format (`.sas7bdat`).
+- **Census Data Files**: Two census data files in SAS format:
+  - **Bacterial Census File** (`censusFile_B`)
+  - **Parasitic Census File** (`censusFile_P`)
+- **Parameters**:
+  - **Travel Status** (`travel`): A list of travel statuses to include (e.g., `"NO,UNKNOWN,YES"`).
+  - **CIDT Variables** (`cidt`): A list of CIDT (Culture-Independent Diagnostic Tests) variables (e.g., `"CIDT+,CX+,PARASITIC"`).
+  - **Project ID** (`projID`): A unique project identifier (e.g., `"20240706"`).
 
-Ensure that data files follow the specified format below to prevent errors during pipeline execution.
-
-### Samplesheet Input
-
-Before running the pipeline, create a **samplesheet** with information about the samples you would like to analyze. Use the `--input` parameter to specify its location. The samplesheet must be a comma-separated file (CSV) with **three columns** and a header row, as shown in the examples below.
-
-```bash
---input '[path to samplesheet file]'
-```
-
-#### Multiple Runs of the Same Sample
-
-If you have re-sequenced the same sample more than once (e.g., to increase sequencing depth), the `sample` identifiers should be the same. The pipeline will concatenate the raw reads before performing any downstream analysis. Below is an example for the same sample sequenced across three lanes:
-
-```csv
-sample,fastq_1,fastq_2
-CONTROL_REP1,AEG588A1_S1_L002_R1_001.fastq.gz,AEG588A1_S1_L002_R2_001.fastq.gz
-CONTROL_REP1,AEG588A1_S1_L003_R1_001.fastq.gz,AEG588A1_S1_L003_R2_001.fastq.gz
-CONTROL_REP1,AEG588A1_S1_L004_R1_001.fastq.gz,AEG588A1_S1_L004_R2_001.fastq.gz
-```
-
-#### Full Samplesheet
-
-The pipeline will auto-detect whether a sample is single- or paired-end based on the information provided in the samplesheet. The samplesheet can have additional columns if needed; however, the **first three columns** must match those defined below.
-
-An example samplesheet file consisting of both single- and paired-end data may look like this. This example includes six samples, where `TREATMENT_REP3` has been sequenced twice:
-
-```csv
-sample,fastq_1,fastq_2
-CONTROL_REP1,AEG588A1_S1_L002_R1_001.fastq.gz,AEG588A1_S1_L002_R2_001.fastq.gz
-CONTROL_REP2,AEG588A2_S2_L002_R1_001.fastq.gz,AEG588A2_S2_L002_R2_001.fastq.gz
-CONTROL_REP3,AEG588A3_S3_L002_R1_001.fastq.gz,AEG588A3_S3_L002_R2_001.fastq.gz
-TREATMENT_REP1,AEG588A4_S4_L003_R1_001.fastq.gz,
-TREATMENT_REP2,AEG588A5_S5_L003_R1_001.fastq.gz,
-TREATMENT_REP3,AEG588A6_S6_L003_R1_001.fastq.gz,
-TREATMENT_REP3,AEG588A6_S6_L004_R1_001.fastq.gz,
-```
-
-| Column    | Description                                                                                                                                                                            |
-|-----------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `sample`  | Custom sample name. This entry will be identical for multiple sequencing libraries/runs from the same sample. Spaces in sample names are automatically converted to underscores (`_`). |
-| `fastq_1` | Full path to FastQ file for Illumina short reads 1. The file must be gzipped and have the extension `.fastq.gz` or `.fq.gz`.                                                           |
-| `fastq_2` | Full path to FastQ file for Illumina short reads 2. The file must be gzipped and have the extension `.fastq.gz` or `.fq.gz`.                                                           |
-
-An [example samplesheet](../assets/samplesheet.csv) has been provided with the pipeline.
-
-### Important Notes
-
-- Ensure that your data files are properly formatted and placed in the correct directories as specified.
-- The pipeline expects data in specific formats for successful execution.
-- For detailed data formatting guidelines, please consult the [GitHub repository](https://github.com/CDCgov/FoodNetTrends).
+Ensure that the data files are accessible and properly formatted.
 
 ## Running the Pipeline
 
-The enhanced FoodNet model is implemented using Nextflow. To run the pipeline:
+The pipeline is implemented using Nextflow and can be run in two ways:
 
-### Clone the Repository
+### Required Parameters
 
-First, clone the repository from GitHub:
+When running the pipeline, the following parameters are required:
 
-```bash
-git clone https://github.com/CDCgov/FoodNetTrends
-cd FoodNetTrends
-```
+- `--outdir`: Absolute path to the output directory.
+  - **Example**: `/path/to/output/results`
+- `--mmwrFile`: Absolute path to the MMWR data file.
+  - **Example**: `/path/to/data/mmwr_data.sas7bdat`
+- `--censusFile_B`: Absolute path to the bacterial census file.
+  - **Example**: `/path/to/data/census_bacteria.sas7bdat`
+- `--censusFile_P`: Absolute path to the parasitic census file.
+  - **Example**: `/path/to/data/census_parasite.sas7bdat`
+- `--travel`: List of travel statuses to include (comma-separated).
+  - **Example**: `"NO,UNKNOWN,YES"`
+- `--cidt`: List of CIDT variables (comma-separated).
+  - **Example**: `"CIDT+,CX+,PARASITIC"`
+- `--projID`: Unique project identifier.
+  - **Example**: `"20240706"`
 
-### Execute the Pipeline
+### Method 1: Running Directly with Nextflow
 
-Execute the pipeline using the following command:
-
-```bash
-nextflow run main.nf --input ./samplesheet.csv --outdir ./results -profile docker
-```
-
-This command launches the pipeline with the `docker` configuration profile. See the [Profiles](#-profile) section below for more information about profiles.
-
-The pipeline will create the following files and directories in your working directory:
-
-```bash
-work             # Directory containing the Nextflow working files
-results          # Finished results in specified location (defined with --outdir)
-.nextflow_log    # Log file from Nextflow
-# Other Nextflow hidden files, e.g., history of pipeline runs and old logs.
-```
-
-### Using a Parameters File
-
-If you wish to repeatedly use the same parameters for multiple runs, specify them in a parameters file.
-
-Pipeline settings can be provided in a `yaml` or `json` file via the `-params-file <file>` option.
-
-For example:
+You can run the pipeline directly by invoking Nextflow with the required parameters:
 
 ```bash
-nextflow run main.nf -profile docker -params-file params.yaml
+module load nextflow singularity conda
+
+nextflow run main.nf \
+    -entry CDC_SPLINE \
+    -profile singularity,conda \
+    -with-conda \
+    -work-dir /path/to/output/work \
+    --outdir /path/to/output/results \
+    --mmwrFile "/path/to/data/mmwr_data.sas7bdat" \
+    --censusFile_B "/path/to/data/census_bacteria.sas7bdat" \
+    --censusFile_P "/path/to/data/census_parasite.sas7bdat" \
+    --travel "NO,UNKNOWN,YES" \
+    --cidt "CIDT+,CX+,PARASITIC" \
+    --projID "20240706"
 ```
 
-With `params.yaml` containing:
+**Explanation of the command:**
 
-```yaml
-input: './samplesheet.csv'
-outdir: './results/'
-# Add other parameters as needed
-```
+- **Module Loading**: Ensure that `nextflow`, `singularity`, and `conda` are loaded in your environment.
+- **`-entry CDC_SPLINE`**: Specifies the entry workflow to run (defined in `main.nf`).
+- **`-profile singularity,conda`**: Uses the Singularity container and Conda environment profiles.
+- **`-with-conda`**: Enables the use of Conda environments specified in the pipeline.
+- **`-work-dir`**: Specifies the working directory for Nextflow.
+- **Parameter Flags (`--`)**: Provide the necessary parameters as described above.
 
-You can also generate such `YAML`/`JSON` files via [nf-core/launch](https://nf-co.re/launch).
+### Method 2: Using the `run_workflow.sh` Script
 
-#### Warning
+Alternatively, you can use the provided `run_workflow.sh` script to execute the pipeline.
 
-Do not use `-c <file>` to specify pipeline parameters, as this will result in errors. Custom config files specified with `-c` must only be used for [tuning process resource specifications](#resource-requests), infrastructural tweaks (such as output directories), or module arguments (args).
+1. **Update the Script:**
 
-## Test Data
+   - Open the `run_workflow.sh` script.
+   - Update the `outDir` and `dataDir` variables with the appropriate paths.
+   - Ensure that the script includes the required parameters (`mmwrFile`, `censusFile_B`, `censusFile_P`, `travel`, `cidt`, `projID`).
 
-A set of test data is included to validate your setup:
+2. **Run the Script:**
 
-- Download the test data from [here](https://github.com/CDCgov/FoodNetTrends/test_data).
+   ```bash
+   bash run_workflow.sh run
+   ```
 
-You can also use the `test` profile to run the pipeline with test data:
-
-```bash
-nextflow run main.nf -profile test,docker
-```
-
-This profile includes links to test data and uses the Docker profile for containerization. It's useful for testing your setup before running the pipeline on your own data.
-
-**Note:** The order of profiles matters; they are loaded in sequence, so later profiles can overwrite earlier profiles.
+   The script will set up the environment and execute the pipeline with the specified parameters.
 
 ## Interpreting Output
 
-After the pipeline completes, you'll find several files and directories in your output folder (`./results` or the specified `--outdir`). These include:
+After the pipeline completes, you'll find several files and directories in your output folder (`--outdir`). These include:
 
-- **Plots and Figures**: Visualizations of the trends and model comparisons.
-- **Summary Statistics**: Tabulated results of the analyses.
+- **SplineResults/**: Contains the results of the spline modeling, including `.Rds` files and plots (`.png` files).
+- **EstIRRCatch_summary.csv**: A summary CSV file combining the estimation results from the spline models.
 - **Logs**: Detailed logs of the pipeline execution for troubleshooting.
 
-The pipeline processes data using the following steps:
+### Output Files and Directories
 
-- **FastQC** - Raw read quality control.
-- **MultiQC** - Aggregates reports and QC metrics from the entire pipeline.
-- **Pipeline Information** - Provides metrics generated during the workflow execution.
+- `SplineResults/`: Directory containing:
 
-### FastQC
+  - `*.Rds`: R data files resulting from the spline modeling.
+  - `*.png`: Plots generated from the modeling.
 
-**Output files:**
+- `EstIRRCatch_summary.csv`: A combined CSV file summarizing the estimation of Incidence Rate Ratios (IRR) by catchment area.
 
-- `fastqc/`
-  - `*_fastqc.html`: FastQC report containing quality metrics.
-  - `*_fastqc.zip`: Zip archive containing the FastQC report, tab-delimited data files, and plot images.
+### Understanding the Results
 
-[FastQC](http://www.bioinformatics.babraham.ac.uk/projects/fastqc/) provides general quality metrics about your sequenced reads. It offers information about the quality score distribution across your reads, per base sequence content (%A/T/G/C), adapter contamination, and overrepresented sequences. For further reading and documentation, see the [FastQC help pages](http://www.bioinformatics.babraham.ac.uk/projects/fastqc/Help/).
-
-![MultiQC - FastQC sequence counts plot](images/mqc_fastqc_counts.png)
-
-![MultiQC - FastQC mean quality scores plot](images/mqc_fastqc_quality.png)
-
-![MultiQC - FastQC adapter content plot](images/mqc_fastqc_adapter.png)
-
-> **Note:** The FastQC plots displayed in the MultiQC report show _untrimmed_ reads. They may contain adapter sequences and potentially regions with low quality.
-
-### MultiQC
-
-**Output files:**
-
-- `multiqc/`
-  - `multiqc_report.html`: A standalone HTML file that can be viewed in your web browser.
-  - `multiqc_data/`: Directory containing parsed statistics from the different tools used in the pipeline.
-  - `multiqc_plots/`: Directory containing static images from the report in various formats.
-
-[MultiQC](http://multiqc.info) is a visualization tool that generates a single HTML report summarizing all samples in your project. Most of the pipeline QC results are visualized in the report, and further statistics are available in the report data directory.
-
-Results generated by MultiQC collate pipeline QC from supported tools, such as FastQC. The pipeline includes steps to report software versions in the MultiQC output for future traceability. For more information about how to use MultiQC reports, see the [MultiQC documentation](http://multiqc.info).
-
-### Pipeline Information
-
-**Output files:**
-
-- `pipeline_info/`
-  - Reports generated by Nextflow: `execution_report.html`, `execution_timeline.html`, `execution_trace.txt`, and `pipeline_dag.dot`/`pipeline_dag.svg`.
-  - Reports generated by the pipeline: `pipeline_report.html`, `pipeline_report.txt`, and `software_versions.yml`. The `pipeline_report*` files will only be present if the `--email` or `--email_on_fail` parameters are used when running the pipeline.
-  - Reformatted samplesheet files used as input to the pipeline: `samplesheet.valid.csv`.
-  - Parameters used by the pipeline run: `params.json`.
-
-[Nextflow](https://www.nextflow.io/docs/latest/tracing.html) provides functionality for generating various reports relevant to the execution of the pipeline. These reports help troubleshoot errors and provide information such as launch commands, run times, and resource usage.
+- **Spline Modeling Results**: The `.Rds` files can be loaded into R for further analysis or visualization.
+- **Plots**: The `.png` files provide visual representations of the spline models, trends, and other relevant analyses.
+- **Summary CSV**: `EstIRRCatch_summary.csv` contains aggregated results, which can be opened with any spreadsheet software or analyzed programmatically.
 
 ## Advanced Configuration and Optimization
 
@@ -218,101 +139,66 @@ Results generated by MultiQC collate pipeline QC from supported tools, such as F
 
 #### `-profile`
 
-Use this parameter to choose a configuration profile. Profiles provide configuration presets for different compute environments.
-
-Several generic profiles are bundled with the pipeline, instructing it to use software packaged using different methods (Docker, Singularity, Podman, Shifter, Charliecloud, Apptainer, Conda).
+Use this parameter to choose a configuration profile. Profiles provide presets for different compute environments.
 
 **Available Profiles:**
 
-- `test`
-  - A profile with a complete configuration for automated testing.
-  - Includes links to test data so needs no other parameters.
-- `docker`
-  - A generic configuration profile to be used with [Docker](https://docker.com/).
-- `singularity`
-  - A generic configuration profile to be used with [Singularity](https://sylabs.io/docs/).
-- `podman`
-  - A generic configuration profile to be used with [Podman](https://podman.io/).
-- `shifter`
-  - A generic configuration profile to be used with [Shifter](https://nersc.gitlab.io/development/shifter/how-to-use/).
-- `charliecloud`
-  - A generic configuration profile to be used with [Charliecloud](https://hpc.github.io/charliecloud/).
-- `apptainer`
-  - A generic configuration profile to be used with [Apptainer](https://apptainer.org/).
-- `conda`
-  - A generic configuration profile to be used with [Conda](https://conda.io/docs/). Please use Conda as a last resort when it's not possible to run the pipeline with other container technologies.
+- `test`: Configuration for automated testing (if test data is available).
+- `docker`: Uses [Docker](https://docker.com/).
+- `singularity`: Uses [Singularity](https://sylabs.io/docs/).
+- `conda`: Uses [Conda](https://conda.io/docs/).
 
 **Note:**
 
-- We highly recommend the use of Docker or Singularity containers for full pipeline reproducibility. However, when this is not possible, Conda is also supported.
-- Multiple profiles can be loaded, for example: `-profile test,docker`. The order of arguments is important as they are loaded in sequence; later profiles can overwrite earlier profiles.
-- If `-profile` is not specified, the pipeline will run locally and expect all software to be installed and available on the `PATH`. This is **not** recommended, as it can lead to different results on different machines depending on the computing environment.
+- We recommend using Docker or Singularity for reproducibility.
+- Multiple profiles can be loaded, e.g., `-profile singularity,conda`.
+- If `-profile` is not specified, the pipeline runs locally, which is **not** recommended.
 
 #### `-resume`
 
-Use this option when restarting a pipeline. Nextflow will use cached results from any pipeline steps where the inputs are the same, continuing from where it left off previously. For inputs to be considered the same, not only the names must be identical but the files' contents as well. For more information about this parameter, see [this blog post](https://www.nextflow.io/blog/2019/demystifying-nextflow-resume.html).
-
-You can also supply a run name to resume a specific run:
+Resume a previous pipeline run:
 
 ```bash
-nextflow run main.nf -resume [run-name]
+nextflow run main.nf -resume
 ```
-
-Use the `nextflow log` command to show previous run names.
 
 #### `-c`
 
-Specify the path to a specific config file (this is a core Nextflow command). See the [nf-core website documentation](https://nf-co.re/usage/configuration) for more information.
+Specify a custom Nextflow config file (for resource specifications or infrastructural tweaks):
 
-**Warning:** Do not use `-c <file>` to specify pipeline parameters, as this will result in errors. Custom config files specified with `-c` must only be used for tuning process resource specifications, infrastructural tweaks (such as output directories), or module arguments (args).
+```bash
+nextflow run main.nf -c /path/to/custom.config
+```
+
+**Warning:** Do not use `-c <file>` to specify pipeline parameters. Use it only for resource configurations.
 
 ### Custom Configuration
 
 #### Resource Requests
 
-You may want to customize the compute resources that the pipeline requests. Each step in the pipeline has default requirements for the number of CPUs, memory, and time. For most steps, if the job exits with any of the error codes specified [here](https://github.com/nf-core/rnaseq/blob/master/conf/base.config#L18), it will automatically be resubmitted with higher requests (twice the original, then three times). If it still fails after the third attempt, the pipeline execution stops.
-
-To change the resource requests, please see the [max resources](https://nf-co.re/docs/usage/configuration#max-resources) and [tuning workflow resources](https://nf-co.re/docs/usage/configuration#tuning-workflow-resources) sections of the nf-core website.
+Customize compute resources by adjusting the Nextflow configuration. See the [Nextflow documentation](https://www.nextflow.io/docs/latest/config.html) for details.
 
 #### Custom Containers
 
-In some cases, you may wish to change which container or Conda environment a step of the pipeline uses for a particular tool. By default, nf-core pipelines use containers and software from the [BioContainers](https://biocontainers.pro/) or [Bioconda](https://bioconda.github.io/) projects. However, the pipeline-specified version may be out of date.
-
-To use a different container from the default or a different Conda environment specified in a pipeline, please see the [updating tool versions](https://nf-co.re/docs/usage/configuration#updating-tool-versions) section of the nf-core website.
+To use different containers or Conda environments for specific tools, adjust the profiles or configuration files accordingly.
 
 #### Custom Tool Arguments
 
-A pipeline might not always support every possible argument or option of a particular tool used in the pipeline. Fortunately, nf-core pipelines provide flexibility for users to insert additional parameters that the pipeline does not include by default.
-
-To learn how to provide additional arguments to a particular tool in the pipeline, please see the [customizing tool arguments](https://nf-co.re/docs/usage/configuration#customising-tool-arguments) section of the nf-core website.
-
-#### nf-core/configs
-
-If you and others within your organization are likely to run nf-core pipelines regularly and need to use the same settings, consider requesting that your custom config file be uploaded to the `nf-core/configs` Git repository.
-
-See the main [Nextflow documentation](https://www.nextflow.io/docs/latest/config.html) for more information about creating your own configuration files.
-
-If you have any questions or issues, please send a message on [Slack](https://nf-co.re/join/slack) in the [`#configs` channel](https://nfcore.slack.com/channels/configs).
-
-### Azure Resource Requests
-
-To be used with the `azurebatch` profile by specifying the `-profile azurebatch`.
-
-We recommend providing a compute `params.vm_type` of `Standard_D16_v3` VMs by default, but these options can be changed if required.
-
-Note that the choice of VM size depends on your quota and the overall workload during the analysis. For a thorough list, please refer to the [Azure Sizes for virtual machines in Azure](https://docs.microsoft.com/en-us/azure/virtual-machines/sizes).
+If you need to provide additional arguments to the R scripts or other tools within the pipeline, you may need to modify the pipeline scripts (`main.nf`, `spline.nf`, `trendy.nf`) accordingly.
 
 ### Running in the Background
 
-Nextflow handles job submissions and supervises the running jobs. The Nextflow process must run until the pipeline is finished.
+Run Nextflow in the background:
 
-The Nextflow `-bg` flag launches Nextflow in the background, detached from your terminal so that the workflow does not stop if you log out of your session. The logs are saved to a file.
+```bash
+nextflow run main.nf ... -bg
+```
 
-Alternatively, you can use `screen`, `tmux`, or similar tools to create a detached session that you can log back into later. Some HPC setups also allow you to run Nextflow within a cluster job submitted to your job scheduler (from where it submits more jobs).
+Alternatively, use `screen`, `tmux`, or submit Nextflow as a job to your scheduler.
 
 ### Nextflow Memory Requirements
 
-In some cases, the Nextflow Java virtual machine can start to request a large amount of memory. It's recommended to add the following line to your environment to limit this (typically in `~/.bashrc` or `~/.bash_profile`):
+Limit Nextflow's Java virtual machine memory usage by adding to your environment:
 
 ```bash
 export NXF_OPTS='-Xms1g -Xmx4g'
