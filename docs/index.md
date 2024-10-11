@@ -9,4 +9,8 @@ Key improvements include:
 - Including site-specific trends.
 - Improved ability to handle uncertainty and noisy data.
 
-[Read more](https://github.com/CDCgov/FoodNetTrends)
+[User Guide](user_guide.md)
+
+[FAQ](faq.md)
+
+[Github](https://github.com/CDCgov/FoodNetTrends)
