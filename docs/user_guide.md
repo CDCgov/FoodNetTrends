@@ -23,7 +23,7 @@ We highly recommend the use of Docker or Singularity containers for full pipelin
 
 ## Preparing Files
 
-Data preparation is crucial for accurate modeling. The FoodNetTrends is designed for the following:
+Data preparation is crucial for accurate modeling. FoodNetTrends is designed for the following:
 
 - **Site-level data aggregated annually**.
 - Data formatted for Bayesian analysis using the `brms` package.
