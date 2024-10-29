@@ -182,52 +182,59 @@ bact$yearn<-as.numeric(as.character(bact$year))
 bact$year<-as.factor(bact$year)
 bact<-split(bact, bact$pathogen)
 target<-unique(bact$pathogen)
+library(parallel)
+library(doParallel)
 
-# Run model
-##############################################################
-# TODO: source code line #224 filters pathogen, but this is blocked out
-# after the split above (#182) the obj is split into three
-# FLEXNERI, Missing, SONNEI
-# unclear which is to be analyzed? for demo only analyzed FLEXNERI
-print("--RUN MODEL")
-proposed=PROPOSED_BM(bact$FLEXNERI)
-saveFile=paste0(outBase,"brm.Rds")
-saveRDS(brm,saveFile)
+# Set up parallel backend
+num_cores <- detectCores() - 1  # Use all but one core for parallel execution
+cl <- makeCluster(num_cores)
+registerDoParallel(cl)
 
-# Draw untransformed (link-level) predictionsusing
-# add_linpred (aka add_fitted_draws) and transform them
-# generates a distribution of estimates for each site
+# Run model in parallel for each pathogen in the list
+print("--RUN MODELS IN PARALLEL")
+results <- foreach(pathogen_name = names(bact), .combine = 'c', .packages = c('brms', 'dplyr')) %dopar% {
+  cat(paste0("Running model for pathogen: ", pathogen_name, "\n"))
+  proposed <- PROPOSED_BM(bact[[pathogen_name]])
+  saveFile <- paste0(outBase, pathogen_name, "_brm.Rds")
+  saveRDS(proposed, saveFile)
+  return(proposed)
+}
+
+# Stop the cluster after processing
+stopCluster(cl)
+
+# Draw untransformed (link-level) predictions using add_linpred (aka add_fitted_draws) and transform them
+# Generates a distribution of estimates for each site
 ##################################################
 print("--RUN POST LINPRED")
-posteriorLinpred<-LINPREAD_DRAW_FN(data=(proposed$data %>%
-                                           group_by(state)),
-                                   model=proposed)
+posteriorLinpred <- LINPREAD_DRAW_FN(data = (results[["FLEXNERI"]]$data %>% group_by(state)),
+                                     model = results[["FLEXNERI"]])
 
 # Catchment
 ##############################################################
 # catchment-level estimates
-col_list = c("CA", "CO", "CT", "GA", "MD",
+col_list <- c("CA", "CO", "CT", "GA", "MD",
              "MN", "NM", "NY", "OR", "TN")
 
 # Convert these draws from site-level to catchment-level estimates
 print("--RUN CATCHMENT")
-catch<-CATCHMENT(posteriorLinpred)
+catch <- CATCHMENT(posteriorLinpred)
 
 # Credibility intervals
 ##############################################################
 # Convert these draws to catchment level estimates, including equal-tailed credibility interval
 print("--RUN LINPRED_TO_CATCHIR")
-catchir.linpred<-LINPRED_TO_CATCHIR(catch)
+catchir.linpred <- LINPRED_TO_CATCHIR(catch)
 
 # redefine meta
-catchir.linpred$pathogen<-target
-catchir.linpred$travel<-travelLabel
-catchir.linpred$culture<-culture
+catchir.linpred$pathogen <- target
+catchir.linpred$travel <- travelLabel
+catchir.linpred$culture <- culture
 
 # save estimates
-saveFile=paste0(outBase,"IRCatch.csv")
-write.table(catchir.linpred%>%select(-c(.value_LL, .value_UL)),
-            saveFile, append = TRUE, quote = TRUE, sep =",",
+saveFile <- paste0(outBase, "IRCatch.csv")
+write.table(catchir.linpred %>% select(-c(.value_LL, .value_UL)),
+            saveFile, append = TRUE, quote = TRUE, sep = ",",
             qmethod = "double", col.names = TRUE, row.names = TRUE)
 
 # Calculate RR and Percent Change for Each Year Relative to a Baseline
@@ -235,16 +242,19 @@ write.table(catchir.linpred%>%select(-c(.value_LL, .value_UL)),
 print("--RUN EST IRR")
 
 # Calculate for 2016-2018
-IR_COMP(catchir.linpred,2016,2018,"EstIRRCatch_2016_2018.csv")
+IR_COMP(catchir.linpred, 2016, 2018, "EstIRRCatch_2016_2018.csv")
 
 # Calculate for The Most Recent 3 Years
-IR_COMP(catchir.linpred,2020,2022,"EstIRRCatch_2020_2022.csv")
+IR_COMP(catchir.linpred, 2020, 2022, "EstIRRCatch_2020_2022.csv")
 
 # Calculate for the Earliest Three Years of the Finalized Catchment
-IR_COMP(catchir.linpred,2004,2006,"EstIRRCatch_2004_2006.csv")
+IR_COMP(catchir.linpred, 2004, 2006, "EstIRRCatch_2004_2006.csv")
 
 # Calculate for all Years Versus the 2006-2008 Baseline
-IR_COMP(catchir.linpred,2006,2008,"EstIRRCatch_2006_2008.csv")
+IR_COMP(catchir.linpred, 2006, 2008, "EstIRRCatch_2006_2008.csv")
+
+# Calculate for all Years Versus the 2006-2008 Baseline
+IR_COMP(catchir.linpred, 2010, 2012, "EstIRRCatch_2010_2012.csv")
 
 # Calculate for all Years Versus the 2006-2008 Baseline
 IR_COMP(catchir.linpred,2010,2012,"EstIRRCatch_2010_2012.csv")
