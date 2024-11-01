@@ -8,7 +8,7 @@ repo_name: CDCgov/FoodNetTrends
 repo_url: https://github.com/CDCgov/FoodNetTrends
 edit_uri: https://github.com/CDCgov/FoodNetTrends/edit/main/docs/
 nav:
-  - Home: index.md
+  - Background: index.md
   - User Guide: user_guide.md
   - FAQ: faq.md
 theme: readthedocs
@@ -69,9 +69,3 @@ markdown_extensions:
   - pymdownx.tasklist:
       custom_checkbox: true
   - pymdownx.tilde
-
-# Page Tree
-nav:
-  - Background : index.md
-  - User Guide: user_guide.md
-  - FAQ: faq.md
