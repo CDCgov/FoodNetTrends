@@ -218,7 +218,12 @@ export NXF_OPTS='-Xms1g -Xmx4g'
 ---
 ## Credits
 
-The Spline pipeline was largely developed by Samantha Sevilla and OAMD's SciComp Team with support Daniel Weller (CDC/DFWED/EDEB), based on R scripts developed by Daniel Weller (CDC/DFWED/EDEB) with support from Beau Bruce (CDC/DFWED/EDEB) and Erica Billig Rose (CDC/DFWED/EDEB). Detailed contributions can be found in our user-guides. 
+The FoodNet Trends pipeline was largely developed by Samantha Sevilla and OAMD's SciComp Team with support Daniel Weller (CDC/DFWED/EDEB), based on R scripts developed by Daniel Weller (CDC/DFWED/EDEB) with support from Beau Bruce (CDC/DFWED/EDEB) and Erica Billig Rose (CDC/DFWED/EDEB). Detailed contributions can be found in our user-guides. 
+
+- [Sevilla, S.](https://github.com/slsevilla)
+- [Forstedt, J.](https://github.com/jforstedt)
+- [Zhao, L.](https://github.com/)
+- [Weller, D.]()
 
 ## Contributions and Support
 
