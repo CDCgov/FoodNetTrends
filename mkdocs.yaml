@@ -7,6 +7,9 @@ site_description: >-
 repo_name: CDCgov/FoodNetTrends
 repo_url: https://github.com/CDCgov/FoodNetTrends
 edit_uri: https://github.com/CDCgov/FoodNetTrends/edit/main/docs/
+# Copyright
+copyright: Copyright &copy; 2024 CDC SciComp
+
 # Configuration
 theme:
   name: material
@@ -28,6 +31,15 @@ theme:
       toggle:
         icon: material/toggle-switch
         name: Switch to light mode
+
+# Plugins
+plugins:
+  - search
+  - git-revision-date
+  - minify:
+      minify_html: true
+
+
 # Extensions
 markdown_extensions:
   - markdown.extensions.admonition
