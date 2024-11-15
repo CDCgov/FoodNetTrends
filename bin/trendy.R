@@ -208,6 +208,15 @@ stopCluster(cl)
 ##################################################
 print("--RUN POST LINPRED")
 posteriorLinpred <- LINPREAD_DRAW_FN(data = (results[["FLEXNERI"]]$data %>% group_by(state)),
+# Debugging before applying group_by
+print("Data before group_by:")
+if (is.null(data_frame_name)) {
+    stop("Error: Data frame is NULL before applying group_by")
+} else if (nrow(data_frame_name) == 0) {
+    stop("Error: Data frame is empty before applying group_by")
+} else {
+    print(head(data_frame_name))
+}
                                      model = results[["FLEXNERI"]])
 
 # Catchment
