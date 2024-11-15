@@ -1,5 +1,5 @@
 # set up paths, files
-outDir="/scicomp/home-pure/xuz1/projects/ticket/RSpline_test"
+outDir="/scicomp/home-pure/smn9/projects/ticket/RSpline_test"
 dataDir="/scicomp/groups-pure/OID/NCEZID/DFWED/EDEB/foodnet/trends/data/"
 
 # set up modules
@@ -24,7 +24,7 @@ if [[ $flag == "run" ]]; then
 	--censusFile_P "$dataDir/cen9623_para.sas7bdat" \
 	--travel "NO,UNKNOWN,YES" \
 	--cidt "CIDT+,CX+,PARASITIC" \
-	--projID "20240706"
+	--projID "20241114"
 fi
 
 if [[ $flag == "full" ]]; then
@@ -39,5 +39,5 @@ if [[ $flag == "full" ]]; then
 	--censusFile_P "$dataDir/cen9623_para.sas7bdat" \
 	--travel "NO,UNKNOWN,YES" \
 	--cidt "CIDT+,CX+,PARASITIC" \
-	--projID "20240830"
+	--projID "20241114"
 fi
