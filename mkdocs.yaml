@@ -32,13 +32,15 @@ theme:
         icon: material/toggle-switch
         name: Switch to light mode
 
-# Plugins
-plugins:
-  - search
-  - git-revision-date
-  - minify:
-      minify_html: true
-
+# Customization
+extra:
+  social:
+    - icon: fontawesome/solid/users
+      link: https://www.cdc.gov/amd/index.html
+    - icon: fontawesome/brands/github
+      link: https://github.com/CDCgov
+  version:
+    provider: mike
 
 # Extensions
 markdown_extensions:
@@ -76,6 +78,8 @@ markdown_extensions:
   - pymdownx.tasklist:
       custom_checkbox: true
   - pymdownx.tilde
+
+
 # Page Tree
 nav:
   - Background : index.md
