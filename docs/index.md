@@ -8,9 +8,3 @@ Key improvements include:
 - Treating the year as a continuous variable.
 - Including site-specific trends.
 - Improved ability to handle uncertainty and noisy data.
-
-[User Guide](user_guide.md)
-
-[FAQ](faq.md)
-
-[Github](https://github.com/CDCgov/FoodNetTrends)
