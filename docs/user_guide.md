@@ -1,14 +1,3 @@
-# Background
-
-The Foodborne Diseases Active Surveillance Network (FoodNet) monitors illnesses caused by enteric and foodborne pathogens across 10 U.S. sites. FoodNet data is used to track trends in these illnesses and to monitor progress toward federal disease reduction goals.
-
-The original model for analyzing FoodNet data faced limitations, such as sensitivity to single-year aberrations and biases toward more populous sites. To address these issues, this enhanced model (FoodNetTrends) was developed using a Bayesian framework, incorporating thin-plate splines and site-specific interactions.
-
-Key improvements include:
-- Treating the year as a continuous variable.
-- Including site-specific trends.
-- Improved ability to handle uncertainty and noisy data.
-
 # User Guide
 
 ## Table of Contents
@@ -216,21 +205,4 @@ export NXF_OPTS='-Xms1g -Xmx4g'
 ```
 
 ---
-## Credits
-
-The FoodNet Trends pipeline was largely developed by Samantha Sevilla and OAMD's SciComp Team with support Daniel Weller (CDC/DFWED/EDEB), based on R scripts developed by Daniel Weller (CDC/DFWED/EDEB) with support from Beau Bruce (CDC/DFWED/EDEB) and Erica Billig Rose (CDC/DFWED/EDEB). Detailed contributions can be found in our user-guides. 
-
-- [Sevilla, S.](https://github.com/slsevilla)
-- [Forstedt, J.](https://github.com/jforstedt)
-- [Zhao, L.](https://github.com/)
-- [Weller, D.]()
-
-## Contributions and Support
-
-If you would like to contribute to this pipeline, please see the [contributing guidelines](.github/CONTRIBUTING.md).
-
-## Citations
-
-An extensive list of references for the tools used by the pipeline can be found in the [`CITATIONS.md`](CITATIONS.md) file.
-
-This pipeline uses code and infrastructure developed and maintained by the [nf-core](https://nf-co.re) community, reused here under the [MIT license](https://github.com/nf-core/tools/blob/master/LICENSE).
+For additional documentation and support, please refer to the [GitHub repository](https://github.com/CDCgov/FoodNetTrends).
