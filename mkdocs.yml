@@ -80,7 +80,6 @@ markdown_extensions:
       custom_checkbox: true
   - pymdownx.tilde
 
-
 # Page Tree
 nav:
   - Background : index.md
@@ -89,5 +88,5 @@ nav:
     - 2. Preparing Files: user-guide/preparing-files.md
     - 3. Running the Pipeline: user-guide/run.md
     - 4. Expected Output: user-guide/output.md
-    - 5. Adavanced Configuration: user-guide/configure.md
-  - FAQ: faq.md
+    - 5. Advanced Configuration: user-guide/configure.md
+  - FAQ: user-guide/faq.md
