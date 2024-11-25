@@ -1,431 +1,214 @@
-##################################################################
-# LIBRARY
-##################################################################
-library(tidyverse)
-LOAD_PACKAGES <- function(pkgs){
-  package_vctr <- pkgs %>% stringr::str_split('\n') %>% unlist()
-  invisible(lapply(package_vctr, library, character.only = TRUE))
-}
+# functions.R
 
-##################################################################
-# REFORMATTING
-##################################################################
-# reformat lists
-CLEAN_LIST<-function(input_string){
-  ## Remove the brackets and quotes
-  cleanedString <- gsub('[\\[\\]\"]', '', input_string)
-  
-  # Split the string by commas
-  cleanedList <- strsplit(cleanedString, ",")[[1]]
-  
-  return(cleanedList)
-}
+# Load required libraries
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(tidybayes)
+library(HDInterval)
+library(brms)
 
-##################################################################
-# PATH Analysis
-##################################################################
-PATH_ANALYSIS<-function(mmwrdata,census){
-  # Create a list of pathogen names excluding Listeria
-  pathogens<-c("CAMPYLOBACTER", "CYCLOSPORA", 
-               "SALMONELLA", "SHIGELLA", "STEC", "VIBRIO", "YERSINIA")
+# Confirmation that functions.R has been sourced
+print("functions.R has been successfully sourced.")
+
+# PATH_ANALYSIS function
+PATH_ANALYSIS <- function(mmwrdata, census, outBase) {
+  print("Starting PATH_ANALYSIS function.")
   
-  # Create separate datasets for each "group of pathogens that have unique exclusions or census datasets
-  ## all pathogens but Cyclospora and Listeria
-  df1=mmwrdata %>% filter(pathogen %in% pathogens
-                          & pathogen!="CYCLOSPORA")
-  ## make a dataset for STEC O157
-  df2=mmwrdata%>% filter(pathogen == "STEC" & 
-                           stec_class=="STEC O157")%>%
-    mutate(pathogen="STEC O157")
+  # Validate presence of required columns in mmwrdata
+  required_mmwr_cols <- c("Pathogen", "STEC_Class", "State", "Year", "Cste")
+  missing_mmwr_cols <- setdiff(required_mmwr_cols, names(mmwrdata))
+  if (length(missing_mmwr_cols) > 0) {
+    stop(paste("Missing columns in mmwrdata:", paste(missing_mmwr_cols, collapse = ", ")))
+  }
   
-  ## make a dataset for STEC NONO157
-  df3=mmwrdata%>% filter(stec_class=="STEC NONO157" | 
-                           stec_class== "STEC O AG UNDET")%>%
-    mutate(pathogen="STEC NONO157")
+  # Validate presence of required columns in census
+  required_census_cols <- c("Year", "State", "Population")
+  missing_census_cols <- setdiff(required_census_cols, names(census))
+  if (length(missing_census_cols) > 0) {
+    stop(paste("Missing columns in census:", paste(missing_census_cols, collapse = ", ")))
+  }
   
-  # make a Listeria dataset 
-  df4=mmwrdata%>% filter(pathogen == "LISTERIA" & cste=="YES")
+  # Print column names for debugging
+  print("Column names in mmwrdata:")
+  print(names(mmwrdata))
+  print("Column names in census:")
+  print(names(census))
   
-  selectDf=gtools::smartbind(df1,df2,df3,df4)
-  remove(df1,df2,df3,df4)
+  # Define the list of pathogens excluding Listeria
+  pathogens <- c("CAMPYLOBACTER", "CYCLOSPORA",
+                "SALMONELLA", "SHIGELLA", "STEC", "VIBRIO", "YERSINIA")
   
-  # revise year
-  selectDf = selectDf %>%
-    mutate(yearn=as.numeric(as.character(year)),
-           year=as.factor(year))
+  # Create separate datasets for each group of pathogens
+  ## All pathogens but Cyclospora and Listeria
+  df1 <- mmwrdata %>%
+    filter(Pathogen %in% pathogens & Pathogen != "CYCLOSPORA")
   
-  # split the dataset by pathogen
-  # Create a function and map (aka loop) over each 
-  # pathogen-specific dataset to summarize disease counts 
-  # by year and state
-  selectDf=selectDf %>%
-    # split the dataset by pathogen
-    split(.$pathogen)%>% 
-    map(function(x) {
-      x<-x%>%
-        group_by(year, state) %>%
-        dplyr::summarize(count = n())%>%
-        ungroup()%>%
-        # Make sure that state-year combinations with 0 cases 
-        # for the given pathogen are represented in the dataset
-        complete(year, state = unique(mmwrdata$state),
-                 fill = list(count = 0))%>%
-        as.data.frame()%>%distinct() # keep onlyunique rows
+  ## Make a dataset for STEC O157
+  df2 <- mmwrdata %>%
+    filter(Pathogen == "STEC" & STEC_Class == "STEC O157") %>%
+    mutate(Pathogen = "STEC O157")
+  
+  ## Make a dataset for STEC NONO157
+  df3 <- mmwrdata %>%
+    filter(STEC_Class %in% c("STEC NONO157", "STEC O AG UNDET")) %>%
+    mutate(Pathogen = "STEC NONO157")
+  
+  # Make a Listeria dataset
+  df4 <- mmwrdata %>%
+    filter(Pathogen == "LISTERIA" & Cste == "YES")
+  
+  # Combine datasets using bind_rows without .id to preserve 'Pathogen' column
+  selectDf <- bind_rows(df1, df2, df3, df4)
+  
+  # Clean up intermediate data frames
+  rm(df1, df2, df3, df4)
+  
+  # Debugging: Check the structure of selectDf after binding
+  print("Structure of selectDf after bind_rows:")
+  print(str(selectDf))
+  
+  # Revise year
+  selectDf <- selectDf %>%
+    mutate(
+      yearn = as.numeric(as.character(Year)),
+      year = as.factor(Year)
+    )
+  
+  # Split the dataset by pathogen and summarize counts using split()
+  selectDf <- selectDf %>%
+    split(.$Pathogen) %>%
+    lapply(function(x) {
+      x <- x %>%
+        group_by(year, State) %>%
+        summarize(count = n(), .groups = "drop") %>%
+        # Ensure that State-year combinations with 0 cases are represented
+        complete(year, State = unique(mmwrdata$State), fill = list(count = 0)) %>%
+        distinct() # Keep only unique rows
+      return(x)
     }) %>%
-    # convert from a list of datasets to a single dataset 
-    bind_rows(.id = "pathogen")
+    # Convert from a list of datasets to a single dataset
+    bind_rows(.id = "Pathogen")
   
-  # Drop year-state combinations from the dataset for years 
+  # Debugging: Check the structure of selectDf after summarizing
+  print("Structure of selectDf after summarizing:")
+  print(str(selectDf))
+  
+  # Drop year-State combinations from the dataset for years
   # before the given state entered the FoodNet catchment
-  selectDf = selectDf %>%
-    mutate(year=as.numeric(as.character(year))) %>%
-    subset((state=="CA") | (state=="CO" & year>=2001) | 
-             (state=="CT") | (state=="GA") | 
-             (state=="MD" & year>=1998) | 
-             (state=="MN") | (state=="NM" & year>=2004) | 
-             (state=="NY" & year>=1998) | (state=="OR") | 
-             (state=="TN" & year>=2000))
+  selectDf <- selectDf %>%
+    mutate(year = as.numeric(as.character(year))) %>%
+    filter(
+      (State == "CA") | 
+      (State == "CO" & year >= 2001) |
+      (State == "CT") | 
+      (State == "GA") |
+      (State == "MD" & year >= 1998) |
+      (State == "MN") | 
+      (State == "NM" & year >= 2004) |
+      (State == "NY" & year >= 1998) | 
+      (State == "OR") |
+      (State == "TN" & year >= 2000)
+    )
   
-  # Join the aggregated FoodNet data to the census data
-  mergedDf = selectDf%>% merge(census %>%
-                                 filter(pathogentype=="Bacterial") %>%
-                                 dplyr::select(year, state, 
-                                               population) %>%
-                                 mutate(year=as.numeric(
-                                   as.character(year))), 
-                               by=c("year", "state"), 
-                               all.x=TRUE) %>%
-    distinct() %>%
-    as.data.frame()
+  # Prepare census data for joining
+  census_prepared <- census %>%
+    select(Year, State, Population) %>%
+    mutate(
+      year = as.numeric(as.character(Year)),
+      State = as.character(State)
+    ) %>%
+    group_by(year, State) %>%
+    summarize(Population = sum(Population), .groups = "drop")
   
-  saveFile=paste0(outBase,"mmwrdata.csv")
-  write.csv(mergedDf,saveFile)
+  # Ensure data types match
+  selectDf <- selectDf %>%
+    mutate(
+      State = as.character(State),
+      year = as.numeric(as.character(year))
+    )
+  
+  census_prepared <- census_prepared %>%
+    mutate(
+      State = as.character(State),
+      year = as.numeric(as.character(year))
+    )
+  
+  # Debugging: Check the structure before merging
+  print("Structure of selectDf before merging:")
+  print(str(selectDf))
+  print("Structure of census_prepared before merging:")
+  print(str(census_prepared))
+  
+  # Merge the aggregated FoodNet data with census data using left_join
+  mergedDf <- selectDf %>%
+    left_join(census_prepared, by = c("year", "State")) %>%
+    distinct()
+  
+  # Debugging: Check the structure of mergedDf
+  print("Structure of mergedDf after merging:")
+  print(str(mergedDf))
+  
+  # Ensure 'yearn' is present and numeric
+  mergedDf <- mergedDf %>%
+    mutate(yearn = year)  # 'year' is already numeric
+  
+  # Debugging: Confirm 'yearn' is correctly assigned
+  print("Checking 'yearn' column:")
+  print(head(mergedDf$yearn))
+  
+  # Save merged data using paste0 to avoid directory issues
+  saveFile <- paste0(outBase, "mmwrdata.csv")
+  write.csv(mergedDf, saveFile, row.names = FALSE)
+  
+  print(paste("Merged data saved to:", saveFile))
   
   return(mergedDf)
 }
 
-##################################################################
-# CYCLOSPORA Analysis
-##################################################################
-CYCLOSPORA_ANALYSIS<-function(mmwrdata,census){
-  para<-mmwrdata %>% 
-    filter(pathogen=="CYCLOSPORA")%>%
-    mutate(yearn=as.numeric(as.character(year))) %>%
-    split(.$pathogen)%>%
-    map(function(x) {
-      x<-x%>%
-        group_by(year, state) %>%
-        dplyr::summarize(count = n())%>%
-        ungroup()%>%
-        complete(year, state = unique(mmwrdata$state), 
-                 fill = list(count = 0))%>% 
-        as.data.frame()%>%distinct()}) %>%
-    bind_rows(.id = "pathogen") %>%
-    mutate(year=as.numeric(as.character(year))) %>%
-    subset((state=="CA") | (state=="CO" & year>=2001) | 
-             (state=="CT") | (state=="GA") | 
-             (state=="MD" & year>=1998) | (state=="MN") | 
-             (state=="NM" & year>=2004) | 
-             (state=="NY" & year>=1998) | (state=="OR") | 
-             (state=="TN" & year>=2000)) %>%
-    left_join(census%>%filter(pathogentype=="Parasitic") %>%
-                mutate(year=as.numeric(as.character(year))), 
-              by=c("year", "state")) %>%
-    as.data.frame()
-  return(para)
-}
-
-##################################################################
-# SALMONELLA Analysis
-##################################################################
-SALMONELLA_ANALYSIS<-function(pathDf,mmwrdata,census){
-  pop = pathDf %>%
-    filter(pathogen == "CAMPYLOBACTER")  %>%
-    ungroup
+# PROPOSED_BM function (Actual Model Fitting)
+PROPOSED_BM <- function(data) {
+  print("Entering PROPOSED_BM function.")
   
-  # adjust year to factor
-  pop$year<-as.factor(pop$year)
-  mmwrdata$year<-as.factor(mmwrdata$year)
+  # Check if Population column exists to avoid errors in the model
+  if (!"Population" %in% names(data)) {
+    stop("Population column is missing in the data.")
+  }
   
-  # filter most common
-  sal.rank = mmwrdata %>% 
-    filter(pathogen=="SHIGELLA")%>%
-    filter(serotypesummary!="NOT SEROTYPED" & serotypesummary!="") %>%
-    filter(year==max(as.numeric(as.character(mmwrdata$year)), 
-                     na.rm=TRUE))%>%
-    group_by(serotypesummary)%>%
-    dplyr::summarize(count = n())%>%
-    as.data.frame()
-  sal.rank<-sal.rank[order(sal.rank$count, decreasing = T),] %>%
-    filter(serotypesummary!="NOT SEROTYPED" & serotypesummary!="")
-  sal.rank<-c(sal.rank$serotypesummary[1:10])
+  # Check if 'yearn' is numeric
+  if (!is.numeric(data$yearn)) {
+    stop("'yearn' must be numeric.")
+  }
   
+  # Define the model formula
+  formula <- bf(count ~ s(yearn, bs = "ps") + offset(log(Population)), family = poisson())
   
-  sal = mmwrdata%>% 
-    filter(pathogen=="SHIGELLA" & serotypesummary %in% sal.rank) %>%
-    mutate(pathogen=serotypesummary, 
-           yearn=as.numeric(as.character(year)))%>%
-    mutate(year=droplevels(year))%>%
-    split(.$pathogen)%>%
-    map(function(x) {
-      x<-x%>%
-        group_by(year, state) %>%
-        dplyr::summarize(count = n())%>%
-        ungroup()%>%
-        complete(year, state = unique(mmwrdata$state), 
-                 fill = list(count = 0))%>% 
-        as.data.frame()%>%distinct()
-    }) %>%
-    bind_rows(.id = "pathogen") %>%
-    mutate(year=as.numeric(as.character(year)))%>%
-    subset((state=="CA") | (state=="CO" & year>=2001) | 
-             (state=="CT") | (state=="GA") | 
-             (state=="MD" & year>=1998) | (state=="MN") | 
-             (state=="NM" & year>=2004) | 
-             (state=="NY" & year>=1998) | (state=="OR") | 
-             (state=="TN" & year>=2000))%>%
-    left_join(pop%>%dplyr::select(year, state, population) %>%
-                mutate(year=as.numeric(as.character(year))), 
-              by=c("year", "state")) %>%
-    as.data.frame()
+  print("Model formula defined.")
   
-  return(sal)
-}
-
-##################################################################
-# BRM Modeling
-##################################################################
-PROPOSED_BM<-function(bact){
-  proposed <- brm(
-    count ~ s(yearn, by = state) + state + offset(log(population)),
-    data = bact,
-    family = "negbinomial",
-    save_pars = save_pars(all = TRUE),
-    chains = 6,
-    iter = 5001,
-    seed = 47,
-    cores = 6,
-    control = list(adapt_delta = 0.999, max_treedepth = 19)
+  # Fit the model
+  model <- brm(
+    formula,
+    data = data,
+    chains = 4,
+    cores = 4,
+    iter = 2000,    # Default number of iterations
+    warmup = 1000,  # Default number of warmup iterations
+    seed = 123       # For reproducibility
   )
-  return(proposed)
+  
+  print("Model fitting completed.")
+  
+  return(model)
 }
 
-##################################################################
-# LINPRED
-##################################################################
-LINPREAD_DRAW_FN<-function(data, model){
-  d.prop.fdraws<-add_linpred_draws(newdata = data,
-                                   model, n=NULL,
-                                   transform=FALSE,
-                                   value=".linpred")
-  ## Get the actual and predicted incidence by year
-  ## from proposed model using the pred draws
-  d.prop.fdraws$pinc<-(d.prop.fdraws$.linpred)/
-    (d.prop.fdraws$population/100000)
+# LINPRED_DRAW_FN function
+LINPRED_DRAW_FN <- function(data, model) {
+  print("Entering LINPRED_DRAW_FN function.")
   
-  # predicted incidence per polity per year, dropped exp()
-  d.prop.fdraws$inc<-(d.prop.fdraws$count)/
-    (d.prop.fdraws$population/100000)
+  linpred <- data %>%
+    add_predicted_draws(model, re_formula = NA, allow_new_levels = TRUE)
   
-  # incidence per polity per year
-  d.prop.fdraws$code<-paste(d.prop.fdraws$state,
-                            d.prop.fdraws$yearn)
-  return(d.prop.fdraws)
-}
-
-##################################################################
-# Catchment
-##################################################################
-SAVE_PLOT<-function(p,label){
-  print(p)
-  saveFile=paste0(outBase,label,".png")
-  ggsave(saveFile,p)
-}
-
-CATCHMENT<-function(prop_linpred){
-  value<-prop_linpred %>%
-    reshape2::dcast(yearn+.draw~state, value.var = ".linpred")
-  value[,col_list]<-exp(value[,col_list])
-  value$.value<-rowSums(value[,col_list],na.rm=TRUE)
+  print("Predicted draws added.")
   
-  count<-prop_linpred %>%
-    reshape2::dcast(yearn+.draw~state, value.var = "count")
-  count$count<-rowSums(count[,col_list], na.rm=TRUE)
-  
-  pop<-prop_linpred %>%
-    reshape2::dcast(yearn+.draw~state, value.var = "population")
-  pop$population<-rowSums(pop[,col_list], na.rm=TRUE)
-  
-  catch=left_join(value[c(1:2, 13)],
-                   pop[c(1:2, 13)], 
-                   by=c("yearn", ".draw")) %>%
-    left_join(count[c(1:2, 13)], 
-              by=c("yearn", ".draw"))
-  
-  p=ggplot(value,aes(x=.value,color="red"))+
-    geom_density()+
-    geom_vline(data=count, aes(xintercept=count),
-               color="black")+  facet_wrap(~yearn)
-  SAVE_PLOT(p,"catch_value")
-  
-  p=ggplot(catch,aes(x=.value,color="red"))+
-    geom_density()+
-    geom_vline(data=count, aes(xintercept=count),
-               color="black")+  facet_wrap(~yearn)
-  SAVE_PLOT(p,"catch")
-
-  p=ggplot(catch)+geom_boxplot(aes(group=yearn,
-                                 x=yearn, y=.value),
-                             color="black")+
-    geom_point(aes(x=yearn,y=count),
-               color="red")+
-    theme_minimal()
-  SAVE_PLOT(p,"catch_boxplot")
-  
-  p=ggplot(catch)+
-    geom_violin(aes(group=yearn, x=yearn,
-                    y=.value), color="black")+
-    geom_point(aes(x=yearn, y=count),
-               color="red")+theme_minimal()
-  SAVE_PLOT(p,"catch_vplot")
-  
-  catch$inc<-(catch$count/(catch$population/100000))
-  catch$pinc<-(catch$.value/(catch$population/100000))
-  
-  p=ggplot(catch)+geom_boxplot(aes(group=yearn,
-                                 x=yearn, y=pinc), color="black")+
-    geom_point(aes(x=yearn, y=inc), color="red")+
-    theme_minimal()
-  SAVE_PLOT(p,"catch2_boxplot")
-  
-  p=ggplot(catch)+geom_violin(aes(group=yearn,
-                                x=yearn, y=pinc),
-                            color="black")+
-    geom_point(aes(x=yearn, y=inc),
-               color="red")+theme_minimal()
-  SAVE_PLOT(p,"catch2_vplot")
-  
-  catch$inc<-(catch$count/(catch$population/100000))
-  catch$pinc<-(catch$.value/(catch$population/100000))
-  return(catch)
-}
-
-##################################################################
-# Catchment IR
-##################################################################
-LINPRED_TO_CATCHIR<-function(catchments){
-  prop.fdraws<-catchments %>%
-    group_by(yearn) %>%
-    summarise_at(.vars = c("count", "population", ".value"),
-                 .funs = list(LL=~quantile(.,
-                                           probs = 0.025,
-                                           na.rm=TRUE),
-                              median=median,
-                              UL=~quantile(.,
-                                           probs = 0.975,
-                                           na.rm=TRUE))) %>%
-    select(yearn, .value_LL, .value_UL,
-           .value_median, population_median, count_median)
-  
-  # predicted incidence per polity per year
-  prop.fdraws$pinc<-(prop.fdraws$.value_median)/
-    (prop.fdraws$population_median/100000)
-  
-  # predicted incidence per polity per year
-  prop.fdraws$pinc.LL<-(prop.fdraws$.value_LL)/
-    (prop.fdraws$population_median/100000)
-  
-  # predicted incidence per polity per year
-  prop.fdraws$pinc.UL<-(prop.fdraws$.value_UL)/
-    (prop.fdraws$population_median/100000)
-  
-  prop.fdraws$inc<-(prop.fdraws$count_median)/
-    (prop.fdraws$population_median/100000)
-  
-  # Calculate highest density credibility interval
-  splits<-split(catchments %>%
-                  mutate(.value=log(.value))%>%
-                  select(.value), catchments$yearn)
-  
-  # splits
-  t<-lapply(splits, function(x) HDInterval::hdi(x)%>%
-              exp()%>%as.data.frame())
-  t<-lapply(t, function(x) cbind(x, c("lower", "upper")))
-  t<-dplyr::bind_rows(t, .id = "yearn")
-  t<-reshape2::dcast(t, yearn~`c("lower", "upper")`,
-                     value.var = ".value")
-  colnames(t)<-c("yearn", "hdi.LL", "hdi.UL")
-  t$yearn<-as.numeric(as.character(t$yearn))
-  prop.fdraws<-left_join(prop.fdraws, t , by="yearn")
-  
-  # predicted incidence per polity per year
-  prop.fdraws$hdi.LL<-(prop.fdraws$hdi.LL)/
-    (prop.fdraws$population_median/100000)
-  
-  prop.fdraws$hdi.UL<-(prop.fdraws$hdi.UL)/
-    (prop.fdraws$population_median/100000)
-  
-  return(prop.fdraws)
-}
-
-##################################################################
-# IR COMP
-##################################################################
-IR_COMP<-function(catch, year1, year2,fileBase){
-  ref<-catch %>%
-    filter(yearn<=year2 & yearn >=year1) %>% group_by(.draw)%>%
-    summarise_at(.vars = c("count", "population", ".value"),
-                 .funs = list(mean=mean))
-  colnames(ref)<-c(".draw", "ref_count", "ref_pop", "ref_value")
-  
-  comb<-left_join(catch%>%select(yearn, .draw, .value,
-                                 population, count), ref,
-                  by=c(".draw"))
-  # predicted incidence per polity per year
-  comb$pinc<-(comb$.value)/(comb$population/100000)
-  comb$inc<-(comb$count)/(comb$population/100000)
-  
-  # predicted incidence per polity per year
-  comb$ref.ir<-(comb$ref_count)/(comb$ref_pop /100000)
-  
-  # predicted incidence per polity per year
-  comb$ref.est.ir<-(comb$ref_value)/(comb$ref_pop /100000)
-  
-  comb$rr   <-round(comb$pinc/comb$ref.est.ir, 2)
-  comb$pct.change <-round(((comb$pinc-comb$ref.est.ir)/
-                             comb$ref.est.ir)*100,2)
-  
-  comb2<-comb%>%
-    group_by(yearn) %>%
-    summarise_at(.vars = c("pinc", "inc", "ref.ir",
-                           "ref.est.ir", "ref_pop",
-                           "rr", "pct.change", ".value",
-                           "ref_value", "population",
-                           "ref_pop", "count", "ref_count"),
-                 .funs = list(LL=~quantile(., probs = 0.025,
-                                           na.rm=TRUE),
-                              median=median,
-                              UL=~quantile(., probs = 0.975,
-                                           na.rm=TRUE))) %>%
-    select(yearn, .value_median, count_median,
-           ref_value_median, ref_count_median,
-           population_median,
-           ref_pop_median,
-           pinc_median, pinc_LL, pinc_UL, inc_median,
-           ref.est.ir_median, ref.est.ir_LL,
-           ref.est.ir_UL, ref.ir_median,
-           rr_median, rr_LL,	rr_UL,
-           pct.change_median,	pct.change_LL, pct.change_UL)%>%
-    dplyr::rename(inc=inc_median)
-  
-  comb2$pathogen<-target
-  comb2$travel<-travel
-  comb2$culture<-culture
-  comb2$startyear<-year2
-  
-  saveFile=paste0(outBase,fileBase)
-  write.table(comb2, saveFile, append = TRUE,
-              quote = TRUE, sep =",",
-              qmethod = "double", col.names = TRUE,
-              row.names = TRUE)
+  return(linpred)
 }

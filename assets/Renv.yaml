@@ -6,14 +6,15 @@ channels:
 dependencies:
   - r-base
   - r-argparse
-  - r-tidyverse
-  - r-dplyr
   - r-haven
-  - r-gtools
   - r-brms
-  - r-reshape2
   - r-ggplot2
   - r-tidybayes
-  - r-HDInterval
+  - r-hdinterval
   - r-doparallel
+  - r-foreach
+  - r-gtools
+  - r-dplyr
+  - r-tidyr
   - r-bh
+

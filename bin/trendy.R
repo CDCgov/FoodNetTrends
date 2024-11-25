@@ -1,269 +1,189 @@
 #!/usr/bin/env Rscript
-suppressPackageStartupMessages(library("argparse"))
-source("functions.R")
-options(warn = -1)
 
-##############################################################
-# Setup
-##############################################################
-# create parser object
+# trendy.R
+
+# Load required libraries
+library(argparse)
+library(dplyr)
+library(haven)
+library(brms)
+library(ggplot2)
+library(tidybayes)
+library(HDInterval)
+# library(doParallel)      # Commented out
+# library(foreach)         # Commented out
+library(gtools)
+library(parallel)
+
+# Set options(width) to prevent errors related to text wrapping
+options(width = 80)
+print(paste("Option width is set to:", getOption("width")))
+
+# Argument parser setup
 parser <- ArgumentParser()
-parser$add_argument("--debug", type="logical", 
-                    default=TRUE)
-parser$add_argument("--mmwrFile", type="character", 
-                    help="foodnet mmwr SASS data")
-parser$add_argument("--censusFile_B", type="character", 
-                    help="census file for bacterial data")
-parser$add_argument("--censusFile_P", type="character", 
-                    help="census file for parasitic data")
-parser$add_argument("--travel", type="character", 
-                    help="list for travel types IE NO,UNKNOWN")
-parser$add_argument("--cidt", type="character", 
-                    help="cidt IE CIDT+,CX+,PARASITIC")
-parser$add_argument("--projID", type="character", 
-                    help="variable to name the project")
+
+parser$add_argument("--mmwrFile", type = "character", help = "MMWR data file")
+parser$add_argument("--censusFile_B", type = "character", help = "Bacterial census data file")
+parser$add_argument("--censusFile_P", type = "character", help = "Parasitic census data file")
+parser$add_argument("--travel", type = "character", help = "Travel types (e.g., NO,UNKNOWN)")
+parser$add_argument("--cidt", type = "character", help = "CIDT types (e.g., CIDT+,CX+,PARASITIC)")
+parser$add_argument("--projID", type = "character", help = "Project ID")
+parser$add_argument("--whichFunctions", type = "character", help = "Path to functions.R")
+parser$add_argument("--debug", action = "store_true", default = FALSE, help = "Debug mode")
+
 args <- parser$parse_args()
 
-# set up args
-if (args$debug == FALSE){
-  # read in args
-  mmwrFile=args$mmwrFile
-  censusFile_B=args$censusFile_B
-  censusFile_P=args$censusFile_P
-  projID=args$projID
-  
-  # reformat list
-  travel=CLEAN_LIST(args$travel)
-  cidt=CLEAN_LIST(args$cidt)
-  
-  # set outputDir
-  outDir="SplineResults"
-  
-} else{
-  # file args
-  mmwrFile="/scicomp/groups-pure/OID/NCEZID/DFWED/EDEB/foodnet/trends/data/mmwr9623_Jan2024.sas7bdat"
-  censusFile_B="/scicomp/groups-pure/OID/NCEZID/DFWED/EDEB/foodnet/trends/data/cen9623.sas7bdat"
-  censusFile_P="/scicomp/groups-pure/OID/NCEZID/DFWED/EDEB/foodnet/trends/data/cen9623_para.sas7bdat"
-  projID="20240705"
-  
-  #reformat list
-  travel=c("NO,UNKNOWN,YES")
-  cidt=c("CIDT+,CX+,PARASITIC")
-  travel=CLEAN_LIST(travel)
-  cidt=CLEAN_LIST(cidt)
-  
-  # set outdir
-  outDir="~/projects/ticket/Rspline_test"
+# Source functions.R from the provided path
+source(args$whichFunctions)
+
+# Define outBase based on projID
+outBase <- paste0("SplineResults/", args$projID, "_")
+dir.create("SplineResults", showWarnings = FALSE)
+
+# Load data using the PATH_ANALYSIS function
+print("Loading MMWR data...")
+mmwrdata <- read_sas(args$mmwrFile)
+print("Loading Bacterial census data...")
+census_B <- read_sas(args$censusFile_B)
+print("Loading Parasitic census data...")
+census_P <- read_sas(args$censusFile_P)
+
+# Combine bacterial and parasitic census data
+print("Combining census data...")
+census <- bind_rows(census_B, census_P)
+
+# Perform path analysis
+print("Performing PATH_ANALYSIS...")
+pathDf <- PATH_ANALYSIS(mmwrdata, census, outBase)
+
+# Debugging: Check columns in pathDf
+print("Columns in pathDf:")
+print(names(pathDf))
+
+# Prepare data for modeling
+print("Preparing data for modeling...")
+bact <- pathDf %>%
+  filter(Pathogen %in% c("CAMPYLOBACTER", "SALMONELLA", "SHIGELLA", 
+                         "STEC", "VIBRIO", "YERSINIA", "STEC O157", "STEC NONO157")) %>%
+  group_by(Pathogen) %>%
+  split(.$Pathogen)  # Replaced group_split and setNames with split
+
+para <- pathDf %>%
+  filter(Pathogen == "LISTERIA") %>%
+  group_by(Pathogen) %>%
+  split(.$Pathogen)  # Replaced group_split and setNames with split
+
+# Combine bacterial and parasitic data
+all_data <- c(bact, para)
+
+# Debugging: Check names of all_data
+print("Names of all_data:")
+print(names(all_data))
+
+# ---- Commented Out Parallel Backend Setup ----
+# # Set up parallel backend
+# num_cores <- detectCores() - 1
+# cl <- makeCluster(num_cores)
+# registerDoParallel(cl)
+
+# # Run models in parallel
+# results <- foreach(
+#     pathogen_name = names(all_data),
+#     .combine = 'list',
+#     .multicombine = TRUE,
+#     .final = function(x) setNames(x, names(all_data)),
+#     .packages = c('brms', 'dplyr', 'tidybayes', 'HDInterval', 'tidyr')
+# ) %dopar% {
+#     tryCatch({
+#         # Source functions within the worker node
+#         source(args$whichFunctions)
+#         print(paste("functions.R sourced in worker for pathogen:", pathogen_name))
+        
+#         # Verify that PROPOSED_BM exists
+#         if (!exists("PROPOSED_BM")) {
+#             stop("Function PROPOSED_BM is not available in the worker environment.")
+#         }
+        
+#         # Get the data for the current pathogen
+#         data <- all_data[[pathogen_name]]
+#         if (nrow(data) == 0) {
+#             warning(paste("No data for pathogen:", pathogen_name))
+#             return(NULL)
+#         }
+        
+#         # Fit the model using PROPOSED_BM function
+#         proposed <- PROPOSED_BM(data)
+        
+#         # Save the model
+#         saveFile <- paste0(outBase, pathogen_name, "_brm.Rds")
+#         saveRDS(proposed, saveFile)
+        
+#         return(list(model = proposed, data = data))
+#     }, error = function(e) {
+#         # Capture and display the error
+#         message(paste("Error in pathogen:", pathogen_name))
+#         message(e)
+#         return(NULL)
+#     })
+# }
+
+# # Stop parallel backend
+# stopCluster(cl)
+
+# ---- End of Parallel Backend Setup ----
+
+# ---- Serial Processing Begins Here ----
+print("Starting serial model fitting...")
+
+# Initialize results list
+results <- list()
+
+# Run models serially using a for loop
+for (pathogen_name in names(all_data)) {
+    tryCatch({
+        # Source functions in the main environment
+        source(args$whichFunctions)
+        print(paste("functions.R sourced in main for pathogen:", pathogen_name))
+        
+        # Verify that PROPOSED_BM exists
+        if (!exists("PROPOSED_BM")) {
+            stop("Function PROPOSED_BM is not available in the main environment.")
+        }
+        
+        # Get the data for the current pathogen
+        data <- all_data[[pathogen_name]]
+        if (nrow(data) == 0) {
+            warning(paste("No data for pathogen:", pathogen_name))
+            results[[pathogen_name]] <- NULL
+            next
+        }
+        
+        # Fit the model using PROPOSED_BM function
+        print(paste("Fitting model for pathogen:", pathogen_name))
+        proposed <- PROPOSED_BM(data)
+        
+        # Save the model
+        saveFile <- paste0(outBase, pathogen_name, "_brm.Rds")
+        saveRDS(proposed, saveFile)
+        
+        # Store the result
+        results[[pathogen_name]] <- list(model = proposed, data = data)
+        
+        print(paste("Model fitted and saved for pathogen:", pathogen_name))
+    }, error = function(e) {
+        # Capture and display the error
+        message(paste("Error in pathogen:", pathogen_name))
+        message(e)
+        results[[pathogen_name]] <- NULL
+    })
 }
+# ---- End of Serial Processing ----
 
-# load packages
-pkgs <- c('haven','gtools','brms','ggplot2','tidybayes','HDInterval')
-LOAD_PACKAGES(pkgs)
+# ---- Optional: Save the Results List ----
+saveFileResults <- paste0(outBase, "all_models_results.Rds")
+saveRDS(results, saveFileResults)
+print(paste("All model results saved to:", saveFileResults))
 
-# Create outputDir
-dir.create(outDir)
+# ---- Optional: Generate Session Information ----
+sessionInfo()
 
-##############################################################
-# Main Code
-##############################################################
-
-# Set labels
-##############################################################
-if (("YES" %in% travel) || ("UNKNOWN" %in% travel)) {
-  travelLabel <- "Travel Included"
-} else if (!("YES" %in% travel) & ("UNKNOWN" %in% travel)) {
-  travelLabel <- "Unknown Travel Included"
-} else {
-  travelLabel <- "Excluded"
-}
-culture<-ifelse("CIDT+" %in% cidt, "CxCIDT", "Cx")
-
-# Set outfile base names
-##############################################################
-outBase=paste0(outDir,"/",
-               projID,"_","splinesmodel_",
-               gsub(" ","",travelLabel),"_",
-               paste(culture,collapse=""),"_")
-
-# print variables
-print("--ANALYSIS DETAILS")
-print(paste0("mmwrFile: ", mmwrFile," | ",
-             "censusFile_B: ",censusFile_B," | ",
-             "censusFile_P: ",censusFile_P," | ",
-             "projID: ",projID," | ",
-             "travel: ",paste(travel,collapse = ",")," | ",
-             "cidt: ",paste(cidt,collapse=",")))
-# Input data
-##############################################################
-print("--IMPORTING")
-mmwrdata<-haven::read_sas(mmwrFile)%>%
-  filter(SiteID!="COEX")
-
-# Convert to df
-mmwrdata=as.data.frame(mmwrdata)
-
-# Update SERO list
-seroList=c("NOT SPECIATED","UNKNOWN","PARTIAL SERO",
-           "NOT SERO","")
-mmwrdata$SERO2<-ifelse(mmwrdata$SERO1 %in% seroList, 
-                       "Missing", mmwrdata$SERO1)
-mmwrdata$SERO2<-ifelse(grepl("UNDET",mmwrdata$SERO2), 
-                       "Missing", mmwrdata$SERO2)
-
-# relabel  SERO2 column
-mmwrdata$serotypesummary<-mmwrdata$SERO2
-
-# Update count labels
-mmwrdata<-mmwrdata %>%
-  setNames(tolower(names(.)))%>%
-  # Exclude by detection method and travel status, other exclusions can be added but would require thought
-  filter((cxcidt %in% cidt) & (travelint %in% travel))%>% 
-  # Fix county names
-  filter(!county %in% c("OUT OF STATE", 
-                        "UNKNOWN", "99997")) %>% 
-  mutate(county = if_else(county %in% c("ST. MARYS'S", "ST. MARYS"), "ST. MARY'S",
-                          county)) %>%
-  mutate(county = if_else(county %in% c("PRINCE GEORGES"), "PRINCE GEORGE'S", 
-                          county)) %>%
-  mutate(county = if_else(county %in% c("QUEEN ANNES"), "QUEEN ANNE'S", 
-                          county)) %>%
-  mutate(county = if_else(county %in% c("DE BACA"), "DEBACA", 
-                          county))%>%
-  # Create a new variable called pathogentype since catchment is slightly different for bacterial and parasitic pathogens in some years
-  mutate(pathogentype = ifelse(pathogen %in% c("CRYPTOSPORIDIUM", 
-                                               "CYCLOSPORA"), 
-                               "Parasitic", "Bacterial"))
-
-# Census data
-##############################################################
-## Read in file for bacterial pathogens
-## Read in file for parasitic pathogens
-print("--IMPORTING CENSUS")
-census=haven::read_sas(censusFile_B) %>%
-  setNames(tolower(names(.))) %>%
-  group_by(year, state) %>%
-  dplyr::summarize(population = sum(population, na.rm=TRUE)) %>%
-  mutate(pathogentype = "Bacterial") %>%
-  bind_rows(
-    haven::read_sas(censusFile_P) %>%
-      setNames(tolower(names(.))) %>%
-      group_by(year, state) %>%
-      dplyr::summarize(population = sum(population, na.rm=TRUE)) %>%
-      mutate(pathogentype = "Parasitic")) %>% ungroup
-census=as.data.frame(census)
-
-# Pathogens
-##############################################################
-print("--RUNNING PATH")
-pathDf=PATH_ANALYSIS(mmwrdata,census)
-
-# Cyclospora, Salmonella
-##############################################################
-if("CIDT+" %in% cidt){
-  print("--RUNNING CYCLO")
-  cyloDF=CYCLOSPORA_ANALYSIS(mmwrdata,census)
-  
-  print("--RUNNING SALMONELLA")
-  salDF=SALMONELLA_ANALYSIS(pathDf,mmwrdata,census)
-  
-  bact=gtools::smartbind(pathDf, cyloDF)%>%
-    gtools::smartbind(salDF) 
-} else{
-  bact=pathDf
-}
-
-# Post Process
-##############################################################
-remove(mmwrdata)
-print("--POST PROCESSING")
-bact<-subset(bact, pathogen=="Missing" | 
-               pathogen=="FLEXNERI"| pathogen=="SONNEI")
-bact$yearn<-as.numeric(as.character(bact$year))
-bact$year<-as.factor(bact$year)
-bact<-split(bact, bact$pathogen)
-target<-unique(bact$pathogen)
-library(parallel)
-library(doParallel)
-
-# Set up parallel backend
-num_cores <- detectCores() - 1  # Use all but one core for parallel execution
-cl <- makeCluster(num_cores)
-registerDoParallel(cl)
-
-# Run model in parallel for each pathogen in the list
-print("--RUN MODELS IN PARALLEL")
-results <- foreach(pathogen_name = names(bact), .combine = 'c', .packages = c('brms', 'dplyr')) %dopar% {
-  cat(paste0("Running model for pathogen: ", pathogen_name, "\n"))
-  proposed <- PROPOSED_BM(bact[[pathogen_name]])
-  saveFile <- paste0(outBase, pathogen_name, "_brm.Rds")
-  saveRDS(proposed, saveFile)
-  return(proposed)
-}
-
-# Stop the cluster after processing
-stopCluster(cl)
-
-# Draw untransformed (link-level) predictions using add_linpred (aka add_fitted_draws) and transform them
-# Generates a distribution of estimates for each site
-##################################################
-print("--RUN POST LINPRED")
-posteriorLinpred <- LINPREAD_DRAW_FN(data = (results[["FLEXNERI"]]$data %>% group_by(state)),
-# Debugging before applying group_by
-print("Data before group_by:")
-if (is.null(data_frame_name)) {
-    stop("Error: Data frame is NULL before applying group_by")
-} else if (nrow(data_frame_name) == 0) {
-    stop("Error: Data frame is empty before applying group_by")
-} else {
-    print(head(data_frame_name))
-}
-                                     model = results[["FLEXNERI"]])
-
-# Catchment
-##############################################################
-# catchment-level estimates
-col_list <- c("CA", "CO", "CT", "GA", "MD",
-             "MN", "NM", "NY", "OR", "TN")
-
-# Convert these draws from site-level to catchment-level estimates
-print("--RUN CATCHMENT")
-catch <- CATCHMENT(posteriorLinpred)
-
-# Credibility intervals
-##############################################################
-# Convert these draws to catchment level estimates, including equal-tailed credibility interval
-print("--RUN LINPRED_TO_CATCHIR")
-catchir.linpred <- LINPRED_TO_CATCHIR(catch)
-
-# redefine meta
-catchir.linpred$pathogen <- target
-catchir.linpred$travel <- travelLabel
-catchir.linpred$culture <- culture
-
-# save estimates
-saveFile <- paste0(outBase, "IRCatch.csv")
-write.table(catchir.linpred %>% select(-c(.value_LL, .value_UL)),
-            saveFile, append = TRUE, quote = TRUE, sep = ",",
-            qmethod = "double", col.names = TRUE, row.names = TRUE)
-
-# Calculate RR and Percent Change for Each Year Relative to a Baseline
-##############################################################
-print("--RUN EST IRR")
-
-# Calculate for 2016-2018
-IR_COMP(catchir.linpred, 2016, 2018, "EstIRRCatch_2016_2018.csv")
-
-# Calculate for The Most Recent 3 Years
-IR_COMP(catchir.linpred, 2020, 2022, "EstIRRCatch_2020_2022.csv")
-
-# Calculate for the Earliest Three Years of the Finalized Catchment
-IR_COMP(catchir.linpred, 2004, 2006, "EstIRRCatch_2004_2006.csv")
-
-# Calculate for all Years Versus the 2006-2008 Baseline
-IR_COMP(catchir.linpred, 2006, 2008, "EstIRRCatch_2006_2008.csv")
-
-# Calculate for all Years Versus the 2006-2008 Baseline
-IR_COMP(catchir.linpred, 2010, 2012, "EstIRRCatch_2010_2012.csv")
-
-# Calculate for all Years Versus the 2006-2008 Baseline
-IR_COMP(catchir.linpred,2010,2012,"EstIRRCatch_2010_2012.csv")

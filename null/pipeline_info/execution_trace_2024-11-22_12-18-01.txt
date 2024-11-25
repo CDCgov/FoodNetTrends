@@ -1,0 +1,2 @@
+task_id	hash	native_id	name	status	exit	submit	duration	realtime	%cpu	peak_rss	peak_vmem	rchar	wchar
+1	ab/2d4f48	136435	TRENDY (trendy)	FAILED	1	2024-11-22 12:18:02.370	12.1s	12s	-	-	-	-	-
