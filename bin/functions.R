@@ -1,23 +1,54 @@
 ##################################################################
 # LIBRARY
 ##################################################################
-library(tidyverse)
-LOAD_PACKAGES <- function(pkgs){
+require(tidyverse)
+require(tidybayes)
+LOAD_PACKAGES <- function(pkgs) {
   package_vctr <- pkgs %>% stringr::str_split('\n') %>% unlist()
   invisible(lapply(package_vctr, library, character.only = TRUE))
 }
 
 ##################################################################
+# Helper function for safe file writing
+##################################################################
+SAFE_WRITE <- function(data, file_path) {
+  tryCatch({
+    if (endsWith(file_path, ".csv")) {
+      if (file.exists(file_path)) {
+        # Append without column names
+        write.table(data, file = file_path, append = F, quote = TRUE, sep = ",",
+                    col.names = FALSE, row.names = FALSE)
+      } else {
+        # Write with column names
+        write.table(data, file = file_path, append = FALSE, quote = TRUE, sep = ",",
+                    col.names = TRUE, row.names = FALSE)
+      }
+    } else if (endsWith(file_path, ".Rds")) {
+      saveRDS(data, file = file_path)
+    }
+    message("Successfully wrote file: ", file_path)
+  }, error = function(e) {
+    message("Failed to write file: ", file_path)
+    message("Error: ", e$message)
+  })
+}
+
+CLEANUP_TEMP <- function(temp_dir) {
+  tryCatch({
+    unlink(temp_dir, recursive = TRUE, force = TRUE)
+    message("Temporary directory cleaned: ", temp_dir)
+  }, error = function(e) {
+    message("Failed to clean temporary directory: ", temp_dir)
+    message("Error: ", e$message)
+  })
+}
+
+##################################################################
 # REFORMATTING
 ##################################################################
-# reformat lists
-CLEAN_LIST<-function(input_string){
-  ## Remove the brackets and quotes
+CLEAN_LIST <- function(input_string) {
   cleanedString <- gsub('[\\[\\]\"]', '', input_string)
-  
-  # Split the string by commas
   cleanedList <- strsplit(cleanedString, ",")[[1]]
-  
   return(cleanedList)
 }
 
@@ -192,240 +223,279 @@ SALMONELLA_ANALYSIS<-function(pathDf,mmwrdata,census){
   return(sal)
 }
 
+
 ##################################################################
 # BRM Modeling
 ##################################################################
-PROPOSED_BM<-function(bact){
-  proposed <- brm(
-    count ~ s(yearn, by = state) + state + offset(log(population)),
-    data = bact,
-    family = "negbinomial",
-    save_pars = save_pars(all = TRUE),
-    chains = 6,
-    iter = 5001,
-    seed = 47,
-    cores = 6,
-    control = list(adapt_delta = 0.999, max_treedepth = 19)
-  )
+PROPOSED_BM <- function(bact) {
+  # Define output file for the model
+  output_file <- paste0(outBase, "brm_model.Rds")
+  
+  # Log model configuration
+  cat("Starting BRM model with the following configuration:\n")
+  cat(paste0("  - Chains: ", 4, "\n"))
+  cat(paste0("  - Iterations: ", 101, "\n"))
+  cat(paste0("  - Cores: ", 9, "\n"))
+  cat(paste0("  - Seed: ", 47, "\n"))
+  cat(paste0("  - Adapt Delta: ", 0.999, "\n"))
+  cat(paste0("  - Max Tree Depth: ", 19, "\n"))
+  cat(paste0("  - Output File: ", output_file, "\n"))
+  
+  tryCatch({
+    # Start fitting the model
+    cat("Fitting the BRM model...\n")
+    proposed <- brm(
+      count ~ s(yearn, by = state) + state + offset(log(population)),
+      data = bact,
+      family = "negbinomial",
+      save_pars = save_pars(all = TRUE),
+      chains = 4,
+      iter = 101,
+      cores = 9,
+      seed = 47,
+      control = list(adapt_delta = 0.999, max_treedepth = 19)
+    )
+    
+    # Save the model and log success
+    saveRDS(proposed, output_file)
+    cat("Successfully saved BRM model to: ", output_file, "\n")
+  }, error = function(e) {
+    # Log error if model fitting or saving fails
+    cat("Failed to run or save BRM model: ", output_file, "\n")
+    cat("Error: ", e$message, "\n")
+  })
+  
+  # Return the model object
+  cat("Returning the fitted BRM model.\n")
   return(proposed)
 }
 
 ##################################################################
 # LINPRED
 ##################################################################
-LINPREAD_DRAW_FN<-function(data, model){
-  d.prop.fdraws<-add_linpred_draws(newdata = data,
-                                   model, n=NULL,
-                                   transform=FALSE,
-                                   value=".linpred")
-  ## Get the actual and predicted incidence by year
-  ## from proposed model using the pred draws
-  d.prop.fdraws$pinc<-(d.prop.fdraws$.linpred)/
-    (d.prop.fdraws$population/100000)
+LINPREAD_DRAW_FN <- function(data, model) {
+  # Ensure the model is valid
+  if (!inherits(model, "brmsfit")) {
+    stop("Error: `model` must be a valid `brmsfit` object.")
+  }
   
-  # predicted incidence per polity per year, dropped exp()
-  d.prop.fdraws$inc<-(d.prop.fdraws$count)/
-    (d.prop.fdraws$population/100000)
+  # Generate posterior predictive draws
+  d.prop.fdraws <- add_linpred_draws(
+    object = model,  # Bayesian model
+    newdata = data,  # Data for predictions
+    ndraws = NULL,   # Use all posterior draws
+    transform = FALSE, # Keep predictions on the link scale
+    value = ".linpred" # Column for predicted values
+  )
   
-  # incidence per polity per year
-  d.prop.fdraws$code<-paste(d.prop.fdraws$state,
-                            d.prop.fdraws$yearn)
+  # Ensure .draw column exists
+  if (!".draw" %in% colnames(d.prop.fdraws)) {
+    stop("Error: `.draw` column is missing in posterior draws.")
+  }
+  
+  # Add predicted incidence (pinc) and actual incidence (inc)
+  d.prop.fdraws$pinc <- (d.prop.fdraws$.linpred) / (d.prop.fdraws$population / 100000)
+  d.prop.fdraws$inc <- (d.prop.fdraws$count) / (d.prop.fdraws$population / 100000)
+  
+  # Generate unique identifier for state and year
+  d.prop.fdraws$code <- paste(d.prop.fdraws$state, d.prop.fdraws$yearn)
+  
   return(d.prop.fdraws)
 }
-
 ##################################################################
 # Catchment
 ##################################################################
-SAVE_PLOT<-function(p,label){
-  print(p)
-  saveFile=paste0(outBase,label,".png")
-  ggsave(saveFile,p)
+
+SAVE_PLOT <- function(p, label, pathogen_name) {
+  # Include pathogen name in the file name
+  save_file <- paste0(outBase, pathogen_name, "_", label, ".png")
+  tryCatch({
+    ggsave(save_file, p)
+    message("Successfully saved plot: ", save_file)
+  }, error = function(e) {
+    message("Failed to save plot: ", save_file)
+    message("Error: ", e$message)
+  })
 }
 
-CATCHMENT<-function(prop_linpred){
-  value<-prop_linpred %>%
-    reshape2::dcast(yearn+.draw~state, value.var = ".linpred")
-  value[,col_list]<-exp(value[,col_list])
-  value$.value<-rowSums(value[,col_list],na.rm=TRUE)
+CATCHMENT <- function(prop_linpred) {
+  # Check if .draw exists in the input
+  if (!".draw" %in% colnames(prop_linpred)) {
+    stop("Error: `.draw` column is missing in input to CATCHMENT.")
+  }
   
-  count<-prop_linpred %>%
-    reshape2::dcast(yearn+.draw~state, value.var = "count")
-  count$count<-rowSums(count[,col_list], na.rm=TRUE)
+  # Compute .value
+  value <- prop_linpred %>%
+    reshape2::dcast(yearn + .draw ~ state, value.var = ".linpred") %>%
+    mutate(.value = rowSums(across(-c(yearn, .draw)), na.rm = TRUE))
   
-  pop<-prop_linpred %>%
-    reshape2::dcast(yearn+.draw~state, value.var = "population")
-  pop$population<-rowSums(pop[,col_list], na.rm=TRUE)
+  # Compute count
+  count <- prop_linpred %>%
+    reshape2::dcast(yearn + .draw ~ state, value.var = "count") %>%
+    mutate(count = rowSums(across(-c(yearn, .draw)), na.rm = TRUE))
   
-  catch=left_join(value[c(1:2, 13)],
-                   pop[c(1:2, 13)], 
-                   by=c("yearn", ".draw")) %>%
-    left_join(count[c(1:2, 13)], 
-              by=c("yearn", ".draw"))
+  # Compute population
+  pop <- prop_linpred %>%
+    reshape2::dcast(yearn + .draw ~ state, value.var = "population") %>%
+    mutate(population = rowSums(across(-c(yearn, .draw)), na.rm = TRUE))
   
-  p=ggplot(value,aes(x=.value,color="red"))+
-    geom_density()+
-    geom_vline(data=count, aes(xintercept=count),
-               color="black")+  facet_wrap(~yearn)
-  SAVE_PLOT(p,"catch_value")
+  # Merge results
+  catch <- value %>%
+    select(yearn, .draw, .value) %>%  # Include .draw explicitly
+    left_join(pop %>% select(yearn, .draw, population), by = c("yearn", ".draw")) %>%
+    left_join(count %>% select(yearn, .draw, count), by = c("yearn", ".draw"))
   
-  p=ggplot(catch,aes(x=.value,color="red"))+
-    geom_density()+
-    geom_vline(data=count, aes(xintercept=count),
-               color="black")+  facet_wrap(~yearn)
-  SAVE_PLOT(p,"catch")
-
-  p=ggplot(catch)+geom_boxplot(aes(group=yearn,
-                                 x=yearn, y=.value),
-                             color="black")+
-    geom_point(aes(x=yearn,y=count),
-               color="red")+
+  # Ensure .draw remains intact
+  if (!".draw" %in% colnames(catch)) {
+    stop("Error: `.draw` column was dropped during CATCHMENT processing.")
+  }
+  
+  # Save plots with pathogen name
+  p <- ggplot(value, aes(x = .value, color = "red")) +
+    geom_density() +
+    geom_vline(data = count, aes(xintercept = count), color = "black") +
+    facet_wrap(~yearn)
+  SAVE_PLOT(p, "catch_value", pathogen_name)
+  
+  p <- ggplot(catch, aes(x = .value, color = "red")) +
+    geom_density() +
+    geom_vline(data = count, aes(xintercept = count), color = "black") +
+    facet_wrap(~yearn)
+  SAVE_PLOT(p, "catch", pathogen_name)
+  
+  p <- ggplot(catch) + geom_boxplot(aes(group = yearn, x = yearn, y = .value), color = "black") +
+    geom_point(aes(x = yearn, y = count), color = "red") +
     theme_minimal()
-  SAVE_PLOT(p,"catch_boxplot")
+  SAVE_PLOT(p, "catch_boxplot", pathogen_name)
   
-  p=ggplot(catch)+
-    geom_violin(aes(group=yearn, x=yearn,
-                    y=.value), color="black")+
-    geom_point(aes(x=yearn, y=count),
-               color="red")+theme_minimal()
-  SAVE_PLOT(p,"catch_vplot")
-  
-  catch$inc<-(catch$count/(catch$population/100000))
-  catch$pinc<-(catch$.value/(catch$population/100000))
-  
-  p=ggplot(catch)+geom_boxplot(aes(group=yearn,
-                                 x=yearn, y=pinc), color="black")+
-    geom_point(aes(x=yearn, y=inc), color="red")+
+  p <- ggplot(catch) +
+    geom_violin(aes(group = yearn, x = yearn, y = .value), color = "black") +
+    geom_point(aes(x = yearn, y = count), color = "red") +
     theme_minimal()
-  SAVE_PLOT(p,"catch2_boxplot")
+  SAVE_PLOT(p, "catch_vplot", pathogen_name)
   
-  p=ggplot(catch)+geom_violin(aes(group=yearn,
-                                x=yearn, y=pinc),
-                            color="black")+
-    geom_point(aes(x=yearn, y=inc),
-               color="red")+theme_minimal()
-  SAVE_PLOT(p,"catch2_vplot")
+  catch$inc <- (catch$count / (catch$population / 100000))
+  catch$pinc <- (catch$.value / (catch$population / 100000))
   
-  catch$inc<-(catch$count/(catch$population/100000))
-  catch$pinc<-(catch$.value/(catch$population/100000))
+  p <- ggplot(catch) + geom_boxplot(aes(group = yearn, x = yearn, y = pinc), color = "black") +
+    geom_point(aes(x = yearn, y = inc), color = "red") +
+    theme_minimal()
+  SAVE_PLOT(p, "catch2_boxplot", pathogen_name)
+  
+  p <- ggplot(catch) + geom_violin(aes(group = yearn, x = yearn, y = pinc), color = "black") +
+    geom_point(aes(x = yearn, y = inc), color = "red") +
+    theme_minimal()
+  SAVE_PLOT(p, "catch2_vplot", pathogen_name)
+  
+  # Return the final dataset with .draw intact
   return(catch)
 }
 
 ##################################################################
 # Catchment IR
 ##################################################################
-LINPRED_TO_CATCHIR<-function(catchments){
-  prop.fdraws<-catchments %>%
+LINPRED_TO_CATCHIR <- function(catchments) {
+  # Check for required columns
+  if (!all(c("count", "population", ".value", "yearn", ".draw") %in% colnames(catchments))) {
+    stop("Error: Required columns (count, population, .value, yearn, .draw) are missing in `catchments`.")
+  }
+  
+  # Summarize data with LL, median, and UL, keeping .draw
+  raw_data <- catchments %>%
+    group_by(yearn, .draw) %>%  # Keep .draw for posterior tracking
+    summarise(
+      count = mean(count, na.rm = TRUE),
+      population = mean(population, na.rm = TRUE),
+      .value = mean(.value, na.rm = TRUE),
+      .groups = "drop"
+    ) %>%
+    mutate(
+      pinc = (.value) / (population / 100000),  # Predicted incidence
+      inc = (count) / (population / 100000)    # Observed incidence
+    )
+  
+  # Calculate summary statistics (LL, median, UL)
+  summary_stats <- raw_data %>%
     group_by(yearn) %>%
-    summarise_at(.vars = c("count", "population", ".value"),
-                 .funs = list(LL=~quantile(.,
-                                           probs = 0.025,
-                                           na.rm=TRUE),
-                              median=median,
-                              UL=~quantile(.,
-                                           probs = 0.975,
-                                           na.rm=TRUE))) %>%
-    select(yearn, .value_LL, .value_UL,
-           .value_median, population_median, count_median)
+    summarise(
+      count_LL = quantile(count, probs = 0.025, na.rm = TRUE),
+      count_median = median(count, na.rm = TRUE),
+      count_UL = quantile(count, probs = 0.975, na.rm = TRUE),
+      population_LL = quantile(population, probs = 0.025, na.rm = TRUE),
+      population_median = median(population, na.rm = TRUE),
+      population_UL = quantile(population, probs = 0.975, na.rm = TRUE),
+      .value_LL = quantile(.value, probs = 0.025, na.rm = TRUE),
+      .value_median = median(.value, na.rm = TRUE),
+      .value_UL = quantile(.value, probs = 0.975, na.rm = TRUE),
+      pinc_LL = quantile(pinc, probs = 0.025, na.rm = TRUE),
+      pinc_median = median(pinc, na.rm = TRUE),
+      pinc_UL = quantile(pinc, probs = 0.975, na.rm = TRUE),
+      inc_LL = quantile(inc, probs = 0.025, na.rm = TRUE),
+      inc_median = median(inc, na.rm = TRUE),
+      inc_UL = quantile(inc, probs = 0.975, na.rm = TRUE),
+      .groups = "drop"
+    )
   
-  # predicted incidence per polity per year
-  prop.fdraws$pinc<-(prop.fdraws$.value_median)/
-    (prop.fdraws$population_median/100000)
+  # Join summary statistics back to raw_data
+  combined_data <- raw_data %>%
+    left_join(summary_stats, by = "yearn")
   
-  # predicted incidence per polity per year
-  prop.fdraws$pinc.LL<-(prop.fdraws$.value_LL)/
-    (prop.fdraws$population_median/100000)
-  
-  # predicted incidence per polity per year
-  prop.fdraws$pinc.UL<-(prop.fdraws$.value_UL)/
-    (prop.fdraws$population_median/100000)
-  
-  prop.fdraws$inc<-(prop.fdraws$count_median)/
-    (prop.fdraws$population_median/100000)
-  
-  # Calculate highest density credibility interval
-  splits<-split(catchments %>%
-                  mutate(.value=log(.value))%>%
-                  select(.value), catchments$yearn)
-  
-  # splits
-  t<-lapply(splits, function(x) HDInterval::hdi(x)%>%
-              exp()%>%as.data.frame())
-  t<-lapply(t, function(x) cbind(x, c("lower", "upper")))
-  t<-dplyr::bind_rows(t, .id = "yearn")
-  t<-reshape2::dcast(t, yearn~`c("lower", "upper")`,
-                     value.var = ".value")
-  colnames(t)<-c("yearn", "hdi.LL", "hdi.UL")
-  t$yearn<-as.numeric(as.character(t$yearn))
-  prop.fdraws<-left_join(prop.fdraws, t , by="yearn")
-  
-  # predicted incidence per polity per year
-  prop.fdraws$hdi.LL<-(prop.fdraws$hdi.LL)/
-    (prop.fdraws$population_median/100000)
-  
-  prop.fdraws$hdi.UL<-(prop.fdraws$hdi.UL)/
-    (prop.fdraws$population_median/100000)
-  
-  return(prop.fdraws)
+  # Return combined data
+  return(combined_data)
 }
-
 ##################################################################
 # IR COMP
 ##################################################################
-IR_COMP<-function(catch, year1, year2,fileBase){
-  ref<-catch %>%
-    filter(yearn<=year2 & yearn >=year1) %>% group_by(.draw)%>%
-    summarise_at(.vars = c("count", "population", ".value"),
-                 .funs = list(mean=mean))
-  colnames(ref)<-c(".draw", "ref_count", "ref_pop", "ref_value")
+IR_COMP <- function(catch, year1, year2, fileBase, target, travel, culture) {
+  ref <- catch %>%
+    filter(yearn <= year2 & yearn >= year1) %>%
+    group_by(.draw) %>%
+    summarise(across(c("count", "population", ".value"), list(mean = mean)))
+  colnames(ref) <- c(".draw", "ref_count", "ref_pop", "ref_value")
   
-  comb<-left_join(catch%>%select(yearn, .draw, .value,
-                                 population, count), ref,
-                  by=c(".draw"))
-  # predicted incidence per polity per year
-  comb$pinc<-(comb$.value)/(comb$population/100000)
-  comb$inc<-(comb$count)/(comb$population/100000)
+  comb <- left_join(catch %>% select(yearn, .draw, .value, population, count), ref, by = c(".draw")) %>%
+    mutate(
+      pinc = (.value) / (population / 100000),
+      inc = (count) / (population / 100000),
+      ref.ir = (ref_count) / (ref_pop / 100000),
+      ref.est.ir = (ref_value) / (ref_pop / 100000),
+      rr = round(pinc / ref.est.ir, 2),
+      pct.change = round(((pinc - ref.est.ir) / ref.est.ir) * 100, 2)
+    )
   
-  # predicted incidence per polity per year
-  comb$ref.ir<-(comb$ref_count)/(comb$ref_pop /100000)
-  
-  # predicted incidence per polity per year
-  comb$ref.est.ir<-(comb$ref_value)/(comb$ref_pop /100000)
-  
-  comb$rr   <-round(comb$pinc/comb$ref.est.ir, 2)
-  comb$pct.change <-round(((comb$pinc-comb$ref.est.ir)/
-                             comb$ref.est.ir)*100,2)
-  
-  comb2<-comb%>%
+  comb2 <- comb %>%
     group_by(yearn) %>%
-    summarise_at(.vars = c("pinc", "inc", "ref.ir",
-                           "ref.est.ir", "ref_pop",
-                           "rr", "pct.change", ".value",
-                           "ref_value", "population",
-                           "ref_pop", "count", "ref_count"),
-                 .funs = list(LL=~quantile(., probs = 0.025,
-                                           na.rm=TRUE),
-                              median=median,
-                              UL=~quantile(., probs = 0.975,
-                                           na.rm=TRUE))) %>%
-    select(yearn, .value_median, count_median,
-           ref_value_median, ref_count_median,
-           population_median,
-           ref_pop_median,
-           pinc_median, pinc_LL, pinc_UL, inc_median,
-           ref.est.ir_median, ref.est.ir_LL,
-           ref.est.ir_UL, ref.ir_median,
-           rr_median, rr_LL,	rr_UL,
-           pct.change_median,	pct.change_LL, pct.change_UL)%>%
-    dplyr::rename(inc=inc_median)
+    summarise(across(c("pinc", "inc", "ref.ir", "ref.est.ir", "ref_pop", "rr", "pct.change", ".value", "ref_value", "population", "ref_pop", "count", "ref_count"),
+                     list(LL = ~quantile(., probs = 0.025, na.rm = TRUE),
+                          median = median,
+                          UL = ~quantile(., probs = 0.975, na.rm = TRUE)))) %>%
+    select(yearn, .value_median, count_median, ref_value_median, ref_count_median, population_median, ref_pop_median, pinc_median, pinc_LL, pinc_UL, inc_median, ref.est.ir_median, ref.est.ir_LL, ref.est.ir_UL, ref.ir_median, rr_median, rr_LL, rr_UL, pct.change_median, pct.change_LL, pct.change_UL) %>%
+    dplyr::rename(inc = inc_median)
   
-  comb2$pathogen<-target
-  comb2$travel<-travel
-  comb2$culture<-culture
-  comb2$startyear<-year2
+  if (nrow(comb2) > 0) {
+    comb2 <- comb2 %>%
+      mutate(
+        pathogen = target,
+        travel = travel,
+        culture = culture,
+        startyear = year2
+      )
+  }
   
-  saveFile=paste0(outBase,fileBase)
-  write.table(comb2, saveFile, append = TRUE,
-              quote = TRUE, sep =",",
-              qmethod = "double", col.names = TRUE,
-              row.names = TRUE)
+  saveFile <- paste0(outBase, fileBase)
+  
+  # Check for duplicates
+  if (file.exists(saveFile)) {
+    tryCatch({
+      existing_data <- read.csv(saveFile, stringsAsFactors = FALSE)
+      existing_data <- existing_data %>% select(names(comb2)) # Align columns
+      comb2 <- anti_join(comb2, existing_data, by = colnames(comb2))
+    }, error = function(e) {
+      message("Error reading existing file, skipping duplicate check: ", e$message)
+    })
+  }
+  
+  # Write the data
+  write.table(comb2, saveFile, append = TRUE, quote = TRUE, sep = ",", qmethod = "double", col.names = !file.exists(saveFile), row.names = FALSE)
+  message("Results saved to: ", saveFile)
 }

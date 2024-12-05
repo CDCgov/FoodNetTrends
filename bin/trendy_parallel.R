@@ -1,30 +1,26 @@
 #!/usr/bin/env Rscript
+# Load required libraries and suppress startup messages
 suppressPackageStartupMessages(library("argparse"))
+suppressPackageStartupMessages(library("parallel"))
+suppressPackageStartupMessages(library("doParallel"))
 source("functions.R")
 options(warn = -1)
 
 ##############################################################
-# Setup
+# Setup and Argument Parsing
 ##############################################################
-# create parser object
+
+# Create an ArgumentParser object to handle command-line arguments
 parser <- ArgumentParser()
-parser$add_argument("--debug", type="logical", 
-                    default=TRUE)
-parser$add_argument("--mmwrFile", type="character", 
-                    help="foodnet mmwr SASS data")
-parser$add_argument("--censusFile_B", type="character", 
-                    help="census file for bacterial data")
-parser$add_argument("--censusFile_P", type="character", 
-                    help="census file for parasitic data")
-parser$add_argument("--travel", type="character", 
-                    help="list for travel types IE NO,UNKNOWN")
-parser$add_argument("--cidt", type="character", 
-                    help="cidt IE CIDT+,CX+,PARASITIC")
-parser$add_argument("--projID", type="character", 
-                    help="variable to name the project")
-parser$add_argument("--outDir", type="character", 
-                    default="./",
-                    help="output directory for results (default: ./)")
+parser$add_argument("--debug", type = "logical", default = TRUE, help = "Enable debug mode")
+parser$add_argument("--mmwrFile", type = "character", help = "Path to FoodNet MMWR SASS data")
+parser$add_argument("--censusFile_B", type = "character", help = "Path to census data for bacterial pathogens")
+parser$add_argument("--censusFile_P", type = "character", help = "Path to census data for parasitic pathogens")
+parser$add_argument("--travel", type = "character", help = "Travel types (e.g., NO, UNKNOWN)")
+parser$add_argument("--cidt", type = "character", help = "CIDT types (e.g., CIDT+, CX+, PARASITIC)")
+parser$add_argument("--projID", type = "character", help = "Project identifier")
+parser$add_argument("--outDir", type = "character", default = "./", help = "Output directory for results")
+
 args <- parser$parse_args()
 
 # set up args
@@ -140,9 +136,7 @@ mmwrdata<-mmwrdata %>%
                                                "CYCLOSPORA"), 
                                "Parasitic", "Bacterial"))
 
-# Census data
-##############################################################
-## Read in file for bacterial pathogens
+
 ## Read in file for parasitic pathogens
 print("--IMPORTING CENSUS")
 census=haven::read_sas(censusFile_B) %>%
@@ -157,14 +151,14 @@ census=haven::read_sas(censusFile_B) %>%
       dplyr::summarize(population = sum(population, na.rm=TRUE)) %>%
       mutate(pathogentype = "Parasitic")) %>% ungroup
 census=as.data.frame(census)
-
-# Pathogens
 ##############################################################
-print("--RUNNING PATH")
-pathDf=PATH_ANALYSIS(mmwrdata,census)
-
-# Cyclospora, Salmonella
+# Pathogen Analysis
 ##############################################################
+
+# Perform PATH_ANALYSIS and include Cyclospora and Salmonella
+print("--RUNNING PATHOGEN ANALYSIS")
+pathDf <- PATH_ANALYSIS(mmwrdata, census)
+
 if("CIDT+" %in% cidt){
   print("--RUNNING CYCLO")
   cyloDF=CYCLOSPORA_ANALYSIS(mmwrdata,census)
@@ -189,54 +183,64 @@ bact$yearn<-as.numeric(as.character(bact$year))
 bact$year<-as.factor(bact$year)
 bact<-split(bact, bact$pathogen)
 
-
-# Run modelproposed
 ##############################################################
-# TODO: source code line #224 filters pathogen, but this is blocked out
-# after the split above (#182) the obj is split into three
-# FLEXNERI, Missing, SONNEI
-# unclear which is to be analyzed? for demo only analyzed FLEXNERI
-print("--RUN MODEL")
-# BRM modeling
-results <- list() # Initialize an empty list to store results
+# Parallel Model Fitting
+##############################################################
 
-for (pathogen_name in names(bact)) {
+print("--FITTING MODELS IN PARALLEL")
+cl <- makeCluster(detectCores() - 2) 
+registerDoParallel(cl)
+
+results <- foreach(
+  pathogen_name = names(bact),
+  .combine = 'c',
+  .packages = c('brms', 'dplyr'),
+  .export = c('bact', 'outBase', 'PROPOSED_BM')
+) %dopar% {
   print(paste0("Processing pathogen: ", pathogen_name))
-  
-  # Run the model
   proposed <- PROPOSED_BM(bact[[pathogen_name]])
-  
-  # Save the result to a file
   saveRDS(proposed, paste0(outBase, pathogen_name, "_brm.Rds"))
-  
-  # Store the result in the list with the pathogen name as the key
-  results[[pathogen_name]] <- proposed
+  setNames(list(proposed), pathogen_name)
 }
 
-# Check the structure of the results
-str(results)
-# Generate posterior predictions
-posteriorLinpred <- LINPREAD_DRAW_FN(
-  data = proposed$data %>% 
-    group_by(state, yearn, population, count) %>% 
-    summarise(across(everything(), ~ unique(.)), .groups = "drop"),
-  model = proposed
-)
+stopCluster(cl)
 
-# Catchment-level estimates
-catch <- CATCHMENT(posteriorLinpred)
+##############################################################
+# Post-Model Processing
+##############################################################
 
-# Convert to catchment-level IR
-catchir.linpred <- LINPRED_TO_CATCHIR(catch)
-
-# Save intermediate results
-saveFile <- paste0(outBase, "IRCatch.csv")
-SAFE_WRITE(catchir.linpred, saveFile)
-
-# Run IR_COMP for different year ranges
-print("--RUN EST IRR")
-IR_COMP(catchir.linpred, 2016, 2018, paste0(pathogen_name, "_EstIRRCatch_2016_2018.csv"), target = pathogen_name, travel = travelLabel, culture = culture)
-IR_COMP(catchir.linpred, 2020, 2022, paste0(pathogen_name, "_EstIRRCatch_2020_2022.csv"),target = pathogen_name, travel = travelLabel, culture = culture)
-IR_COMP(catchir.linpred, 2004, 2006, paste0(pathogen_name, "_EstIRRCatch_2004_2006.csv"),target = pathogen_name, travel = travelLabel, culture = culture)
-IR_COMP(catchir.linpred, 2006, 2008, paste0(pathogen_name, "_EstIRRCatch_2006_2008.csv"),target = pathogen_name, travel = travelLabel, culture = culture)
-IR_COMP(catchir.linpred, 2010, 2012, paste0(pathogen_name, "_EstIRRCatch_2010_2012.csv"),target = pathogen_name, travel = travelLabel, culture = culture)
+# Iterate over all pathogens in `bact`
+for (pathogen_name in names(bact)) {
+  print(paste0("--PROCESSING PATHOGEN: ", pathogen_name))
+  
+  # Generate posterior predictions for the current pathogen
+  print("--GENERATING POSTERIOR PREDICTIONS")
+  posteriorLinpred <- LINPREAD_DRAW_FN(
+    data = results[[pathogen_name]]$data %>%
+      group_by(state, yearn, population, count) %>%
+      summarise(across(everything(), ~ unique(.)), .groups = "drop"),
+    model = results[[pathogen_name]]
+  )
+  
+  # Calculate catchment-level estimates
+  print("--CALCULATING CATCHMENT-LEVEL ESTIMATES")
+  catch <- CATCHMENT(posteriorLinpred)
+  
+  # Calculate incidence rate comparisons
+  print("--CALCULATING INCIDENCE RATE COMPARISONS")
+  catchir.linpred <- LINPRED_TO_CATCHIR(catch)
+   # Check dimensions to match metadata assignment
+  
+  # Save catchment-level estimates for the current pathogen
+  save_file <- paste0(outBase, pathogen_name, "_IRCatch.csv")
+  SAFE_WRITE(catchir.linpred, save_file)
+  
+  # Perform incidence rate comparisons for the current pathogen
+  IR_COMP(catchir.linpred, 2016, 2018, paste0(pathogen_name, "_EstIRRCatch_2016_2018.csv"), target = pathogen_name, travel = travelLabel, culture = culture)
+  IR_COMP(catchir.linpred, 2020, 2022, paste0(pathogen_name, "_EstIRRCatch_2020_2022.csv"),target = pathogen_name, travel = travelLabel, culture = culture)
+  IR_COMP(catchir.linpred, 2004, 2006, paste0(pathogen_name, "_EstIRRCatch_2004_2006.csv"),target = pathogen_name, travel = travelLabel, culture = culture)
+  IR_COMP(catchir.linpred, 2006, 2008, paste0(pathogen_name, "_EstIRRCatch_2006_2008.csv"),target = pathogen_name, travel = travelLabel, culture = culture)
+  IR_COMP(catchir.linpred, 2010, 2012, paste0(pathogen_name, "_EstIRRCatch_2010_2012.csv"),target = pathogen_name, travel = travelLabel, culture = culture)
+  
+  print(paste0("--COMPLETED PROCESSING FOR PATHOGEN: ", pathogen_name))
+}
