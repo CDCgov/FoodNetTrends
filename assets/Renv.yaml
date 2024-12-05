@@ -1,4 +1,4 @@
-name: r_environment
+name: FootNetTreands_R
 channels:
   - conda-forge
   - bioconda
