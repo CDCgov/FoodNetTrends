@@ -33,6 +33,7 @@ SAFE_WRITE <- function(data, file_path) {
   })
 }
 
+# What does this function do?
 CLEANUP_TEMP <- function(temp_dir) {
   tryCatch({
     unlink(temp_dir, recursive = TRUE, force = TRUE)
@@ -44,7 +45,7 @@ CLEANUP_TEMP <- function(temp_dir) {
 }
 
 ##################################################################
-# REFORMATTING
+# REFORMATTING STRINGS
 ##################################################################
 CLEAN_LIST <- function(input_string) {
   cleanedString <- gsub('[\\[\\]\"]', '', input_string)
@@ -53,30 +54,28 @@ CLEAN_LIST <- function(input_string) {
 }
 
 ##################################################################
-# PATH Analysis
+# Creating a dataset for bacterial pathogen incidence by year and state
 ##################################################################
 PATH_ANALYSIS<-function(mmwrdata,census){
   # Create a list of pathogen names excluding Listeria
   pathogens<-c("CAMPYLOBACTER", "CYCLOSPORA", 
                "SALMONELLA", "SHIGELLA", "STEC", "VIBRIO", "YERSINIA")
   
-  # Create separate datasets for each "group of pathogens that have unique exclusions or census datasets
-  ## all pathogens but Cyclospora and Listeria
+  # Create dataset that includes CAMPYLOBACTER, SALMONELLA, SHIGELLA, STEC, VIBRIO, and YERSINIA. We will create a separate dataset for Listeria because there are additional exclusions needed for ensuring Listeria cases meet the CSTE definition
+  # We will need to create separate datasets for Cyclospora because a different census dataset is needed (using function below)
+  ## Datasets for all pathogens but Cyclospora and Listeria
   df1=mmwrdata %>% filter(pathogen %in% pathogens
                           & pathogen!="CYCLOSPORA")
-  ## make a dataset for STEC O157
-  df2=mmwrdata%>% filter(pathogen == "STEC" & 
-                           stec_class=="STEC O157")%>%
+  ## Create datasets for STEC O157 and non-STEC O157
+  df2=mmwrdata%>% filter(pathogen == "STEC" & stec_class=="STEC O157")%>%
     mutate(pathogen="STEC O157")
-  
-  ## make a dataset for STEC NONO157
-  df3=mmwrdata%>% filter(stec_class=="STEC NONO157" | 
-                           stec_class== "STEC O AG UNDET")%>%
+  df3=mmwrdata%>% filter(stec_class=="STEC NONO157" | stec_class== "STEC O AG UNDET")%>%
     mutate(pathogen="STEC NONO157")
   
   # make a Listeria dataset 
-  df4=mmwrdata%>% filter(pathogen == "LISTERIA" & cste=="YES")
+  df4=mmwrdata%>% filter(pathogen == "LISTERIA" & cste=="YES") # Basically for a Listeria infection to be included it needs to meet the CSTE definition
   
+  # join together the four pathogen-specific datasets, then remove these four separate datasets
   selectDf=gtools::smartbind(df1,df2,df3,df4)
   remove(df1,df2,df3,df4)
   
@@ -136,7 +135,7 @@ PATH_ANALYSIS<-function(mmwrdata,census){
 }
 
 ##################################################################
-# CYCLOSPORA Analysis
+# Creating a dataset for parasitic (i.e., Cyclospora) pathogen incidence by year and state
 ##################################################################
 CYCLOSPORA_ANALYSIS<-function(mmwrdata,census){
   para<-mmwrdata %>% 
@@ -167,7 +166,7 @@ CYCLOSPORA_ANALYSIS<-function(mmwrdata,census){
 }
 
 ##################################################################
-# SALMONELLA Analysis
+# Creating a dataset for with incidence for each of the most frequently reported Salmonella serotypes
 ##################################################################
 SALMONELLA_ANALYSIS<-function(pathDf,mmwrdata,census){
   pop = pathDf %>%
@@ -179,8 +178,8 @@ SALMONELLA_ANALYSIS<-function(pathDf,mmwrdata,census){
   mmwrdata$year<-as.factor(mmwrdata$year)
   
   # filter most common
-  sal.rank = mmwrdata %>% 
-    filter(pathogen=="SHIGELLA")%>%
+  sal.rank = mmwrdata %>%
+    filter(pathogen=="SALMONELLA")%>%
     filter(serotypesummary!="NOT SEROTYPED" & serotypesummary!="") %>%
     filter(year==max(as.numeric(as.character(mmwrdata$year)), 
                      na.rm=TRUE))%>%
@@ -189,11 +188,11 @@ SALMONELLA_ANALYSIS<-function(pathDf,mmwrdata,census){
     as.data.frame()
   sal.rank<-sal.rank[order(sal.rank$count, decreasing = T),] %>%
     filter(serotypesummary!="NOT SEROTYPED" & serotypesummary!="")
-  sal.rank<-c(sal.rank$serotypesummary[1:10])
+  sal.rank<-c(sal.rank$serotypesummary[1:10]) # change the last number if you want estimates for the 20 most frequently reported serotypes instead of the 10 most frequently reported serotypes
   
   
   sal = mmwrdata%>% 
-    filter(pathogen=="SHIGELLA" & serotypesummary %in% sal.rank) %>%
+    filter(pathogen=="SALMONELLA" & serotypesummary %in% sal.rank) %>%
     mutate(pathogen=serotypesummary, 
            yearn=as.numeric(as.character(year)))%>%
     mutate(year=droplevels(year))%>%
@@ -234,11 +233,11 @@ PROPOSED_BM <- function(bact) {
   # Log model configuration
   cat("Starting BRM model with the following configuration:\n")
   cat(paste0("  - Chains: ", 4, "\n"))
-  cat(paste0("  - Iterations: ", 101, "\n"))
+  cat(paste0("  - Iterations: ", 5001, "\n")) # 101 is too few iterations for convergence. 5001 was needed for less common etiologic agents.
   cat(paste0("  - Cores: ", 9, "\n"))
   cat(paste0("  - Seed: ", 47, "\n"))
-  cat(paste0("  - Adapt Delta: ", 0.999, "\n"))
-  cat(paste0("  - Max Tree Depth: ", 19, "\n"))
+  cat(paste0("  - Adapt Delta: ", 0.99, "\n"))
+  cat(paste0("  - Max Tree Depth: ", 16, "\n"))
   cat(paste0("  - Output File: ", output_file, "\n"))
   
   tryCatch({
@@ -250,7 +249,7 @@ PROPOSED_BM <- function(bact) {
       family = "negbinomial",
       save_pars = save_pars(all = TRUE),
       chains = 4,
-      iter = 101,
+      iter = 2501, # iterations may need to be tuned for each model, but needs to be sufficiently high to ensure convergence I tested it out and 2501 worked well for most things. Could we add a way for this to be changeable when specifying parameters for running the Nextflow model 
       cores = 9,
       seed = 47,
       control = list(adapt_delta = 0.999, max_treedepth = 19)
@@ -284,7 +283,7 @@ LINPREAD_DRAW_FN <- function(data, model) {
     object = model,  # Bayesian model
     newdata = data,  # Data for predictions
     ndraws = NULL,   # Use all posterior draws
-    transform = FALSE, # Keep predictions on the link scale
+    transform = TRUE, # Transform predictions to response (if you want it on the link scale set to FALSE)
     value = ".linpred" # Column for predicted values
   )
   
@@ -414,7 +413,7 @@ LINPRED_TO_CATCHIR <- function(catchments) {
       inc = (count) / (population / 100000)    # Observed incidence
     )
   
-  # Calculate summary statistics (LL, median, UL)
+  # Calculate summary statistics (LL, median, UL) # this
   summary_stats <- raw_data %>%
     group_by(yearn) %>%
     summarise(

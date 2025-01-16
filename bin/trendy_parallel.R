@@ -1,3 +1,4 @@
+#b.	How would one specify that they want to use trendy_parallel.R in the pipeline instead of trendy.R? Would this be something we specify in the nextflow pipeline, or do we need a pipeline for running in parallel and a pipeline for running singularly? 
 #!/usr/bin/env Rscript
 # Load required libraries and suppress startup messages
 suppressPackageStartupMessages(library("argparse"))
@@ -104,16 +105,15 @@ mmwrdata<-haven::read_sas(mmwrFile)%>%
 # Convert to df
 mmwrdata=as.data.frame(mmwrdata)
 
-# Update SERO list
-seroList=c("NOT SPECIATED","UNKNOWN","PARTIAL SERO",
-           "NOT SERO","")
-mmwrdata$SERO2<-ifelse(mmwrdata$SERO1 %in% seroList, 
-                       "Missing", mmwrdata$SERO1)
-mmwrdata$SERO2<-ifelse(grepl("UNDET",mmwrdata$SERO2), 
-                       "Missing", mmwrdata$SERO2)
-
+# Update SERO list: This was only there to create a “smaller” test case for building out the pipeline. We can remove it for now. Alternatively, we could add it as an option to the function if we want these values of SERO1 to be included or not. However, for the larger analysis, serotypesummary is an actual column we want to keep; we would just want to add SERO2 to that if serotypesummary was missing
+# seroList=c("NOT SPECIATED","UNKNOWN","PARTIAL SERO",
+#           "NOT SERO","")
+# mmwrdata$SERO2<-ifelse(mmwrdata$SERO1 %in% seroList, 
+#                       "Missing", mmwrdata$SERO1)
+# mmwrdata$SERO2<-ifelse(grepl("UNDET",mmwrdata$SERO2), 
+#                       "Missing", mmwrdata$SERO2)
 # relabel  SERO2 column
-mmwrdata$serotypesummary<-mmwrdata$SERO2
+# mmwrdata$serotypesummary<-mmwrdata$SERO2
 
 # Update count labels
 mmwrdata<-mmwrdata %>%
@@ -156,14 +156,14 @@ census=as.data.frame(census)
 ##############################################################
 
 # Perform PATH_ANALYSIS and include Cyclospora and Salmonella
-print("--RUNNING PATHOGEN ANALYSIS")
+print("--CALCULATING INCIDENCE FOR BACTERIAL PATHOGENS")
 pathDf <- PATH_ANALYSIS(mmwrdata, census)
 
 if("CIDT+" %in% cidt){
-  print("--RUNNING CYCLO")
+  print("--CALCULATING INCIDENCE FOR CYCLOSPORA")
   cyloDF=CYCLOSPORA_ANALYSIS(mmwrdata,census)
   
-  print("--RUNNING SALMONELLA")
+  print("--CALCULATING INCIDENCE FOR SALMONELLA SEROTYPES")
   salDF=SALMONELLA_ANALYSIS(pathDf,mmwrdata,census)
   
   bact=gtools::smartbind(pathDf, cyloDF)%>%
@@ -175,9 +175,8 @@ if("CIDT+" %in% cidt){
 # Post Process
 ##############################################################
 #remove(mmwrdata)
-print("--POST PROCESSING")
-bact<-subset(bact, pathogen=="Missing" | 
-               pathogen=="FLEXNERI"| pathogen=="SONNEI")
+print("--POST PROCESSING OF INCIDENCE DATA")
+bact<-subset(bact) # Goal is to run models for reach value in pathogen in bact in parallel, so no need to subset
 target<-unique(bact$pathogen)
 bact$yearn<-as.numeric(as.character(bact$year))
 bact$year<-as.factor(bact$year)

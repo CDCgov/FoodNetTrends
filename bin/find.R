@@ -1,3 +1,5 @@
+# can I suggest renaming to something that better relates to what the function in this file does, such as calcIR.R or aggrIR.R
+
 #!/usr/bin/env Rscript
 suppressPackageStartupMessages(library("argparse"))
 source("functions.R")
@@ -81,7 +83,7 @@ culture<-ifelse("CIDT+" %in% cidt, "CxCIDT", "Cx")
 # Set outfile base names
 ##############################################################
 outBase=paste0(outDir,"/",
-               projID,"_","splinesmodel_",
+               projID,"_",# "splinesmodel_", 
                paste(travelLabel,collapse=""),"_",
                paste(culture,collapse=""),"_")
 
@@ -94,16 +96,15 @@ mmwrdata<-haven::read_sas(mmwrFile)%>%
 # Convert to df
 mmwrdata=as.data.frame(mmwrdata)
 
-# Update SERO list
-seroList=c("NOT SPECIATED","UNKNOWN","PARTIAL SERO",
-           "NOT SERO","")
-mmwrdata$SERO2<-ifelse(mmwrdata$SERO1 %in% seroList, 
-                       "Missing", mmwrdata$SERO1)
-mmwrdata$SERO2<-ifelse(grepl("UNDET",mmwrdata$SERO2), 
-                       "Missing", mmwrdata$SERO2)
-
+# Update SERO list: This was only there to create a “smaller” test case for building out the pipeline. We can remove it for now. Alternatively, we could add it as an option to the function if we want these values of SERO1 to be included or not. However, for the larger analysis, serotypesummary is an actual column we want to keep; we would just want to add SERO2 to that if serotypesummary was missing
+# seroList=c("NOT SPECIATED","UNKNOWN","PARTIAL SERO",
+#           "NOT SERO","") # 
+# mmwrdata$SERO2<-ifelse(mmwrdata$SERO1 %in% seroList, 
+#                       "Missing", mmwrdata$SERO1)
+# mmwrdata$SERO2<-ifelse(grepl("UNDET",mmwrdata$SERO2), 
+#                       "Missing", mmwrdata$SERO2)
 # relabel  SERO2 column
-mmwrdata$serotypesummary<-mmwrdata$SERO2
+# mmwrdata$serotypesummary<-mmwrdata$SERO2
 
 # Update count labels
 mmwrdata<-mmwrdata %>%
@@ -168,8 +169,7 @@ if("CIDT+" %in% cidt){
 ##############################################################
 remove(mmwrdata)
 print("--POST PROCESSING")
-bact<-subset(bact, pathogen=="Missing" | 
-               pathogen=="FLEXNERI"| pathogen=="SONNEI")
+# bact<-subset(bact, pathogen=="Missing" | pathogen=="FLEXNERI"| pathogen=="SONNEI") # this was done to make a "small" dataset for developing the pipeline. The full analysis would run for all 8 pathogens, both STEC subtypes and the top-10 to 20 Salmonella serotypes
 bact$yearn<-as.numeric(as.character(bact$year))
 bact$year<-as.factor(bact$year)
 bact<-split(bact, bact$pathogen)
