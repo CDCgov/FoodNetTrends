@@ -1,0 +1,32 @@
+----- Structure of the Data -----
+tibble [12,034 × 8] (S3: tbl_df/tbl/data.frame)
+ $ Year         : num [1:12034] 1997 1997 1997 1997 1997 ...
+ $ State        : chr [1:12034] "CA" "CA" "CA" "CT" ...
+ $ EntryYear    : num [1:12034] 1997 1997 1997 1997 1997 ...
+ $ State_EntYear: chr [1:12034] "CA_1997" "CA_1997" "CA_1997" "CT_1997" ...
+ $ Population   : num [1:12034] 1372202 524705 740993 833839 827511 ...
+  ..- attr(*, "label")= chr "Population"
+ $ STFIP        : num [1:12034] 6 6 6 9 9 9 9 9 9 9 ...
+  ..- attr(*, "label")= chr "State FIPS Code"
+ $ COFIP        : num [1:12034] 1 13 75 1 3 5 7 9 11 13 ...
+  ..- attr(*, "label")= chr "County FIPS Code"
+ $ county       : chr [1:12034] "ALAMEDA" "CONTRA COSTA" "SAN FRANCISCO" "FAIRFIELD" ...
+
+----- Column Names -----
+[1] "Year"          "State"         "EntryYear"     "State_EntYear"
+[5] "Population"    "STFIP"         "COFIP"         "county"       
+
+----- First 10 Rows -----
+# A tibble: 10 × 8
+    Year State EntryYear State_EntYear Population STFIP COFIP county       
+   <dbl> <chr>     <dbl> <chr>              <dbl> <dbl> <dbl> <chr>        
+ 1  1997 CA         1997 CA_1997         1372202      6     1 ALAMEDA      
+ 2  1997 CA         1997 CA_1997          524705.     6    13 CONTRA COSTA 
+ 3  1997 CA         1997 CA_1997          740993      6    75 SAN FRANCISCO
+ 4  1997 CT         1997 CT_1997          833839      9     1 FAIRFIELD    
+ 5  1997 CT         1997 CT_1997          827511      9     3 HARTFORD     
+ 6  1997 CT         1997 CT_1997          180448      9     5 LITCHFIELD   
+ 7  1997 CT         1997 CT_1997          148813      9     7 MIDDLESEX    
+ 8  1997 CT         1997 CT_1997          792133      9     9 NEW HAVEN    
+ 9  1997 CT         1997 CT_1997          250308      9    11 NEW LONDON   
+10  1997 CT         1997 CT_1997          130686      9    13 TOLLAND      

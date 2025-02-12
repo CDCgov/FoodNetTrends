@@ -1,0 +1,32 @@
+----- Structure of the Data -----
+tibble [12,172 × 8] (S3: tbl_df/tbl/data.frame)
+ $ Year         : num [1:12172] 1996 1996 1996 1996 1996 ...
+ $ State        : chr [1:12172] "CA" "CA" "CT" "CT" ...
+ $ EntryYear    : num [1:12172] 1996 1996 1996 1996 1996 ...
+ $ State_EntYear: chr [1:12172] "CA_1996" "CA_1996" "CT_1996" "CT_1996" ...
+ $ Population   : num [1:12172] 1351804 735228 830265 792544 201748 ...
+  ..- attr(*, "label")= chr "Population"
+ $ STFIP        : num [1:12172] 6 6 9 9 13 13 13 13 13 13 ...
+  ..- attr(*, "label")= chr "State FIPS Code"
+ $ COFIP        : num [1:12172] 1 75 3 9 63 67 89 97 121 135 ...
+  ..- attr(*, "label")= chr "County FIPS Code"
+ $ county       : chr [1:12172] "ALAMEDA" "SAN FRANCISCO" "HARTFORD" "NEW HAVEN" ...
+
+----- Column Names -----
+[1] "Year"          "State"         "EntryYear"     "State_EntYear"
+[5] "Population"    "STFIP"         "COFIP"         "county"       
+
+----- First 10 Rows -----
+# A tibble: 10 × 8
+    Year State EntryYear State_EntYear Population STFIP COFIP county       
+   <dbl> <chr>     <dbl> <chr>              <dbl> <dbl> <dbl> <chr>        
+ 1  1996 CA         1996 CA_1996          1351804     6     1 ALAMEDA      
+ 2  1996 CA         1996 CA_1996           735228     6    75 SAN FRANCISCO
+ 3  1996 CT         1996 CT_1996           830265     9     3 HARTFORD     
+ 4  1996 CT         1996 CT_1996           792544     9     9 NEW HAVEN    
+ 5  1996 GA         1996 GA_1996           201748    13    63 CLAYTON      
+ 6  1996 GA         1996 GA_1996           536992    13    67 COBB         
+ 7  1996 GA         1996 GA_1996           587594    13    89 DEKALB       
+ 8  1996 GA         1996 GA_1996            84290    13    97 DOUGLAS      
+ 9  1996 GA         1996 GA_1996           714882    13   121 FULTON       
+10  1996 GA         1996 GA_1996           476790    13   135 GWINNETT     

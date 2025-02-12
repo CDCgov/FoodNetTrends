@@ -1,0 +1,403 @@
+----- Structure of the Data -----
+tibble [521,923 × 242] (S3: tbl_df/tbl/data.frame)
+ $ NARMS_genrecID        : chr [1:521923] "417212" "" "" "" ...
+  ..- attr(*, "label")= chr "NARMS general isolate record ID"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ StecOAg               : chr [1:521923] "" "" "" "" ...
+  ..- attr(*, "label")= chr "if E. coli, what was the O antigen number"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ StecHAg               : chr [1:521923] "" "" "" "" ...
+  ..- attr(*, "label")= chr "if E. coli, what was the H antigen number"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ TravelDest_Clean      : chr [1:521923] "" "" "" "" ...
+  ..- attr(*, "label")= chr "Cleaned TravelDest: countries listed alphabetically"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ TravelDest_Correct    : chr [1:521923] "" "" "" "" ...
+  ..- attr(*, "label")= chr "Corrected TravelDest: most specific country or (sub)region"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ CXCIDT                : chr [1:521923] "CX+" "CX+" "CX+" "CX+" ...
+  ..- attr(*, "label")= chr "Dichotomous culturestatus"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ AgClinic              : chr [1:521923] "" "" "" "" ...
+  ..- attr(*, "label")= chr "Result of antigen-based test used at clinical laboratory"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ AgClinicTestType      : chr [1:521923] "" "" "" "" ...
+  ..- attr(*, "label")= chr "Name of antigen-based test used at clinical laboratory"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ AgeMnth               : num [1:521923] NA NA NA NA NA NA NA 9 NA NA ...
+  ..- attr(*, "label")= chr "age of case in months if patient is less than 1 year old"
+ $ AgeYr                 : num [1:521923] 5 32 72 80 71 4 62 NA 62 45 ...
+  ..- attr(*, "label")= chr "age of case in years"
+ $ AgSphl                : chr [1:521923] "NOT TESTED" "NOT TESTED" "NOT TESTED" "NOT TESTED" ...
+  ..- attr(*, "label")= chr "Result of antigen-based test used at public health laboratory"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ AgSphlTestType        : chr [1:521923] "" "" "" "" ...
+  ..- attr(*, "label")= chr "Name of antigen-based test used at public health laboratory"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ AR_antacid_any        : chr [1:521923] "NO" "NO" "YES" "UNKNOWN" ...
+  ..- attr(*, "label")= chr "in the 30 days before illnes began, did you/your child any form of antacid"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ AR_antacid_any_1      : chr [1:521923] "" "" "ZANTAC" "" ...
+  ..- attr(*, "label")= chr "what medications to block acids did you/your child take in 30 days before illness"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ AR_antacid_any_2      : chr [1:521923] "" "" "OTHER" "" ...
+  ..- attr(*, "label")= chr "what medications to block acids did you/your child take in 30 days before illness"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ AR_antacid_any_3      : chr [1:521923] "" "" "" "" ...
+  ..- attr(*, "label")= chr "what medications to block acids did you/your child take in 30 days before illness"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ AR_antibiotic_use     : chr [1:521923] "YES" "NO" "YES" "UNKNOWN" ...
+  ..- attr(*, "label")= chr "did you/your child take antibiotics for this illness"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ AR_antibiotic_use_1   : chr [1:521923] "CEPHALEXIN" "" "BACTRIM" "" ...
+  ..- attr(*, "label")= chr "what antibiotics did you/your child take for this illness"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ AR_antibiotic_use_2   : chr [1:521923] "" "" "CIPROFLOXACIN / CIPRO" "" ...
+  ..- attr(*, "label")= chr "what antibiotics did you/your child take for this illness"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ AR_antibiotic_use_3   : chr [1:521923] "" "" "CIPROFLOXACIN / CIPRO" "" ...
+  ..- attr(*, "label")= chr "what antibiotics did you/your child take for this illness"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ AR_antibiotic_use_4   : chr [1:521923] "" "" "" "" ...
+  ..- attr(*, "label")= chr "what antibiotics did you/your child take for this illness"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ AR_antibiotic_use_5   : chr [1:521923] "" "" "" "" ...
+  ..- attr(*, "label")= chr "what antibiotics did you/your child take for this illness"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ AR_antibiotic_use_6   : chr [1:521923] "" "" "" "" ...
+  ..- attr(*, "label")= chr "what antibiotics did you/your child take for this illness"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ AR_antibiotic_use_7   : chr [1:521923] "" "" "" "" ...
+  ..- attr(*, "label")= chr "what antibiotics did you/your child take for this illness"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ AR_antibiotic_use_8   : chr [1:521923] "" "" "" "" ...
+  ..- attr(*, "label")= chr "what antibiotics did you/your child take for this illness"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ AR_antibiotic_use30   : chr [1:521923] "NO" "NO" "NO" "UNKNOWN" ...
+  ..- attr(*, "label")= chr "in the 30 days before illness began, did you/your child take any anitbiotics"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ AR_antibiotic_use30_1 : chr [1:521923] "" "" "" "" ...
+  ..- attr(*, "label")= chr "what anitbiotics did you/your child take 30 days before illness began"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ AR_antibiotic_use30_2 : chr [1:521923] "" "" "" "" ...
+  ..- attr(*, "label")= chr "what anitbiotics did you/your child take 30 days before illness began"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ AR_antibiotic_use30_3 : chr [1:521923] "" "" "" "" ...
+  ..- attr(*, "label")= chr "what anitbiotics did you/your child take 30 days before illness began"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ AR_antibiotic_use30_4 : chr [1:521923] "" "" "" "" ...
+  ..- attr(*, "label")= chr "what anitbiotics did you/your child take 30 days before illness began"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ AR_antibiotic_use30_5 : chr [1:521923] "" "" "" "" ...
+  ..- attr(*, "label")= chr "what anitbiotics did you/your child take 30 days before illness began"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ AR_antibiotic_use30_6 : chr [1:521923] "" "" "" "" ...
+  ..- attr(*, "label")= chr "what anitbiotics did you/your child take 30 days before illness began"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ AR_antibiotic_use30_7 : chr [1:521923] "" "" "" "" ...
+  ..- attr(*, "label")= chr "what anitbiotics did you/your child take 30 days before illness began"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ AR_antibiotic_use30_8 : chr [1:521923] "" "" "" "" ...
+  ..- attr(*, "label")= chr "what anitbiotics did you/your child take 30 days before illness began"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ AR_comorb_abdominal   : chr [1:521923] "NO" "NO" "NO" "UNKNOWN" ...
+  ..- attr(*, "label")= chr "in the 6 mos before illness began did you/your child have abdominal surgery"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ AR_comorb_cancer      : chr [1:521923] "NO" "NO" "NO" "UNKNOWN" ...
+  ..- attr(*, "label")= chr "in the 6 mos before illness began did you/your diagnosed or treated for cancer"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ AR_comorb_diabetes    : chr [1:521923] "NO" "NO" "NO" "UNKNOWN" ...
+  ..- attr(*, "label")= chr "in the 6 mos before illness began did you/your diagnosed or treated for diabetes"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ Ar_Diet_veal          : chr [1:521923] "NO" "NO" "NO" "UNKNOWN" ...
+  ..- attr(*, "label")= chr "in the past 7 days did you/your child eat any veal"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ AR_durationillness    : chr [1:521923] "27" "11" "" "" ...
+  ..- attr(*, "label")= chr "how many days were you/your child sick"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ AR_HHtrav6mo          : chr [1:521923] "NO" "UNKNOWN" "NO" "UNKNOWN" ...
+  ..- attr(*, "label")= chr "in the 6 mos before you/your child illness began, did any memebers of you household travel outside the US"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ AR_HHtrav6mo_country  : chr [1:521923] "" "" "" "" ...
+  ..- attr(*, "label")= chr "in the 6 mos before you/your child illness began, what countries did your memebers of you household visit"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ AR_hosp_icu           : chr [1:521923] "" "" "" "" ...
+  ..- attr(*, "label")= chr "did you/your child stay in ICU or CCU"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ AR_probiotic_use30    : chr [1:521923] "NO" "NO" "YES" "UNKNOWN" ...
+  ..- attr(*, "label")= chr "in the 30 days before you/your child illness began, did you take a probiotic"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ AR_travel6mo          : chr [1:521923] "NO" "NO" "NO" "UNKNOWN" ...
+  ..- attr(*, "label")= chr "in the 6 mos before your illness began did you/your child travel outside the US"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ AR_travel6mo_country  : chr [1:521923] "" "" "" "" ...
+  ..- attr(*, "label")= chr "in the 6 mos before your illness what countries did you/your child visit"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ Audit                 : chr [1:521923] "NO" "NO" "NO" "NO" ...
+  ..- attr(*, "label")= chr "was case found during audit"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ BioID                 : chr [1:521923] "YES" "YES" "YES" "YES" ...
+  ..- attr(*, "label")= chr "was isolate identified by culture"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ BloodyDiarr           : chr [1:521923] "YES" "NO" "NO" "UNKNOWN" ...
+  ..- attr(*, "label")= chr "Did the patient have bloody diarrhea during this illness"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ Campyspec             : chr [1:521923] "" "" "" "" ...
+  ..- attr(*, "label")= chr "For Campylobacter, final species result"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ CDCID                 : chr [1:521923] "" "" "" "" ...
+  ..- attr(*, "label")= chr "Link to CDC Laboratory ID (for STEC only)"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ CEA_Beef              : chr [1:521923] "UNKNOWN" "UNKNOWN" "YES" "" ...
+  ..- attr(*, "label")= chr "eat beef or any foods containing beef"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ CEA_Beef_grnd         : chr [1:521923] "UNKNOWN" "UNKNOWN" "YES" "" ...
+  ..- attr(*, "label")= chr "eat any ground beef"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ CEA_Beef_out          : chr [1:521923] "NO" "UNKNOWN" "NO" "" ...
+  ..- attr(*, "label")= chr "eat any beef made outside of home"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ CEA_Beef_unckgrnd     : chr [1:521923] "NO" "UNKNOWN" "NO" "" ...
+  ..- attr(*, "label")= chr "eat any ground beef that was undercooked or raw"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ CEA_Berries           : chr [1:521923] "NO" "NO" "YES" "" ...
+  ..- attr(*, "label")= chr "eat any fresh (unfrozen) berries"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ CEA_Bird              : chr [1:521923] "NO" "NO" "NO" "" ...
+  ..- attr(*, "label")= chr "contact with a bird, not including live poultry"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ CEA_Cantaloupe        : chr [1:521923] "NO" "NO" "NO" "" ...
+  ..- attr(*, "label")= chr "eat any fresh cantaloupe"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ CEA_Cat               : chr [1:521923] "NO" "YES" "NO" "" ...
+  ..- attr(*, "label")= chr "contact with a cat"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ CEA_Chicken           : chr [1:521923] "YES" "YES" "YES" "" ...
+  ..- attr(*, "label")= chr "eat chicken or any foods containing chicken"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ CEA_Chx_fresh         : chr [1:521923] "" "" "" "" ...
+  ..- attr(*, "label")= chr "eat chicken at home bought fresh (refrigerated)"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ CEA_Chx_frozen        : chr [1:521923] "" "" "" "" ...
+  ..- attr(*, "label")= chr "eat chicken at home bought frozen"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ CEA_Chx_grnd          : chr [1:521923] "NO" "NO" "NO" "" ...
+  ..- attr(*, "label")= chr "eat any ground chicken"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ CEA_Chx_out           : chr [1:521923] "NO" "YES" "NO" "" ...
+  ..- attr(*, "label")= chr "eat any chicken made outside of home"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ CEA_Dairy             : chr [1:521923] "YES" "YES" "YES" "" ...
+  ..- attr(*, "label")= chr "eat or drink any dairy products"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ CEA_Dog               : chr [1:521923] "YES" "NO" "YES" "" ...
+  ..- attr(*, "label")= chr "contact with a dog"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ CEA_Eggs              : chr [1:521923] "YES" "NO" "NO" "" ...
+  ..- attr(*, "label")= chr "eat any eggs"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ CEA_Eggs_out          : chr [1:521923] "NO" "NO" "NO" "" ...
+  ..- attr(*, "label")= chr "eat any eggs made outside of home"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ CEA_Eggs_unck         : chr [1:521923] "NO" "NO" "NO" "" ...
+  ..- attr(*, "label")= chr "eat any eggs that were runny or raw, or uncooked foods made with raw eggs"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ CEA_Farm_ranch        : chr [1:521923] "NO" "NO" "NO" "" ...
+  ..- attr(*, "label")= chr "visit, work, or live on farm, ranch, petting zoo, or other setting that has animals"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ CEA_Fish              : chr [1:521923] "NO" "NO" "NO" "" ...
+  ..- attr(*, "label")= chr "eat any fish or fish products"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ CEA_Fish_unck         : chr [1:521923] "NO" "NO" "NO" "" ...
+  ..- attr(*, "label")= chr "eat any fish or fish products that was raw or undercooked"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ CEA_Handle_raw_meat   : chr [1:521923] "" "" "" "" ...
+  ..- attr(*, "label")= chr "handle raw meat"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ CEA_Handle_raw_poultry: chr [1:521923] "" "" "" "" ...
+  ..- attr(*, "label")= chr "handle raw poultry"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ CEA_Handle_raw_seafood: chr [1:521923] "" "" "" "" ...
+  ..- attr(*, "label")= chr "handle raw seafood"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ CEA_Herbs             : chr [1:521923] "NO" "UNKNOWN" "NO" "" ...
+  ..- attr(*, "label")= chr "eat any fresh herbs"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ CEA_Lamb              : chr [1:521923] "" "" "" "" ...
+  ..- attr(*, "label")= chr "eat any lamb or mutton"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ CEA_Lettuce           : chr [1:521923] "NO" "YES" "YES" "" ...
+  ..- attr(*, "label")= chr "eat any fresh, raw lettuce"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ CEA_Live_poultry      : chr [1:521923] "NO" "NO" "NO" "" ...
+  ..- attr(*, "label")= chr "contact with any live poultry"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ CEA_Liver_pate        : chr [1:521923] "" "" "" "" ...
+  ..- attr(*, "label")= chr "eat any liver pate"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ CEA_Liver_raw         : chr [1:521923] "" "" "" "" ...
+  ..- attr(*, "label")= chr "eat any raw or undercooked liver"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ CEA_Milk_pasteurized  : chr [1:521923] "" "" "" "" ...
+  ..- attr(*, "label")= chr "have any pasteurized cow or goat milk"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ CEA_Milk_raw          : chr [1:521923] "NO" "NO" "NO" "" ...
+  ..- attr(*, "label")= chr "drink any unpasteurized milk"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ CEA_Odairy_raw        : chr [1:521923] "" "" "" "" ...
+  ..- attr(*, "label")= chr "eat or drink any other dairy products that were raw or unpasteurized"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ CEA_Ountreat_water    : chr [1:521923] "NO" "NO" "NO" "" ...
+  ..- attr(*, "label")= chr "drink any water directly from a natural spring, lake, pond, stream, or river"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ CEA_Pig               : chr [1:521923] "NO" "NO" "NO" "" ...
+  ..- attr(*, "label")= chr "contact with any pigs"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ CEA_Pocketpet         : chr [1:521923] "" "" "" "" ...
+  ..- attr(*, "label")= chr "contact with any mammalian household pet other than a dog or cat"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ CEA_Pork              : chr [1:521923] "YES" "NO" "YES" "" ...
+  ..- attr(*, "label")= chr "eat pork or any foods containing pork"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ CEA_Raw_cider         : chr [1:521923] "NO" "NO" "NO" "" ...
+  ..- attr(*, "label")= chr "drink any juice that was not pasteurized and not from a concentrate"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ CEA_Reptile_amphib    : chr [1:521923] "NO" "NO" "NO" "" ...
+  ..- attr(*, "label")= chr "contact with a reptile or amphibian"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ CEA_Ruminants         : chr [1:521923] "NO" "NO" "NO" "" ...
+  ..- attr(*, "label")= chr "contact with any cattle, goats, or sheep"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ CEA_Seafd             : chr [1:521923] "NO" "NO" "NO" "" ...
+  ..- attr(*, "label")= chr "eat any seafood"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ CEA_Sampled           : chr [1:521923] "" "" "" "" ...
+  ..- attr(*, "label")= chr "Sampled"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ CEA_Seafd_unck        : chr [1:521923] "NO" "NO" "NO" "" ...
+  ..- attr(*, "label")= chr "eat any seafood that was raw or undercooked"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ CEA_Sewer_water       : chr [1:521923] "NO" "NO" "NO" "" ...
+  ..- attr(*, "label")= chr "reside in a home with a septic system"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ CEA_Sick_contact      : chr [1:521923] "YES" "NO" "NO" "" ...
+  ..- attr(*, "label")= chr "household member or a close contact with diarrhea"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ CEA_Sick_pet          : chr [1:521923] "NO" "NO" "NO" "" ...
+  ..- attr(*, "label")= chr "contact with a pet that had diarrhea"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ CEA_Softcheese        : chr [1:521923] "NO" "NO" "NO" "" ...
+  ..- attr(*, "label")= chr "eat any soft cheese"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ CEA_Softcheese_raw    : chr [1:521923] "" "" "" "" ...
+  ..- attr(*, "label")= chr "eat any unpasteurized soft cheese"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+ $ CEA_Spinach           : chr [1:521923] "NO" "YES" "NO" "" ...
+  ..- attr(*, "label")= chr "eat any fresh (unfrozen), raw spinach"
+  ..- attr(*, "format.sas")= chr "$UPCASE"
+  [list output truncated]
+
+----- Column Names -----
+  [1] "NARMS_genrecID"         "StecOAg"                "StecHAg"               
+  [4] "TravelDest_Clean"       "TravelDest_Correct"     "CXCIDT"                
+  [7] "AgClinic"               "AgClinicTestType"       "AgeMnth"               
+ [10] "AgeYr"                  "AgSphl"                 "AgSphlTestType"        
+ [13] "AR_antacid_any"         "AR_antacid_any_1"       "AR_antacid_any_2"      
+ [16] "AR_antacid_any_3"       "AR_antibiotic_use"      "AR_antibiotic_use_1"   
+ [19] "AR_antibiotic_use_2"    "AR_antibiotic_use_3"    "AR_antibiotic_use_4"   
+ [22] "AR_antibiotic_use_5"    "AR_antibiotic_use_6"    "AR_antibiotic_use_7"   
+ [25] "AR_antibiotic_use_8"    "AR_antibiotic_use30"    "AR_antibiotic_use30_1" 
+ [28] "AR_antibiotic_use30_2"  "AR_antibiotic_use30_3"  "AR_antibiotic_use30_4" 
+ [31] "AR_antibiotic_use30_5"  "AR_antibiotic_use30_6"  "AR_antibiotic_use30_7" 
+ [34] "AR_antibiotic_use30_8"  "AR_comorb_abdominal"    "AR_comorb_cancer"      
+ [37] "AR_comorb_diabetes"     "Ar_Diet_veal"           "AR_durationillness"    
+ [40] "AR_HHtrav6mo"           "AR_HHtrav6mo_country"   "AR_hosp_icu"           
+ [43] "AR_probiotic_use30"     "AR_travel6mo"           "AR_travel6mo_country"  
+ [46] "Audit"                  "BioID"                  "BloodyDiarr"           
+ [49] "Campyspec"              "CDCID"                  "CEA_Beef"              
+ [52] "CEA_Beef_grnd"          "CEA_Beef_out"           "CEA_Beef_unckgrnd"     
+ [55] "CEA_Berries"            "CEA_Bird"               "CEA_Cantaloupe"        
+ [58] "CEA_Cat"                "CEA_Chicken"            "CEA_Chx_fresh"         
+ [61] "CEA_Chx_frozen"         "CEA_Chx_grnd"           "CEA_Chx_out"           
+ [64] "CEA_Dairy"              "CEA_Dog"                "CEA_Eggs"              
+ [67] "CEA_Eggs_out"           "CEA_Eggs_unck"          "CEA_Farm_ranch"        
+ [70] "CEA_Fish"               "CEA_Fish_unck"          "CEA_Handle_raw_meat"   
+ [73] "CEA_Handle_raw_poultry" "CEA_Handle_raw_seafood" "CEA_Herbs"             
+ [76] "CEA_Lamb"               "CEA_Lettuce"            "CEA_Live_poultry"      
+ [79] "CEA_Liver_pate"         "CEA_Liver_raw"          "CEA_Milk_pasteurized"  
+ [82] "CEA_Milk_raw"           "CEA_Odairy_raw"         "CEA_Ountreat_water"    
+ [85] "CEA_Pig"                "CEA_Pocketpet"          "CEA_Pork"              
+ [88] "CEA_Raw_cider"          "CEA_Reptile_amphib"     "CEA_Ruminants"         
+ [91] "CEA_Seafd"              "CEA_Sampled"            "CEA_Seafd_unck"        
+ [94] "CEA_Sewer_water"        "CEA_Sick_contact"       "CEA_Sick_pet"          
+ [97] "CEA_Softcheese"         "CEA_Softcheese_raw"     "CEA_Spinach"           
+[100] "CEA_Sprouts"            "CEA_Swim_treat"         "CEA_Swim_untreat"      
+[103] "CEA_Tomatoes"           "CEA_Turkey"             "CEA_Turkey_grnd"       
+[106] "CEA_Turkey_out"         "CEA_Watermelon"         "CEA_Well_water"        
+[109] "County"                 "CultCdc"                "CultClinic"            
+[112] "CultSphl"               "Culturestatus"          "Diarrhea"              
+[115] "Discordant"             "DOB"                    "DtAdmit"               
+[118] "DtAdmit2"               "DtDisch"                "DtDisch2"              
+[121] "DtEntered"              "DtOnset"                "DtRcvd"                
+[124] "DtRptComp"              "DtSpec"                 "DtUSDepart"            
+[127] "DtUSReturn"             "DxO157"                 "DxO157TestType"        
+[130] "EforsNum"               "Ethnicity"              "Fever"                 
+[133] "Hospital"               "Hospstay"               "HospTrans"             
+[136] "HUS"                    "Immigrate"              "Interview"             
+[139] "LabName"                "LabNum"                 "LocalID"               
+[142] "LIlink"                 "Mombaby"                "Mombabyid"             
+[145] "Nstid"                  "OtherCDCTest"           "OtherClinicTest"       
+[148] "OtherClinicTestType"    "OtherSphlTest"          "OtherSphlTestType"     
+[151] "Outbreak"               "OutbrkStID"             "OutbrkType"            
+[154] "Outcome"                "OutFetal"               "Pathogen"              
+[157] "PatID"                  "PcrCDC"                 "PcrClinic"             
+[160] "PCRClinicTestType"      "PcrSphl"                "PcrSphlTestType"       
+[163] "PersonID"               "Pregnant"               "Race"                  
+[166] "ResultID"               "RptComp"                "SentCDC"               
+[169] "SeroSite"               "Sex"                    "SiteID"                
+[172] "SLabsID"                "SpeciesCDC"             "SpeciesClinic"         
+[175] "SpeciesSphl"            "SpecSite"               "SpecSrce"              
+[178] "State"                  "StecH7"                 "StecNM"                
+[181] "StecO157"               "StecStx"                "StLabRcvd"             
+[184] "Study5975id"            "TravelDest"             "TravelInt"             
+[187] "WGS_ID"                 "Zipcode"                "Year"                  
+[190] "Month"                  "Sterile"                "Cste"                  
+[193] "Age"                    "cea_any"                "cea_rep"               
+[196] "cea_intv"               "cea_var40"              "cea_eligible"          
+[199] "Comorb1"                "Comorb2"                "Comorb3"               
+[202] "Comorb4"                "Comorb5"                "NarmsLink"             
+[205] "AliqID"                 "Comments"               "HospInfo"              
+[208] "OutInfo"                "SpecID"                 "StecEIA"               
+[211] "StecPCR"                "TravelInfo"             "FBO"                   
+[214] "OutPatient"             "RaceAdSite"             "RaceSite"              
+[217] "Homeless"               "cea_clinical_intv"      "cea_travel_intv"       
+[220] "CampyClinic"            "CampySPHL"              "STEC_Class"            
+[223] "serotypesummary"        "PulseNetID"             "PulseNetKey"           
+[226] "RUCC"                   "FIPS"                   "CTNO2010"              
+[229] "CTNO2000"               "SalGroupNumber"         "SalGroupLetter"        
+[232] "CTNO2020"               "PulseNet_WgsId"         "Except_ID"             
+[235] "DX"                     "Status"                 "agegrp"                
+[238] "agegrp2"                "SERO1"                  "sero"                  
+[241] "top10"                  "top20"                 
+
+----- First 10 Rows -----
+# A tibble: 10 × 242
+   NARMS_genrecID StecOAg StecHAg TravelDest_Clean TravelDest_Correct CXCIDT
+   <chr>          <chr>   <chr>   <chr>            <chr>              <chr> 
+ 1 "417212"       ""      ""      ""               ""                 CX+   
+ 2 ""             ""      ""      ""               ""                 CX+   
+ 3 ""             ""      ""      ""               ""                 CX+   
+ 4 ""             ""      ""      ""               ""                 CX+   
+ 5 ""             ""      ""      ""               ""                 CX+   
+ 6 ""             ""      ""      ""               ""                 CX+   
+ 7 ""             ""      ""      ""               ""                 CX+   
+ 8 ""             ""      ""      ""               ""                 CX+   
+ 9 "417220"       ""      ""      ""               ""                 CX+   
+10 ""             ""      ""      ""               ""                 CX+   
+# ℹ 236 more variables: AgClinic <chr>, AgClinicTestType <chr>, AgeMnth <dbl>,
+#   AgeYr <dbl>, AgSphl <chr>, AgSphlTestType <chr>, AR_antacid_any <chr>,
+#   AR_antacid_any_1 <chr>, AR_antacid_any_2 <chr>, AR_antacid_any_3 <chr>,
+#   AR_antibiotic_use <chr>, AR_antibiotic_use_1 <chr>,
+#   AR_antibiotic_use_2 <chr>, AR_antibiotic_use_3 <chr>,
+#   AR_antibiotic_use_4 <chr>, AR_antibiotic_use_5 <chr>,
+#   AR_antibiotic_use_6 <chr>, AR_antibiotic_use_7 <chr>, …

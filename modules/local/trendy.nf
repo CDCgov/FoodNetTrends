@@ -1,39 +1,45 @@
 process TRENDY {
-    tag "trendy"
+    tag "$pathogen"
     label 'process_large'
-
-    conda "${baseDir}/assets/Renv.yaml"
+    shell '/bin/bash'
+    container "foodnet.sif"
 
     input:
-    path whichScript
-    path whichFunctions
-    path mmwrFile
-    path censusFile_B
-    path censusFile_P
-    val travel
-    val cidt
-    val projID
+      val pathogen
+      path mmwrFile
+      path censusFile_B
+      path censusFile_P
+      val travel
+      val cidt
+      val projID
+      val whichScript
+      val preprocessed
+      val cleanFile
 
     output:
-    path 'SplineResults/*.Rds', emit: Rds
-    path 'EstIRRCatch_summary.csv', emit: csv
-    path 'SplineResults/*.png', emit: png
+      // path "${projID}/SplineResults/${pathogen}_brm.Rds", emit: rds
+      // path "${projID}/SplineResults/${pathogen}_IRCatch.csv", emit: csv
+      // path "${projID}/SplineResults/*.png", emit: png
 
     script:
     """
-    # Run the R script with the provided arguments
-    Rscript "trendy.R" \
-        --mmwrFile "$mmwrFile" \
-        --censusFile_B "$censusFile_B" \
-        --censusFile_P "$censusFile_P" \
-        --travel "${travel}" \
-        --cidt "${cidt}" \
-        --projID "${projID}" \
-        --whichFunctions "functions.R" \
-        --debug FALSE
+    mkdir -p ${projID}/SplineResults
 
-    # Combine CSV files into a summary
-    paste SplineResults/EstIRRCatch*.csv > EstIRRCatch_summary.csv
+    # Now run Rscript using the default invocation; the updated PATH and R_LIBS should take effect.
+    Rscript ${whichScript} \\
+      --mmwrFile "$mmwrFile" \\
+      --censusFile_B "$censusFile_B" \\
+      --censusFile_P "$censusFile_P" \\
+      --travel "${travel}" \\
+      --cidt "${cidt}" \\
+      --projID "${projID}" \\
+      --outDir "${projID}/SplineResults" \\
+      --pathogen "${pathogen}" \\
+      --preprocessed ${preprocessed} \\
+      --cleanFile "$cleanFile" \\
+      --debug FALSE
+
+    # paste ${projID}/SplineResults/EstIRRCatch*.csv > EstIRRCatch_summary.csv
     """
 }
 

@@ -1,9 +1,8 @@
 nextflow.enable.dsl = 2
 
 // Create a channel with the list of pathogens to model.
-// This has been modified to only run 2 pathogens for testing. It needs to have the others added before production.
 Channel
-    .from(['CAMPYLOBACTER', 'CYCLOSPORA'])
+    .from(['CAMPYLOBACTER', 'CRYPTOSPORIDIUM', 'CYCLOSPORA', 'LISTERIA', 'SALMONELLA', 'SHIGELLA', 'STEC', 'VIBRIO', 'YERSINIA'])
     .set { pathogens_ch }
 
 // Include the TRENDY module from modules/local/trendy.nf

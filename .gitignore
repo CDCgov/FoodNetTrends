@@ -1,3 +1,7 @@
 # nextflow
 .nextflow/
 .nextflow.log*
+# dev_backups
+dev_backups/
+bin/dev_backups/
+

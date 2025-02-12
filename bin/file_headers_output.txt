@@ -1,0 +1,155 @@
+
+--- START OF: MMWR File ---
+
+File loaded successfully:  /scicomp/groups-pure/OID/NCEZID/DFWED/EDEB/foodnet/trends/data/mmwr9623_Jan2024.sas7bdat 
+Number of Rows: 521923 
+Number of Columns: 242 
+
+Column Names:
+  [1] "NARMS_genrecID"         "StecOAg"                "StecHAg"               
+  [4] "TravelDest_Clean"       "TravelDest_Correct"     "CXCIDT"                
+  [7] "AgClinic"               "AgClinicTestType"       "AgeMnth"               
+ [10] "AgeYr"                  "AgSphl"                 "AgSphlTestType"        
+ [13] "AR_antacid_any"         "AR_antacid_any_1"       "AR_antacid_any_2"      
+ [16] "AR_antacid_any_3"       "AR_antibiotic_use"      "AR_antibiotic_use_1"   
+ [19] "AR_antibiotic_use_2"    "AR_antibiotic_use_3"    "AR_antibiotic_use_4"   
+ [22] "AR_antibiotic_use_5"    "AR_antibiotic_use_6"    "AR_antibiotic_use_7"   
+ [25] "AR_antibiotic_use_8"    "AR_antibiotic_use30"    "AR_antibiotic_use30_1" 
+ [28] "AR_antibiotic_use30_2"  "AR_antibiotic_use30_3"  "AR_antibiotic_use30_4" 
+ [31] "AR_antibiotic_use30_5"  "AR_antibiotic_use30_6"  "AR_antibiotic_use30_7" 
+ [34] "AR_antibiotic_use30_8"  "AR_comorb_abdominal"    "AR_comorb_cancer"      
+ [37] "AR_comorb_diabetes"     "Ar_Diet_veal"           "AR_durationillness"    
+ [40] "AR_HHtrav6mo"           "AR_HHtrav6mo_country"   "AR_hosp_icu"           
+ [43] "AR_probiotic_use30"     "AR_travel6mo"           "AR_travel6mo_country"  
+ [46] "Audit"                  "BioID"                  "BloodyDiarr"           
+ [49] "Campyspec"              "CDCID"                  "CEA_Beef"              
+ [52] "CEA_Beef_grnd"          "CEA_Beef_out"           "CEA_Beef_unckgrnd"     
+ [55] "CEA_Berries"            "CEA_Bird"               "CEA_Cantaloupe"        
+ [58] "CEA_Cat"                "CEA_Chicken"            "CEA_Chx_fresh"         
+ [61] "CEA_Chx_frozen"         "CEA_Chx_grnd"           "CEA_Chx_out"           
+ [64] "CEA_Dairy"              "CEA_Dog"                "CEA_Eggs"              
+ [67] "CEA_Eggs_out"           "CEA_Eggs_unck"          "CEA_Farm_ranch"        
+ [70] "CEA_Fish"               "CEA_Fish_unck"          "CEA_Handle_raw_meat"   
+ [73] "CEA_Handle_raw_poultry" "CEA_Handle_raw_seafood" "CEA_Herbs"             
+ [76] "CEA_Lamb"               "CEA_Lettuce"            "CEA_Live_poultry"      
+ [79] "CEA_Liver_pate"         "CEA_Liver_raw"          "CEA_Milk_pasteurized"  
+ [82] "CEA_Milk_raw"           "CEA_Odairy_raw"         "CEA_Ountreat_water"    
+ [85] "CEA_Pig"                "CEA_Pocketpet"          "CEA_Pork"              
+ [88] "CEA_Raw_cider"          "CEA_Reptile_amphib"     "CEA_Ruminants"         
+ [91] "CEA_Seafd"              "CEA_Sampled"            "CEA_Seafd_unck"        
+ [94] "CEA_Sewer_water"        "CEA_Sick_contact"       "CEA_Sick_pet"          
+ [97] "CEA_Softcheese"         "CEA_Softcheese_raw"     "CEA_Spinach"           
+[100] "CEA_Sprouts"            "CEA_Swim_treat"         "CEA_Swim_untreat"      
+[103] "CEA_Tomatoes"           "CEA_Turkey"             "CEA_Turkey_grnd"       
+[106] "CEA_Turkey_out"         "CEA_Watermelon"         "CEA_Well_water"        
+[109] "County"                 "CultCdc"                "CultClinic"            
+[112] "CultSphl"               "Culturestatus"          "Diarrhea"              
+[115] "Discordant"             "DOB"                    "DtAdmit"               
+[118] "DtAdmit2"               "DtDisch"                "DtDisch2"              
+[121] "DtEntered"              "DtOnset"                "DtRcvd"                
+[124] "DtRptComp"              "DtSpec"                 "DtUSDepart"            
+[127] "DtUSReturn"             "DxO157"                 "DxO157TestType"        
+[130] "EforsNum"               "Ethnicity"              "Fever"                 
+[133] "Hospital"               "Hospstay"               "HospTrans"             
+[136] "HUS"                    "Immigrate"              "Interview"             
+[139] "LabName"                "LabNum"                 "LocalID"               
+[142] "LIlink"                 "Mombaby"                "Mombabyid"             
+[145] "Nstid"                  "OtherCDCTest"           "OtherClinicTest"       
+[148] "OtherClinicTestType"    "OtherSphlTest"          "OtherSphlTestType"     
+[151] "Outbreak"               "OutbrkStID"             "OutbrkType"            
+[154] "Outcome"                "OutFetal"               "Pathogen"              
+[157] "PatID"                  "PcrCDC"                 "PcrClinic"             
+[160] "PCRClinicTestType"      "PcrSphl"                "PcrSphlTestType"       
+[163] "PersonID"               "Pregnant"               "Race"                  
+[166] "ResultID"               "RptComp"                "SentCDC"               
+[169] "SeroSite"               "Sex"                    "SiteID"                
+[172] "SLabsID"                "SpeciesCDC"             "SpeciesClinic"         
+[175] "SpeciesSphl"            "SpecSite"               "SpecSrce"              
+[178] "State"                  "StecH7"                 "StecNM"                
+[181] "StecO157"               "StecStx"                "StLabRcvd"             
+[184] "Study5975id"            "TravelDest"             "TravelInt"             
+[187] "WGS_ID"                 "Zipcode"                "Year"                  
+[190] "Month"                  "Sterile"                "Cste"                  
+[193] "Age"                    "cea_any"                "cea_rep"               
+[196] "cea_intv"               "cea_var40"              "cea_eligible"          
+[199] "Comorb1"                "Comorb2"                "Comorb3"               
+[202] "Comorb4"                "Comorb5"                "NarmsLink"             
+[205] "AliqID"                 "Comments"               "HospInfo"              
+[208] "OutInfo"                "SpecID"                 "StecEIA"               
+[211] "StecPCR"                "TravelInfo"             "FBO"                   
+[214] "OutPatient"             "RaceAdSite"             "RaceSite"              
+[217] "Homeless"               "cea_clinical_intv"      "cea_travel_intv"       
+[220] "CampyClinic"            "CampySPHL"              "STEC_Class"            
+[223] "serotypesummary"        "PulseNetID"             "PulseNetKey"           
+[226] "RUCC"                   "FIPS"                   "CTNO2010"              
+[229] "CTNO2000"               "SalGroupNumber"         "SalGroupLetter"        
+[232] "CTNO2020"               "PulseNet_WgsId"         "Except_ID"             
+[235] "DX"                     "Status"                 "agegrp"                
+[238] "agegrp2"                "SERO1"                  "sero"                  
+[241] "top10"                  "top20"                 
+
+First 5 Rows:
+# A tibble: 5 × 242
+  NARMS_genrecID StecOAg StecHAg TravelDest_Clean TravelDest_Correct CXCIDT
+  <chr>          <chr>   <chr>   <chr>            <chr>              <chr> 
+1 "417212"       ""      ""      ""               ""                 CX+   
+2 ""             ""      ""      ""               ""                 CX+   
+3 ""             ""      ""      ""               ""                 CX+   
+4 ""             ""      ""      ""               ""                 CX+   
+5 ""             ""      ""      ""               ""                 CX+   
+# ℹ 236 more variables: AgClinic <chr>, AgClinicTestType <chr>, AgeMnth <dbl>,
+#   AgeYr <dbl>, AgSphl <chr>, AgSphlTestType <chr>, AR_antacid_any <chr>,
+#   AR_antacid_any_1 <chr>, AR_antacid_any_2 <chr>, AR_antacid_any_3 <chr>,
+#   AR_antibiotic_use <chr>, AR_antibiotic_use_1 <chr>,
+#   AR_antibiotic_use_2 <chr>, AR_antibiotic_use_3 <chr>,
+#   AR_antibiotic_use_4 <chr>, AR_antibiotic_use_5 <chr>,
+#   AR_antibiotic_use_6 <chr>, AR_antibiotic_use_7 <chr>, …
+
+--- END OF: MMWR File ---
+
+
+--- START OF: Census Bacterial File ---
+
+File loaded successfully:  /scicomp/groups-pure/OID/NCEZID/DFWED/EDEB/foodnet/trends/data/cen9623.sas7bdat 
+Number of Rows: 12172 
+Number of Columns: 8 
+
+Column Names:
+[1] "Year"          "State"         "EntryYear"     "State_EntYear"
+[5] "Population"    "STFIP"         "COFIP"         "county"       
+
+First 5 Rows:
+# A tibble: 5 × 8
+   Year State EntryYear State_EntYear Population STFIP COFIP county       
+  <dbl> <chr>     <dbl> <chr>              <dbl> <dbl> <dbl> <chr>        
+1  1996 CA         1996 CA_1996          1351804     6     1 ALAMEDA      
+2  1996 CA         1996 CA_1996           735228     6    75 SAN FRANCISCO
+3  1996 CT         1996 CT_1996           830265     9     3 HARTFORD     
+4  1996 CT         1996 CT_1996           792544     9     9 NEW HAVEN    
+5  1996 GA         1996 GA_1996           201748    13    63 CLAYTON      
+
+--- END OF: Census Bacterial File ---
+
+
+--- START OF: Census Parasitic File ---
+
+File loaded successfully:  /scicomp/groups-pure/OID/NCEZID/DFWED/EDEB/foodnet/trends/data/cen9623_para.sas7bdat 
+Number of Rows: 12034 
+Number of Columns: 8 
+
+Column Names:
+[1] "Year"          "State"         "EntryYear"     "State_EntYear"
+[5] "Population"    "STFIP"         "COFIP"         "county"       
+
+First 5 Rows:
+# A tibble: 5 × 8
+   Year State EntryYear State_EntYear Population STFIP COFIP county       
+  <dbl> <chr>     <dbl> <chr>              <dbl> <dbl> <dbl> <chr>        
+1  1997 CA         1997 CA_1997         1372202      6     1 ALAMEDA      
+2  1997 CA         1997 CA_1997          524705.     6    13 CONTRA COSTA 
+3  1997 CA         1997 CA_1997          740993      6    75 SAN FRANCISCO
+4  1997 CT         1997 CT_1997          833839      9     1 FAIRFIELD    
+5  1997 CT         1997 CT_1997          827511      9     3 HARTFORD     
+
+--- END OF: Census Parasitic File ---
+

@@ -1,0 +1,25 @@
+Bootstrap: docker
+From: continuumio/miniconda3
+
+%labels
+    author Ethan H
+    date 2025-1-14
+    version 1.0.0
+    description FoodNet container with Rscript support
+
+%files
+    foodnet.yml
+
+%post
+    # Create the Conda environment from the YAML file
+    conda env create -f foodnet.yml
+    conda clean --all --yes
+
+    apt-get update
+    apt-get install -y build-essential
+
+%environment
+    export PATH="/opt/conda/envs/FootNetTreands_R/bin:$PATH"
+
+%runscript
+    exec "$@"
