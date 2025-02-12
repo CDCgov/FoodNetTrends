@@ -5,3 +5,7 @@
 dev_backups/
 bin/dev_backups/
 workflows/dev_backup/
+# container
+foodnet.sif
+# cleaned mmwr file
+bin/clean_mmwr.csv
