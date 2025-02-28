@@ -2,7 +2,8 @@
 
 #!/usr/bin/env Rscript
 suppressPackageStartupMessages(library("argparse"))
-source("functions.R")
+source("functions.R") # source("~/AT1_FNTrends/FoodNetTrends/bin/functions.R")
+
 
 ##############################################################
 # Setup
@@ -46,7 +47,7 @@ if (args$debug == FALSE){
   mmwrFile="/scicomp/groups-pure/OID/NCEZID/DFWED/EDEB/foodnet/trends/data/mmwr9623_Jan2024.sas7bdat"
   censusFile_B="/scicomp/groups-pure/OID/NCEZID/DFWED/EDEB/foodnet/trends/data/cen9623.sas7bdat"
   censusFile_P="/scicomp/groups-pure/OID/NCEZID/DFWED/EDEB/foodnet/trends/data/cen9623_para.sas7bdat"
-  projID="20240705"
+  projID="17Jan2025BetaTesting"
   
   #reformat list
   travel=c("NO,UNKNOWN,YES")
@@ -55,7 +56,8 @@ if (args$debug == FALSE){
   cidt=CLEAN_LIST(cidt)
   
   # set outdir
-  outDir="~/projects/ticket/Rspline_test"
+  outDir="~/projects/ticket/Rspline_test" #"~/AT1_FNTrends/mmwr_output/PipelineBetaTest"
+
 }
 
 # load packages
@@ -83,7 +85,7 @@ culture<-ifelse("CIDT+" %in% cidt, "CxCIDT", "Cx")
 # Set outfile base names
 ##############################################################
 outBase=paste0(outDir,"/",
-               projID,"_",# "splinesmodel_", 
+               projID,"_",
                paste(travelLabel,collapse=""),"_",
                paste(culture,collapse=""),"_")
 
@@ -179,7 +181,7 @@ head(bact)
 # Run model
 ##############################################################
 print("--RUN MODEL")
-brm=PROPOSED_BM(bact)
+brm=PROPOSED_BM(bact) # brm=PROPOSED_BM(bact[[LISTERIA]])
 saveFile=paste0(outBase,"brm.Rds")
 saveRDS(brm,saveFile)
 

@@ -87,7 +87,7 @@ culture<-ifelse("CIDT+" %in% cidt, "CxCIDT", "Cx")
 # Set outfile base names
 ##############################################################
 outBase=paste0(outDir,"/",
-               projID,"_","splinesmodel_",
+               projID,"_",
                gsub(" ","",travelLabel),"_",
                paste(culture,collapse=""),"_")
 

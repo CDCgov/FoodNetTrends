@@ -128,8 +128,8 @@ PATH_ANALYSIS<-function(mmwrdata,census){
     distinct() %>%
     as.data.frame()
   
-  saveFile=paste0(outBase,"mmwrdata.csv")
-  write.csv(mergedDf,saveFile)
+  # saveFile=paste0(outBase,"mmwrdata.csv") # Why save the file? We generally try to avoid saving intermediate files to prevent multiple versions of a dataset from accumulating
+  # write.csv(mergedDf,saveFile)
   
   return(mergedDf)
 }
@@ -233,7 +233,7 @@ PROPOSED_BM <- function(bact) {
   # Log model configuration
   cat("Starting BRM model with the following configuration:\n")
   cat(paste0("  - Chains: ", 4, "\n"))
-  cat(paste0("  - Iterations: ", 5001, "\n")) # 101 is too few iterations for convergence. 5001 was needed for less common etiologic agents.
+  cat(paste0("  - Iterations: ", 2501, "\n")) # 101 is too few iterations for convergence. 5001 was needed for less common etiologic agents.
   cat(paste0("  - Cores: ", 9, "\n"))
   cat(paste0("  - Seed: ", 47, "\n"))
   cat(paste0("  - Adapt Delta: ", 0.99, "\n"))
