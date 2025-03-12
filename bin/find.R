@@ -44,10 +44,10 @@ if (args$debug == FALSE){
   
 } else{
   # file args
-  mmwrFile="/scicomp/groups-pure/OID/NCEZID/DFWED/EDEB/foodnet/trends/data/mmwr9623_Jan2024.sas7bdat"
-  censusFile_B="/scicomp/groups-pure/OID/NCEZID/DFWED/EDEB/foodnet/trends/data/cen9623.sas7bdat"
-  censusFile_P="/scicomp/groups-pure/OID/NCEZID/DFWED/EDEB/foodnet/trends/data/cen9623_para.sas7bdat"
-  projID="17Jan2025BetaTesting"
+  mmwrFile="/scicomp/groups-pure/OID/NCEZID/DFWED/EDEB/foodnet/trends/data/mmwr9623_Jan2024.sas7bdat" # "Y:/foodnet/trends/data/mmwr9623_Jan2024.sas7bdat"
+  censusFile_B="/scicomp/groups-pure/OID/NCEZID/DFWED/EDEB/foodnet/trends/data/cen9623.sas7bdat"      # "Y:/foodnet/trends/data/cen9623.sas7bdat"  
+  censusFile_P="/scicomp/groups-pure/OID/NCEZID/DFWED/EDEB/foodnet/trends/data/cen9623_para.sas7bdat" # "Y:/foodnet/trends/data/cen9623_para.sas7bdat"
+  projID="28Feb2025BetaTesting"
   
   #reformat list
   travel=c("NO,UNKNOWN,YES")
@@ -181,9 +181,9 @@ head(bact)
 # Run model
 ##############################################################
 print("--RUN MODEL")
-brm=PROPOSED_BM(bact) # brm=PROPOSED_BM(bact[[LISTERIA]])
-saveFile=paste0(outBase,"brm.Rds")
-saveRDS(brm,saveFile)
+baymodel=PROPOSED_BM(bact) # baymodel=PROPOSED_BM(bact$CAMPYLOBACTER) # renaming because brm is a function in brms 
+saveFile=paste0(outBase,"baymodel.Rds")
+saveRDS(baymodel,saveFile)
 
 # Draw untransformed (link-level) predictionsusing 
 # add_linpred (aka add_fitted_draws) and transform them

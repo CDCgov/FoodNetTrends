@@ -228,7 +228,7 @@ SALMONELLA_ANALYSIS<-function(pathDf,mmwrdata,census){
 ##################################################################
 PROPOSED_BM <- function(bact) {
   # Define output file for the model
-  output_file <- paste0(outBase, "brm_model.Rds")
+  output_file <- paste0(outBase, "baymodel.Rds")
   
   # Log model configuration
   cat("Starting BRM model with the following configuration:\n")
