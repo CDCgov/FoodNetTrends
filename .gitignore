@@ -1,11 +1,29 @@
 # nextflow
 .nextflow/
 .nextflow.log*
+.nextflow*
+work/
 # dev_backups
 dev_backups/
 bin/dev_backups/
 workflows/dev_backup/
 # container
 foodnet.sif
+*.sif
 # cleaned mmwr file
 bin/clean_mmwr.csv
+# all backup copies
+*.bak*
+*clean_mmwr.csv
+# output directories
+output/
+null/
+# large data files
+*_brm.Rds
+*.png
+*_IRCatch.csv
+# git pack files over certain size
+.git/objects/pack/pack-*.pack
+# log files
+*.log*
+FoodNetTrends.*

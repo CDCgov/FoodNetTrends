@@ -1,6 +1,5 @@
 #!/usr/bin/env Rscript
 
-# this is currently hard coded to use 16 cores
 # Load required libraries
 suppressPackageStartupMessages(library("argparse"))
 suppressPackageStartupMessages(library("dplyr"))
@@ -8,11 +7,17 @@ suppressPackageStartupMessages(library("haven"))
 suppressPackageStartupMessages(library("brms"))
 suppressPackageStartupMessages(library("tidybayes"))
 suppressPackageStartupMessages(library("HDInterval"))
+suppressPackageStartupMessages(library("ggplot2"))
+suppressPackageStartupMessages(library("gridExtra"))
 
 # Set warning options
 options(warn = -1)
 
 sink("output_log.txt")  # Redirect output to a log file
+
+# Dynamically determine number of cores to use based on available resources
+available_cores <- parallel::detectCores()
+model_cores <- min(available_cores, as.integer(Sys.getenv("NCPUS", available_cores)))
 
 ################################################################################
 # Argument Parsing
@@ -40,13 +45,15 @@ parser$add_argument("--preprocessed", type = "logical", default = FALSE,
                     help = "Set to TRUE if using preprocessed CSV data")
 parser$add_argument("--cleanFile", type = "character", default = NULL,
                     help = "Path to cleaned CSV file (if --preprocessed is TRUE)")
+parser$add_argument("--use_splines", type = "logical", default = TRUE,
+                    help = "Use spline-based model instead of linear model")
 opts <- parser$parse_args()
 
 # Make options globally available
 assign("opts", opts, envir = .GlobalEnv)
 
 # Load helper functions
-source("/scicomp/home-pure/rqu4/PROJECTS/SCICOMP/FoodNetTrends/FoodNetTrends4Ethan/bin/functions.R")
+source("/scicomp/home-pure/smn9/FoodNetTrends/bin/functions.R")
 
 ################################################################################
 # Set parameters
@@ -58,10 +65,11 @@ if (!opts$debug) {
   projID        <- opts$projID
   travel        <- CLEAN_LIST(opts$travel)
   cidt          <- CLEAN_LIST(opts$cidt)
-  outDir        <- paste0(projID, "/", "SplineResults")
+  outDir        <- opts$outDir
   pathogen_arg  <- opts$pathogen
   preprocessed  <- opts$preprocessed
   cleanFile     <- opts$cleanFile
+  use_splines   <- opts$use_splines
 } else {
   # Debug mode defaults
   mmwrFile      <- "/scicomp/groups-pure/OID/NCEZID/DFWED/EDEB/foodnet/trends/data/mmwr9623_Jan2024.sas7bdat"
@@ -70,13 +78,14 @@ if (!opts$debug) {
   projID        <- "20240705"
   travel        <- CLEAN_LIST(c("NO", "UNKNOWN", "YES"))
   cidt          <- CLEAN_LIST(c("CIDT+", "CX+", "PARASITIC"))
-  outDir        <- paste0(projID, "/", "SplineResults")
+  outDir        <- "./"
   pathogen_arg  <- opts$pathogen
   preprocessed  <- opts$preprocessed
   cleanFile     <- opts$cleanFile
+  use_splines   <- TRUE
 }
 
-# Create output directory
+# Create output directory if needed
 dir.create(outDir, showWarnings = FALSE, recursive = TRUE)
 
 ################################################################################
@@ -133,17 +142,36 @@ mmwrdata <- mmwrdata %>%
 # Model Fitting
 ################################################################################
 message("-- FITTING MODELS --")
-PROPOSED_BM <- function(data) {
-  model <- brm(
-    count ~ Year + State + offset(log(Population)),
-    data = data,
-    family = negbinomial(),
-    chains = 1,
-    iter = 100,
-    cores = 16,
-    control = list(adapt_delta = 0.95, max_treedepth = 5)
-  )
-  return(model)
+
+# Define model based on use_splines flag
+if (use_splines) {
+  message("Using spline-based model")
+  CURRENT_MODEL <- function(data) {
+    model <- brm(
+      count ~ s(Year, by = State) + State + offset(log(Population)),
+      data = data,
+      family = negbinomial(),
+      chains = 4,
+      iter = 2000,
+      cores = model_cores,
+      control = list(adapt_delta = 0.99, max_treedepth = 15)
+    )
+    return(model)
+  }
+} else {
+  message("Using linear model")
+  CURRENT_MODEL <- function(data) {
+    model <- brm(
+      count ~ Year + State + offset(log(Population)),
+      data = data,
+      family = negbinomial(),
+      chains = 4,
+      iter = 2000,
+      cores = model_cores,
+      control = list(adapt_delta = 0.99, max_treedepth = 15)
+    )
+    return(model)
+  }
 }
 
 if (nrow(mmwrdata) == 0) {
@@ -151,7 +179,7 @@ if (nrow(mmwrdata) == 0) {
 }
 
 message("Fitting model for pathogen: ", unique(mmwrdata$Pathogen))
-model_fit <- try(PROPOSED_BM(mmwrdata), silent = TRUE)
+model_fit <- try(CURRENT_MODEL(mmwrdata), silent = TRUE)
 if (inherits(model_fit, "try-error")) {
   stop(paste("Error fitting model for", unique(mmwrdata$Pathogen), ":", model_fit[1])) # Extract error message
 } else {
@@ -162,46 +190,7 @@ if (inherits(model_fit, "try-error")) {
 ################################################################################
 # Post-Model Processing
 ################################################################################
-# message("-- POST-MODEL PROCESSING --")
-# model_data <- model_fit$data
-# if (!inherits(model_data, "data.frame")) {
-#   model_data <- as.data.frame(model_data)
-# }
-# if (!"Population" %in% names(model_data) && "population" %in% names(model_data)) {
-#   model_data <- model_data %>% mutate(Population = population)
-# }
-# if (!"count" %in% names(model_data)) {
-#   stop("Column 'count' not found in the model data.")
-# }
-# model_data <- distinct(model_data, State, Year, Population, count, .keep_all = TRUE)
-# posteriorLinpred <- LINPREAD_DRAW_FN(data = model_data, model = model_fit)
-# catch <- CATCHMENT(posteriorLinpred)
-# catchir.linpred <- LINPRED_TO_CATCHIR(catch)
-# csv_file <- file.path(outDir, paste0(unique(mmwrdata$Pathogen), "_IRCatch.csv"))
-# SAFE_WRITE(catchir.linpred, csv_file)
-# message("Post-model processing complete. CSV saved to ", csv_file)
-# message("-- ANALYSIS COMPLETE --")
-
-# message("Run completed. Printing sessionInfo:")
-# sessionInfo()
-
-################################################################################
-# Post-Model Processing
-################################################################################
 message("-- POST-MODEL PROCESSING --")
-
-# Skip the model data processing to bypass errors
-# model_data <- model_fit$data
-# if (!inherits(model_data, "data.frame")) {
-#   model_data <- as.data.frame(model_data)
-# }
-# if (!"Population" %in% names(model_data) && "population" %in% names(model_data)) {
-#   model_data <- model_data %>% mutate(Population = population)
-# }
-# if (!"count" %in% names(model_data)) {
-#   stop("Column 'count' not found in the model data.")
-# }
-# model_data <- distinct(model_data, State, Year, Population, count, .keep_all = TRUE)
 
 # Directly use the model fit object instead of processed data
 posteriorLinpred <- tryCatch({
@@ -218,7 +207,7 @@ if (!is.null(posteriorLinpred)) {
     message("Error in CATCHMENT: ", e$message)
     return(NULL)
   })
-  
+
   if (!is.null(catch)) {
     catchir.linpred <- tryCatch({
       LINPRED_TO_CATCHIR(catch)
@@ -226,11 +215,83 @@ if (!is.null(posteriorLinpred)) {
       message("Error in LINPRED_TO_CATCHIR: ", e$message)
       return(NULL)
     })
-    
+
     if (!is.null(catchir.linpred)) {
       csv_file <- file.path(outDir, paste0(unique(mmwrdata$Pathogen), "_IRCatch.csv"))
       SAFE_WRITE(catchir.linpred, csv_file)
       message("Post-model processing complete. CSV saved to ", csv_file)
+
+      # Generate visualizations if ggplot2 and gridExtra are available
+      if (requireNamespace("ggplot2", quietly = TRUE) && requireNamespace("gridExtra", quietly = TRUE)) {
+        tryCatch({
+          # Create site-specific trends plot
+          site_plot <- ggplot(catchir.linpred, aes(x = Year, y = median_incidence)) +
+            geom_line(linewidth = 1) +
+            geom_ribbon(aes(ymin = lower_hdi, ymax = upper_hdi), alpha = 0.3) +
+            facet_wrap(~ State, scales = "free_y") +
+            labs(
+              title = paste("Site-Specific Trends for", unique(mmwrdata$Pathogen)),
+              subtitle = "Median incidence with 95% HDI intervals",
+              y = "Incidence per 100,000 population",
+              x = "Year"
+            ) +
+            theme_minimal() +
+            theme(
+              plot.title = element_text(hjust = 0.5, face = "bold"),
+              plot.subtitle = element_text(hjust = 0.5),
+              strip.text = element_text(face = "bold")
+            )
+
+          # Save the site-specific plot
+          site_plot_file <- file.path(outDir, paste0(unique(mmwrdata$Pathogen), "_site_trends.png"))
+          ggsave(site_plot_file, site_plot, width = 12, height = 8, dpi = 300)
+          message("Site-specific trends plot saved to ", site_plot_file)
+
+          # Calculate overall incidence by year
+          overall_data <- catchir.linpred %>%
+            group_by(Year) %>%
+            summarise(
+              median_incidence = mean(median_incidence),
+              lower_hdi = mean(lower_hdi),
+              upper_hdi = mean(upper_hdi),
+              .groups = "drop"
+            )
+
+          # Create overall trend plot
+          overall_plot <- ggplot(overall_data, aes(x = Year, y = median_incidence)) +
+            geom_line(linewidth = 1.5) +
+            geom_ribbon(aes(ymin = lower_hdi, ymax = upper_hdi), alpha = 0.3) +
+            labs(
+              title = paste("Overall Trend for", unique(mmwrdata$Pathogen)),
+              subtitle = "Median incidence with 95% HDI intervals",
+              y = "Incidence per 100,000 population",
+              x = "Year"
+            ) +
+            theme_minimal() +
+            theme(
+              plot.title = element_text(hjust = 0.5, face = "bold"),
+              plot.subtitle = element_text(hjust = 0.5)
+            )
+
+          # Save the overall plot
+          overall_plot_file <- file.path(outDir, paste0(unique(mmwrdata$Pathogen), "_overall_trend.png"))
+          ggsave(overall_plot_file, overall_plot, width = 10, height = 6, dpi = 300)
+          message("Overall trend plot saved to ", overall_plot_file)
+
+          # Combine the plots
+          combined_plot <- gridExtra::grid.arrange(overall_plot, site_plot,
+                                                  ncol = 1, heights = c(1, 2))
+
+          # Save the combined plot
+          combined_plot_file <- file.path(outDir, paste0(unique(mmwrdata$Pathogen), "_combined.png"))
+          ggsave(combined_plot_file, combined_plot, width = 12, height = 14, dpi = 300)
+          message("Combined visualization saved to ", combined_plot_file)
+        }, error = function(e) {
+          message("Error generating visualizations: ", e$message)
+        })
+      } else {
+        message("Skipping visualizations: ggplot2 or gridExtra not available.")
+      }
     } else {
       message("Skipping post-model processing: Error in LINPRED_TO_CATCHIR.")
     }
@@ -244,4 +305,8 @@ if (!is.null(posteriorLinpred)) {
 message("-- ANALYSIS COMPLETE --")
 
 message("Run completed. Printing sessionInfo:")
-sessionInfo()
+print(sessionInfo())
+
+# Close the log file
+sink()
+

@@ -3,6 +3,7 @@ process TRENDY {
     label 'process_large'
     shell '/bin/bash'
     container "foodnet.sif"
+    publishDir "${params.outdir}/${projID}/spline_results", mode: 'copy'
 
     input:
       val pathogen
@@ -17,15 +18,13 @@ process TRENDY {
       val cleanFile
 
     output:
-      // path "${projID}/SplineResults/${pathogen}_brm.Rds", emit: rds
-      // path "${projID}/SplineResults/${pathogen}_IRCatch.csv", emit: csv
-      // path "${projID}/SplineResults/*.png", emit: png
+      path "${pathogen}_brm.Rds", emit: rds
+      path "${pathogen}_IRCatch.csv", emit: csv
+      path "${pathogen}_*.png", emit: png
 
     script:
     """
-    mkdir -p ${projID}/SplineResults
-
-    # Now run Rscript using the default invocation; the updated PATH and R_LIBS should take effect.
+    # Run Rscript using the default invocation
     Rscript ${whichScript} \\
       --mmwrFile "$mmwrFile" \\
       --censusFile_B "$censusFile_B" \\
@@ -33,13 +32,11 @@ process TRENDY {
       --travel "${travel}" \\
       --cidt "${cidt}" \\
       --projID "${projID}" \\
-      --outDir "${projID}/SplineResults" \\
+      --outDir "./" \\
       --pathogen "${pathogen}" \\
       --preprocessed ${preprocessed} \\
       --cleanFile "$cleanFile" \\
       --debug FALSE
-
-    # paste ${projID}/SplineResults/EstIRRCatch*.csv > EstIRRCatch_summary.csv
     """
 }
 
