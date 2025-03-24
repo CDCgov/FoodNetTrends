@@ -1,43 +1,103 @@
-nextflow.enable.dsl = 2
+#!/usr/bin/env nextflow
 
-// Create a channel with the list of pathogens to model.
-// This has been modified to only run 2 pathogens for testing. It needs to have the others added before production.
-Channel
-    .from(['CAMPYLOBACTER', 'CYCLOSPORA'])
-    .set { pathogens_ch }
-
-// Include the modules
-include { TRENDY } from '../modules/local/trendy.nf'
-include { PREPROCESS } from '../modules/local/preprocess.nf'
+// Import modules
+include { TRENDY } from '../modules/local/trendy'
+include { PREPROCESS } from '../modules/local/preprocess'
 
 workflow SPLINE {
-    // Define a parameter to control preprocessing
-    def skipPreprocessing = params.preprocessed
-
-    // Conditionally run preprocessing
-    if (!skipPreprocessing) {
-        PREPROCESS(
-            Channel.value(params.mmwrFile),
-            Channel.value(params.projID)
-        )
-        clean_file = PREPROCESS.out.clean_csv
-        use_preprocessed = true
+    // Define input channels
+    if (params.pathogen) {
+        // If specific pathogen is requested, use it
+        pathogens = Channel.of(params.pathogen)
     } else {
-        clean_file = Channel.value(params.cleanFile ?: '')
-        use_preprocessed = params.preprocessed
+        // Default to CAMPYLOBACTER and CYCLOSPORA for testing
+        pathogens = Channel.of('CAMPYLOBACTER', 'CYCLOSPORA')
     }
 
-    TRENDY(
-      pathogens_ch,                          // 1. Pathogen channel (positional)
-      Channel.value(params.mmwrFile),        // 2. mmwrFile (still needed for reference)
-      Channel.value(params.censusFile_B),    // 3. censusFile_B
-      Channel.value(params.censusFile_P),    // 4. censusFile_P
-      Channel.value(params.travel),          // 5. travel
-      Channel.value(params.cidt),            // 6. cidt
-      Channel.value(params.projID),          // 7. projID
-      Channel.value(params.whichScript),     // 8. whichScript (path to trendy.R)
-      Channel.value(true),                   // 9. preprocessed flag (always true when we handle it here)
-      clean_file                             // 10. cleanFile (path to cleaned CSV)
-    )
-}
+    // Input files
+    mmwrFile = file(params.mmwrFile)
+    censusFileB = file(params.censusFileB)
+    censusFileP = file(params.censusFileP)
 
+    // Check if files exist
+    if (!mmwrFile.exists()) {
+        error "MMWR file not found: ${params.mmwrFile}"
+    }
+    if (!censusFileB.exists()) {
+        error "Census bacterial file not found: ${params.censusFileB}"
+    }
+    if (!censusFileP.exists()) {
+        error "Census parasitic file not found: ${params.censusFileP}"
+    }
+
+    // Log pipeline start
+    log.info """
+    ==============================================
+    FoodNet Trends Pipeline
+    ==============================================
+    Project ID    : ${params.projID}
+    MMWR File     : ${params.mmwrFile}
+    Census Files  : ${params.censusFileB}, ${params.censusFileP}
+    Travel        : ${params.travel}
+    CIDT          : ${params.cidt}
+    Cores         : ${params.cpus ?: 'default'}
+    Chains        : ${params.chains}
+    Iterations    : ${params.iterations}
+    Adapt Delta   : ${params.adapt_delta}
+    Max Treedepth : ${params.max_treedepth}
+    Seed          : ${params.seed}
+    Output Dir    : ${params.outdir}/${params.projID}
+    ==============================================
+    """
+
+    // Conditional preprocessing
+    if (params.preprocessed) {
+        log.info "Using preprocessed data from: ${params.cleanFile}"
+        cleanFile = file(params.cleanFile)
+        if (!cleanFile.exists()) {
+            error "Preprocessed file not found: ${params.cleanFile}"
+        }
+
+        // Run TRENDY with preprocessed data
+        TRENDY(
+            pathogens,
+            mmwrFile,
+            censusFileB,
+            censusFileP,
+            params.travel,
+            params.cidt,
+            params.projID,
+            params.trendyScript,
+            params.preprocessed,
+            cleanFile
+        )
+    } else {
+        log.info "Preprocessing raw data files"
+
+        // Run preprocessing step
+        PREPROCESS(
+            mmwrFile,
+            params.projID
+        )
+
+        // Create a proper channel from the preprocessed file
+        processedFile = PREPROCESS.out.cleanFile.first()
+
+        // Run TRENDY with processed data
+        TRENDY(
+            pathogens,
+            mmwrFile,
+            censusFileB,
+            censusFileP,
+            params.travel,
+            params.cidt,
+            params.projID,
+            params.trendyScript,
+            params.preprocessed,
+            processedFile
+        )
+    }
+
+    // Log completion
+    log.info "Pipeline completed successfully"
+}

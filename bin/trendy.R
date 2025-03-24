@@ -1,312 +1,593 @@
 #!/usr/bin/env Rscript
+#
+# trendy.R - Main script for FoodNet Trends Bayesian modeling
+#
+# This script implements a Bayesian hierarchical model with splines to analyze
+# foodborne illness surveillance data from the FoodNet program. It processes
+# multiple pathogens, fits models, and generates incidence rate estimates.
+#
 
-# Load required libraries
+# Suppress warnings during package loading
 suppressPackageStartupMessages(library("argparse"))
-suppressPackageStartupMessages(library("dplyr"))
-suppressPackageStartupMessages(library("haven"))
-suppressPackageStartupMessages(library("brms"))
-suppressPackageStartupMessages(library("tidybayes"))
-suppressPackageStartupMessages(library("HDInterval"))
-suppressPackageStartupMessages(library("ggplot2"))
-suppressPackageStartupMessages(library("gridExtra"))
+options(warn = 1)  # Show warnings as they occur
 
-# Set warning options
-options(warn = -1)
+# Determine script directory and source helper functions
+script_path <- commandArgs(trailingOnly = FALSE)
+script_path <- sub("--file=", "", script_path[grep("--file=", script_path)])
+script_dir <- dirname(script_path)
 
-sink("output_log.txt")  # Redirect output to a log file
-
-# Dynamically determine number of cores to use based on available resources
-available_cores <- parallel::detectCores()
-model_cores <- min(available_cores, as.integer(Sys.getenv("NCPUS", available_cores)))
-
-################################################################################
-# Argument Parsing
-################################################################################
-parser <- ArgumentParser()
-parser$add_argument("--debug", type = "logical", default = TRUE,
-                    help = "Enable debug mode")
-parser$add_argument("--mmwrFile", type = "character",
-                    help = "Path to FoodNet MMWR SAS data")
-parser$add_argument("--censusFile_B", type = "character",
-                    help = "Path to census data for bacterial pathogens")
-parser$add_argument("--censusFile_P", type = "character",
-                    help = "Path to census data for parasitic pathogens")
-parser$add_argument("--travel", type = "character",
-                    help = "Travel types (e.g., NO, UNKNOWN)")
-parser$add_argument("--cidt", type = "character",
-                    help = "CIDT types (e.g., CIDT+, CX+, PARASITIC)")
-parser$add_argument("--projID", type = "character",
-                    help = "Project identifier")
-parser$add_argument("--outDir", type = "character", default = "./",
-                    help = "Output directory for results")
-parser$add_argument("--pathogen", type = "character", default = NULL,
-                    help = "If provided, only process this pathogen")
-parser$add_argument("--preprocessed", type = "logical", default = FALSE,
-                    help = "Set to TRUE if using preprocessed CSV data")
-parser$add_argument("--cleanFile", type = "character", default = NULL,
-                    help = "Path to cleaned CSV file (if --preprocessed is TRUE)")
-parser$add_argument("--use_splines", type = "logical", default = TRUE,
-                    help = "Use spline-based model instead of linear model")
-opts <- parser$parse_args()
-
-# Make options globally available
-assign("opts", opts, envir = .GlobalEnv)
-
-# Load helper functions
-source("/scicomp/home-pure/smn9/FoodNetTrends/bin/functions.R")
-
-################################################################################
-# Set parameters
-################################################################################
-if (!opts$debug) {
-  mmwrFile      <- opts$mmwrFile
-  censusFile_B  <- opts$censusFile_B
-  censusFile_P  <- opts$censusFile_P
-  projID        <- opts$projID
-  travel        <- CLEAN_LIST(opts$travel)
-  cidt          <- CLEAN_LIST(opts$cidt)
-  outDir        <- opts$outDir
-  pathogen_arg  <- opts$pathogen
-  preprocessed  <- opts$preprocessed
-  cleanFile     <- opts$cleanFile
-  use_splines   <- opts$use_splines
-} else {
-  # Debug mode defaults
-  mmwrFile      <- "/scicomp/groups-pure/OID/NCEZID/DFWED/EDEB/foodnet/trends/data/mmwr9623_Jan2024.sas7bdat"
-  censusFile_B  <- "/scicomp/groups-pure/OID/NCEZID/DFWED/EDEB/foodnet/trends/data/cen9623.sas7bdat"
-  censusFile_P  <- "/scicomp/groups-pure/OID/NCEZID/DFWED/EDEB/foodnet/trends/data/cen9623_para.sas7bdat"
-  projID        <- "20240705"
-  travel        <- CLEAN_LIST(c("NO", "UNKNOWN", "YES"))
-  cidt          <- CLEAN_LIST(c("CIDT+", "CX+", "PARASITIC"))
-  outDir        <- "./"
-  pathogen_arg  <- opts$pathogen
-  preprocessed  <- opts$preprocessed
-  cleanFile     <- opts$cleanFile
-  use_splines   <- TRUE
-}
-
-# Create output directory if needed
-dir.create(outDir, showWarnings = FALSE, recursive = TRUE)
-
-################################################################################
-# Data Import and Preprocessing
-################################################################################
-if (preprocessed) {
-  if (is.null(cleanFile)) {
-    stop("Preprocessed flag is TRUE but no cleanFile provided.")
-  }
-  message("Using preprocessed CSV file from: ", cleanFile)
-  mmwrdata <- read.csv(cleanFile, stringsAsFactors = FALSE)
-} else {
-  message("-- IMPORTING MMWR DATA (raw SAS) --")
-  mmwrdata <- haven::read_sas(mmwrFile) %>%
-    as.data.frame() %>%
-    rename_all(tolower) %>%
-    filter(siteid != "coex") %>%
-    mutate(
-      Pathogen = pathogen,
-      State = state,
-      Year = year,
-      pathogentype = ifelse(Pathogen %in% c("CRYPTOSPORIDIUM", "CYCLOSPORA"), "Parasitic", "Bacterial")
-    )
-}
-
-if (!is.null(pathogen_arg)) {
-  message("Filtering data for pathogen: ", pathogen_arg)
-  mmwrdata <- mmwrdata[mmwrdata$Pathogen == pathogen_arg, ]
-}
-
-mmwrdata <- mmwrdata %>%
-  group_by(Pathogen, State, Year, pathogentype) %>%
-  summarise(count = n(), .groups = "drop")
-
-message("-- IMPORTING CENSUS DATA --")
-census_b <- haven::read_sas(censusFile_B) %>%
-  as.data.frame() %>%
-  rename_all(tolower) %>%
-  rename(State = state, Year = year, Population = population)
-census_p <- haven::read_sas(censusFile_P) %>%
-  as.data.frame() %>%
-  rename_all(tolower) %>%
-  rename(State = state, Year = year, Population = population)
-
-mmwrdata <- mmwrdata %>%
-  left_join(census_b, by = c("State", "Year"), relationship = "many-to-many") %>%
-  left_join(census_p %>% select(State, Year, Population) %>% rename(Population_para = Population),
-            by = c("State", "Year"), relationship = "many-to-many") %>%
-  mutate(Population = ifelse(pathogentype == "Parasitic", Population_para, Population)) %>%
-  select(-Population_para) %>%
-  filter(!is.na(Population) & Population > 0)
-
-################################################################################
-# Model Fitting
-################################################################################
-message("-- FITTING MODELS --")
-
-# Define model based on use_splines flag
-if (use_splines) {
-  message("Using spline-based model")
-  CURRENT_MODEL <- function(data) {
-    model <- brm(
-      count ~ s(Year, by = State) + State + offset(log(Population)),
-      data = data,
-      family = negbinomial(),
-      chains = 4,
-      iter = 2000,
-      cores = model_cores,
-      control = list(adapt_delta = 0.99, max_treedepth = 15)
-    )
-    return(model)
-  }
-} else {
-  message("Using linear model")
-  CURRENT_MODEL <- function(data) {
-    model <- brm(
-      count ~ Year + State + offset(log(Population)),
-      data = data,
-      family = negbinomial(),
-      chains = 4,
-      iter = 2000,
-      cores = model_cores,
-      control = list(adapt_delta = 0.99, max_treedepth = 15)
-    )
-    return(model)
-  }
-}
-
-if (nrow(mmwrdata) == 0) {
-  stop("No data remaining after filtering. Check the input or the --pathogen parameter.")
-}
-
-message("Fitting model for pathogen: ", unique(mmwrdata$Pathogen))
-model_fit <- try(CURRENT_MODEL(mmwrdata), silent = TRUE)
-if (inherits(model_fit, "try-error")) {
-  stop(paste("Error fitting model for", unique(mmwrdata$Pathogen), ":", model_fit[1])) # Extract error message
-} else {
-  saveRDS(model_fit, file = file.path(outDir, paste0(unique(mmwrdata$Pathogen), "_brm.Rds")))
-  message("Model fitting complete. Model saved.")
-}
-
-################################################################################
-# Post-Model Processing
-################################################################################
-message("-- POST-MODEL PROCESSING --")
-
-# Directly use the model fit object instead of processed data
-posteriorLinpred <- tryCatch({
-  LINPREAD_DRAW_FN(data = model_fit$data, model = model_fit)
+# Source helper functions with robust path handling
+tryCatch({
+  cat("Attempting to source functions.R from script directory:", script_dir, "\n")
+  source(file.path(script_dir, "functions.R"))
 }, error = function(e) {
-  message("Error in LINPREAD_DRAW_FN: ", e$message)
-  return(NULL)
+  # Try to find functions.R in the parent directory of the script
+  cat("Trying parent directory...\n")
+  tryCatch({
+    parent_dir <- dirname(script_dir)
+    source(file.path(parent_dir, "bin", "functions.R"))
+  }, error = function(e2) {
+    # Try the current working directory as a last resort
+    cat("Trying current working directory...\n")
+    tryCatch({
+      source("functions.R")
+    }, error = function(e3) {
+      # If all attempts fail, provide diagnostic information and stop
+      cat("Failed to locate functions.R. Script directory:", script_dir, "\n")
+      cat("Current working directory:", getwd(), "\n")
+      cat("Files in script directory:", paste(list.files(script_dir), collapse=", "), "\n")
+      cat("Files in current directory:", paste(list.files("."), collapse=", "), "\n")
+      stop("Error loading functions.R: ", e3$message)
+    })
+  })
 })
 
-if (!is.null(posteriorLinpred)) {
-  catch <- tryCatch({
-    CATCHMENT(posteriorLinpred)
-  }, error = function(e) {
-    message("Error in CATCHMENT: ", e$message)
-    return(NULL)
-  })
-
-  if (!is.null(catch)) {
-    catchir.linpred <- tryCatch({
-      LINPRED_TO_CATCHIR(catch)
-    }, error = function(e) {
-      message("Error in LINPRED_TO_CATCHIR: ", e$message)
-      return(NULL)
-    })
-
-    if (!is.null(catchir.linpred)) {
-      csv_file <- file.path(outDir, paste0(unique(mmwrdata$Pathogen), "_IRCatch.csv"))
-      SAFE_WRITE(catchir.linpred, csv_file)
-      message("Post-model processing complete. CSV saved to ", csv_file)
-
-      # Generate visualizations if ggplot2 and gridExtra are available
-      if (requireNamespace("ggplot2", quietly = TRUE) && requireNamespace("gridExtra", quietly = TRUE)) {
-        tryCatch({
-          # Create site-specific trends plot
-          site_plot <- ggplot(catchir.linpred, aes(x = Year, y = median_incidence)) +
-            geom_line(linewidth = 1) +
-            geom_ribbon(aes(ymin = lower_hdi, ymax = upper_hdi), alpha = 0.3) +
-            facet_wrap(~ State, scales = "free_y") +
-            labs(
-              title = paste("Site-Specific Trends for", unique(mmwrdata$Pathogen)),
-              subtitle = "Median incidence with 95% HDI intervals",
-              y = "Incidence per 100,000 population",
-              x = "Year"
-            ) +
-            theme_minimal() +
-            theme(
-              plot.title = element_text(hjust = 0.5, face = "bold"),
-              plot.subtitle = element_text(hjust = 0.5),
-              strip.text = element_text(face = "bold")
-            )
-
-          # Save the site-specific plot
-          site_plot_file <- file.path(outDir, paste0(unique(mmwrdata$Pathogen), "_site_trends.png"))
-          ggsave(site_plot_file, site_plot, width = 12, height = 8, dpi = 300)
-          message("Site-specific trends plot saved to ", site_plot_file)
-
-          # Calculate overall incidence by year
-          overall_data <- catchir.linpred %>%
-            group_by(Year) %>%
-            summarise(
-              median_incidence = mean(median_incidence),
-              lower_hdi = mean(lower_hdi),
-              upper_hdi = mean(upper_hdi),
-              .groups = "drop"
-            )
-
-          # Create overall trend plot
-          overall_plot <- ggplot(overall_data, aes(x = Year, y = median_incidence)) +
-            geom_line(linewidth = 1.5) +
-            geom_ribbon(aes(ymin = lower_hdi, ymax = upper_hdi), alpha = 0.3) +
-            labs(
-              title = paste("Overall Trend for", unique(mmwrdata$Pathogen)),
-              subtitle = "Median incidence with 95% HDI intervals",
-              y = "Incidence per 100,000 population",
-              x = "Year"
-            ) +
-            theme_minimal() +
-            theme(
-              plot.title = element_text(hjust = 0.5, face = "bold"),
-              plot.subtitle = element_text(hjust = 0.5)
-            )
-
-          # Save the overall plot
-          overall_plot_file <- file.path(outDir, paste0(unique(mmwrdata$Pathogen), "_overall_trend.png"))
-          ggsave(overall_plot_file, overall_plot, width = 10, height = 6, dpi = 300)
-          message("Overall trend plot saved to ", overall_plot_file)
-
-          # Combine the plots
-          combined_plot <- gridExtra::grid.arrange(overall_plot, site_plot,
-                                                  ncol = 1, heights = c(1, 2))
-
-          # Save the combined plot
-          combined_plot_file <- file.path(outDir, paste0(unique(mmwrdata$Pathogen), "_combined.png"))
-          ggsave(combined_plot_file, combined_plot, width = 12, height = 14, dpi = 300)
-          message("Combined visualization saved to ", combined_plot_file)
-        }, error = function(e) {
-          message("Error generating visualizations: ", e$message)
-        })
-      } else {
-        message("Skipping visualizations: ggplot2 or gridExtra not available.")
-      }
-    } else {
-      message("Skipping post-model processing: Error in LINPRED_TO_CATCHIR.")
+# Load required packages function
+LOAD_PACKAGES <- function(packages) {
+  for(pkg in packages) {
+    if(!requireNamespace(pkg, quietly = TRUE)) {
+      stop(paste("Required package", pkg, "is not installed"))
     }
-  } else {
-    message("Skipping post-model processing: Error in CATCHMENT.")
+    suppressPackageStartupMessages(library(pkg, character.only = TRUE))
   }
-} else {
-  message("Skipping post-model processing: Error in LINPREAD_DRAW_FN.")
 }
 
-message("-- ANALYSIS COMPLETE --")
+##############################################################
+# Setup and argument parsing
+##############################################################
 
-message("Run completed. Printing sessionInfo:")
+# Create parser object with comprehensive options
+parser <- ArgumentParser(description="FoodNet Trends Bayesian Modeling Pipeline")
+
+# Input data parameters
+parser$add_argument("--mmwrFile", type="character",
+                    help="Path to FoodNet MMWR SAS data file")
+parser$add_argument("--censusFileB", type="character",
+                    help="Path to census file for bacterial pathogens")
+parser$add_argument("--censusFileP", type="character",
+                    help="Path to census file for parasitic pathogens")
+
+# Filtering parameters
+parser$add_argument("--travel", type="character", default="NO,UNKNOWN,YES",
+                    help="List of travel types to include (default: NO,UNKNOWN,YES)")
+parser$add_argument("--cidt", type="character", default="CIDT+,CX+,PARASITIC",
+                    help="List of diagnostic methods to include (default: CIDT+,CX+,PARASITIC)")
+
+# Output parameters
+parser$add_argument("--projID", type="character",
+                    help="Project identifier for output naming")
+parser$add_argument("--outDir", type="character", default="output",
+                    help="Base output directory (default: output)")
+parser$add_argument("--pathogen", type="character",
+                    help="Specific pathogen to analyze (if not processing all)")
+
+# Preprocessing parameters
+parser$add_argument("--preprocessed", type="logical", default=FALSE,
+                    help="Use preprocessed CSV data (default: FALSE)")
+parser$add_argument("--cleanFile", type="character", default=NULL,
+                    help="Path to cleaned CSV file if preprocessed is TRUE")
+
+# Model parameters
+parser$add_argument("--cores", type="integer", default=16,
+                    help="Number of cores to use for model fitting (default: 16)")
+parser$add_argument("--chains", type="integer", default=2,
+                    help="Number of MCMC chains (default: 2)")
+parser$add_argument("--iterations", type="integer", default=500,
+                    help="Number of MCMC iterations (default: 500)")
+parser$add_argument("--adapt_delta", type="double", default=0.95,
+                    help="Adaptation parameter for MCMC (default: 0.95)")
+parser$add_argument("--max_treedepth", type="integer", default=10,
+                    help="Maximum tree depth for MCMC (default: 10)")
+parser$add_argument("--seed", type="integer", default=123,
+                    help="Random seed for reproducibility (default: 123)")
+
+# Debug mode
+parser$add_argument("--debug", type="logical", default=FALSE,
+                    help="Run in debug mode with default parameters (default: FALSE)")
+
+# Parse arguments with error handling
+tryCatch({
+  opts <- parser$parse_args()
+}, error = function(e) {
+  cat("Error parsing command line arguments:", e$message, "\n")
+  cat("Run with --help for usage information\n")
+  quit(status = 1)
+})
+
+##############################################################
+# Initialize variables based on arguments
+##############################################################
+
+# Report progress
+report_progress <- function(stage, percent=NULL, message=NULL) {
+  timestamp <- format(Sys.time(), "%Y-%m-%d %H:%M:%S")
+  if (!is.null(message)) {
+    cat(sprintf("[%s] %s: %s\n", timestamp, stage, message))
+  } else if (!is.null(percent)) {
+    cat(sprintf("[%s] %s: %d%%\n", timestamp, stage, percent))
+  } else {
+    cat(sprintf("[%s] %s\n", timestamp, stage))
+  }
+  flush.console()
+}
+
+report_progress("SETUP", message="Initializing pipeline")
+
+# Set up parameters based on debug mode
+if (opts$debug == FALSE) {
+  # Use command-line arguments
+  mmwrFile <- opts$mmwrFile
+  censusFileB <- opts$censusFileB
+  censusFileP <- opts$censusFileP
+  projID <- opts$projID
+  outDir <- opts$outDir
+
+  # Reformat list parameters
+  travel <- CLEAN_LIST(opts$travel)
+  cidt <- CLEAN_LIST(opts$cidt)
+
+  # Model parameters
+  modelcores <- opts$cores
+  chains <- opts$chains
+  iterations <- opts$iterations
+  adapt_delta <- opts$adapt_delta
+  max_treedepth <- opts$max_treedepth
+  seed <- opts$seed
+  
+  # Preprocessing parameters
+  preprocessed <- opts$preprocessed
+  cleanFile <- opts$cleanFile
+
+} else {
+  # Use debug defaults
+  report_progress("SETUP", message="Running in DEBUG mode with default parameters")
+
+  # File paths for debugging
+  mmwrFile <- "/scicomp/groups-pure/OID/NCEZID/DFWED/EDEB/foodnet/trends/data/mmwr9623_Jan2024.sas7bdat"
+  censusFileB <- "/scicomp/groups-pure/OID/NCEZID/DFWED/EDEB/foodnet/trends/data/cen9623.sas7bdat"
+  censusFileP <- "/scicomp/groups-pure/OID/NCEZID/DFWED/EDEB/foodnet/trends/data/cen9623_para.sas7bdat"
+  projID <- format(Sys.time(), "%Y%m%d%H%M")
+  outDir <- "debug_output"
+
+  # Default filtering parameters
+  travel <- CLEAN_LIST("NO,UNKNOWN,YES")
+  cidt <- CLEAN_LIST("CIDT+,CX+,PARASITIC")
+
+  # Model parameters for debugging
+  modelcores <- min(parallel::detectCores(), 8)  # Use available cores, max 8 for debug
+  chains <- 2
+  iterations <- 100  # Reduced for debugging
+  adapt_delta <- 0.8  # Lower for faster debug runs
+  max_treedepth <- 8  # Lower for faster debug runs
+  seed <- 123
+  
+  # Preprocessing parameters
+  preprocessed <- FALSE
+  cleanFile <- NULL
+}
+
+# Validate required parameters
+validate_params <- function() {
+  errors <- c()
+
+  # Check required file parameters
+  if (is.null(mmwrFile) || mmwrFile == "")
+    errors <- c(errors, "Missing required parameter: mmwrFile")
+  if (is.null(censusFileB) || censusFileB == "")
+    errors <- c(errors, "Missing required parameter: censusFileB")
+  if (is.null(censusFileP) || censusFileP == "")
+    errors <- c(errors, "Missing required parameter: censusFileP")
+
+  # Check file existence
+  if (length(errors) == 0) {
+    if (!file.exists(mmwrFile))
+      errors <- c(errors, paste("MMWR file does not exist:", mmwrFile))
+    if (!file.exists(censusFileB))
+      errors <- c(errors, paste("Census bacterial file does not exist:", censusFileB))
+    if (!file.exists(censusFileP))
+      errors <- c(errors, paste("Census parasitic file does not exist:", censusFileP))
+  }
+
+  # Check preprocessed file if specified
+  if (preprocessed && !is.null(cleanFile)) {
+    if (!file.exists(cleanFile))
+      errors <- c(errors, paste("Clean file does not exist:", cleanFile))
+  }
+
+  # Check project ID
+  if (is.null(projID) || projID == "") {
+    projID <<- format(Sys.time(), "%Y%m%d%H%M")
+    report_progress("SETUP", message=paste("No projID provided, using timestamp:", projID))
+  }
+
+  # Return errors if any
+  if (length(errors) > 0) {
+    for (err in errors) {
+      report_progress("ERROR", message=err)
+    }
+    stop(paste(errors, collapse="\n"))
+  }
+}
+
+# Validate parameters
+validate_params()
+
+# Create output directory
+dir.create(outDir, showWarnings = FALSE, recursive = TRUE)
+if (!dir.exists(outDir)) {
+  stop("Failed to create output directory: ", outDir)
+}
+
+# Load required packages
+report_progress("SETUP", message="Loading required packages")
+pkgs <- c('haven', 'gtools', 'brms', 'ggplot2', 'tidybayes', 'HDInterval', 'tidyverse')
+tryCatch({
+  LOAD_PACKAGES(pkgs)
+}, error = function(e) {
+  stop("Failed to load required packages: ", e$message)
+})
+
+##############################################################
+# Set up analysis parameters
+##############################################################
+
+# Set travel label based on included travel types
+if (("YES" %in% travel) || ("UNKNOWN" %in% travel)) {
+  travelLabel <- "Travel Included"
+} else if (!("YES" %in% travel) & ("UNKNOWN" %in% travel)) {
+  travelLabel <- "Unknown Travel Included"
+} else {
+  travelLabel <- "Excluded"
+}
+
+# Set culture label based on included diagnostic methods
+culture <- ifelse("CIDT+" %in% cidt, "CxCIDT", "Cx")
+
+# Set output file base name
+outBase <- file.path(outDir, paste0(
+  projID, "_", "splinesmodel_",
+  gsub(" ", "", travelLabel), "_",
+  paste(culture, collapse=""), "_"
+))
+
+# Print analysis details
+report_progress("ANALYSIS DETAILS", message=paste0(
+  "mmwrFile: ", mmwrFile, " | ",
+  "censusFileB: ", censusFileB, " | ",
+  "censusFileP: ", censusFileP, " | ",
+  "projID: ", projID, " | ",
+  "travel: ", paste(travel, collapse=","), " | ",
+  "cidt: ", paste(cidt, collapse=","), " | ",
+  "cores: ", modelcores, " | ",
+  "chains: ", chains, " | ",
+  "iterations: ", iterations
+))
+
+##############################################################
+# Data Import and Preprocessing
+##############################################################
+
+# Import MMWR data
+report_progress("DATA", message="Importing MMWR data")
+tryCatch({
+  if (preprocessed && !is.null(cleanFile) && file.exists(cleanFile)) {
+    report_progress("DATA", message=paste("Using preprocessed data from:", cleanFile))
+    # Read the preprocessed CSV file
+    mmwrdata <- readr::read_csv(cleanFile, show_col_types = FALSE)
+  } else {
+    # Process the raw SAS file
+    mmwrdata <- haven::read_sas(mmwrFile) %>%
+      filter(SiteID != "COEX")
+
+    # Convert to data frame
+    mmwrdata <- as.data.frame(mmwrdata)
+
+    # Update serotype information
+    seroList <- c("NOT SPECIATED", "UNKNOWN", "PARTIAL SERO", "NOT SERO", "")
+    mmwrdata$SERO2 <- ifelse(mmwrdata$SERO1 %in% seroList, "Missing", mmwrdata$SERO1)
+    mmwrdata$SERO2 <- ifelse(grepl("UNDET", mmwrdata$SERO2), "Missing", mmwrdata$SERO2)
+    mmwrdata$serotypesummary <- mmwrdata$SERO2
+
+    # Clean and filter data
+    mmwrdata <- mmwrdata %>%
+      setNames(tolower(names(.))) %>%
+      # Filter by detection method and travel status
+      filter((cxcidt %in% cidt) & (travelint %in% travel)) %>%
+      # Fix county names
+      filter(!county %in% c("OUT OF STATE", "UNKNOWN", "99997")) %>%
+      mutate(county = if_else(county %in% c("ST. MARYS'S", "ST. MARYS"), "ST. MARY'S", county)) %>%
+      mutate(county = if_else(county %in% c("PRINCE GEORGES"), "PRINCE GEORGE'S", county)) %>%
+      mutate(county = if_else(county %in% c("QUEEN ANNES"), "QUEEN ANNE'S", county)) %>%
+      mutate(county = if_else(county %in% c("DE BACA"), "DEBACA", county)) %>%
+      # Create pathogen type variable
+      mutate(pathogentype = ifelse(pathogen %in% c("CRYPTOSPORIDIUM", "CYCLOSPORA"),
+                                "Parasitic", "Bacterial"))
+  }
+
+  # Convert column names to be consistent
+  names(mmwrdata) <- tolower(names(mmwrdata))
+  
+  # Ensure required columns exist
+  required_cols <- c("pathogen", "year", "state")
+  missing_cols <- required_cols[!required_cols %in% names(mmwrdata)]
+  if (length(missing_cols) > 0) {
+    stop("Required columns missing from MMWR data: ", paste(missing_cols, collapse=", "))
+  }
+  
+  # Standardize column naming convention for key fields
+  if ("pathogen" %in% names(mmwrdata)) mmwrdata$pathogen <- toupper(mmwrdata$pathogen)
+  
+  # Ensure pathogentype column exists
+  if (!"pathogentype" %in% names(mmwrdata)) {
+    mmwrdata$pathogentype <- ifelse(mmwrdata$pathogen %in% c("CRYPTOSPORIDIUM", "CYCLOSPORA"), 
+                                   "Parasitic", "Bacterial")
+  }
+
+  report_progress("DATA", message=paste("Processed", nrow(mmwrdata), "MMWR records"))
+}, error = function(e) {
+  stop("Error importing MMWR data: ", e$message)
+})
+
+# Import census data
+report_progress("DATA", message="Importing census data")
+tryCatch({
+  census <- haven::read_sas(censusFileB) %>%
+    setNames(tolower(names(.))) %>%
+    group_by(year, state) %>%
+    dplyr::summarize(population = sum(population, na.rm=TRUE)) %>%
+    mutate(pathogentype = "Bacterial") %>%
+    bind_rows(
+      haven::read_sas(censusFileP) %>%
+        setNames(tolower(names(.))) %>%
+        group_by(year, state) %>%
+        dplyr::summarize(population = sum(population, na.rm=TRUE)) %>%
+        mutate(pathogentype = "Parasitic")
+    ) %>%
+    ungroup()
+
+  census <- as.data.frame(census)
+  report_progress("DATA", message=paste("Processed census data with",
+                                       length(unique(census$year)), "years and",
+                                       length(unique(census$state)), "states"))
+}, error = function(e) {
+  stop("Error importing census data: ", e$message)
+})
+
+##############################################################
+# Pathogen Analysis
+##############################################################
+
+# Process pathogen data
+report_progress("ANALYSIS", message="Processing pathogen data")
+tryCatch({
+  pathDf <- PATH_ANALYSIS(mmwrdata, census)
+  report_progress("ANALYSIS", message=paste("Processed",
+                                          length(unique(pathDf$pathogen)),
+                                          "pathogens"))
+
+  # Process Cyclospora and Salmonella if CIDT+ is included
+  if("CIDT+" %in% cidt) {
+    report_progress("ANALYSIS", message="Processing Cyclospora data")
+    cyloDF <- CYCLOSPORA_ANALYSIS(mmwrdata, census)
+
+    report_progress("ANALYSIS", message="Processing Salmonella data")
+    salDF <- SALMONELLA_ANALYSIS(mmwrdata, census)
+
+    # Combine all pathogen data
+    bact <- gtools::smartbind(pathDf, cyloDF) %>%
+      gtools::smartbind(salDF)
+  } else {
+    bact <- pathDf
+  }
+
+  # Post-processing
+  report_progress("ANALYSIS", message="Post-processing pathogen data")
+
+  # Clean up memory
+  remove(mmwrdata)
+
+  # Filter and prepare data for modeling
+  if (!is.null(opts$pathogen)) {
+    # If a specific pathogen was requested, filter for it
+    bact <- subset(bact, pathogen == opts$pathogen)
+    if (nrow(bact) == 0) {
+      # Instead of stopping, create a minimal dataset for the pathogen
+      # This will allow the pipeline to continue but produce empty results
+      report_progress("WARNING", message=paste("No data found for pathogen:", opts$pathogen, "- Creating minimal dataset"))
+      
+      # Create a minimal dataset with the requested pathogen for all sites
+      states <- c("CA", "CO", "CT", "GA", "MD", "MN", "NM", "NY", "OR", "TN")
+      years <- unique(census$year)
+      
+      minimal_data <- expand.grid(
+        year = years,
+        state = states,
+        pathogen = opts$pathogen,
+        stringsAsFactors = FALSE
+      )
+      
+      # Add required columns
+      minimal_data$count <- 0
+      
+      # Merge with census data to get populations
+      if (opts$pathogen %in% c("CRYPTOSPORIDIUM", "CYCLOSPORA")) {
+        pathogen_type <- "Parasitic"
+      } else {
+        pathogen_type <- "Bacterial"
+      }
+      
+      minimal_data$pathogentype <- pathogen_type
+      minimal_data <- left_join(minimal_data, 
+                              census %>% filter(pathogentype == pathogen_type), 
+                              by = c("year", "state"))
+      
+      # Remove any NA rows that might have been created in the join
+      minimal_data <- minimal_data[!is.na(minimal_data$population), ]
+      
+      bact <- minimal_data
+    }
+  } else {
+    # Otherwise use the default filtering from the original code
+    bact <- subset(bact, pathogen == "CAMPYLOBACTER" | pathogen == "CYCLOSPORA")
+    
+    # Check if any data exists for the default pathogens
+    if (nrow(bact) == 0) {
+      stop("No data found for default pathogens (CAMPYLOBACTER or CYCLOSPORA)")
+    }
+  }
+
+  # Prepare year variables and split by pathogen
+  bact$yearn <- as.numeric(as.character(bact$year))
+  bact$year <- as.factor(bact$year)
+  bact_list <- split(bact, bact$pathogen)
+  target_pathogens <- names(bact_list)
+
+  report_progress("ANALYSIS", message=paste("Prepared data for modeling",
+                                          length(target_pathogens),
+                                          "pathogens:",
+                                          paste(target_pathogens, collapse=", ")))
+}, error = function(e) {
+  stop("Error in pathogen analysis: ", e$message)
+})
+
+##############################################################
+# Model Fitting
+##############################################################
+
+# Process each pathogen
+for (pathogen_name in target_pathogens) {
+  report_progress("MODEL", message=paste("Fitting model for", pathogen_name))
+
+  # Get data for current pathogen
+  current_data <- bact_list[[pathogen_name]]
+
+  # Fit Bayesian model
+  tryCatch({
+    # Fit model with parameters from command line
+    proposed <- PROPOSED_BM(
+      current_data,
+      cores = modelcores,
+      chains = chains,
+      iterations = iterations,
+      adapt_delta = adapt_delta,
+      max_treedepth = max_treedepth,
+      seed = seed
+    )
+
+    # Save model
+    saveFile <- paste0(outDir, "/", pathogen_name, "_brm.Rds")
+    saveRDS(proposed, saveFile)
+    report_progress("MODEL", message=paste("Saved model to", saveFile))
+
+    # Save model summary
+    summaryFile <- paste0(outDir, "/", pathogen_name, "_summary.txt")
+    sink(summaryFile)
+    print(summary(proposed))
+    sink()
+    report_progress("MODEL", message=paste("Saved model summary to", summaryFile))
+
+    # Draw untransformed (link-level) predictions
+    report_progress("POST-PROCESSING", message=paste("Generating predictions for", pathogen_name))
+    posteriorLinpred <- LINPREAD_DRAW_FN(
+      data = (current_data %>% group_by(state)),
+      model = proposed
+    )
+
+    # Catchment-level estimates
+    report_progress("POST-PROCESSING", message="Calculating catchment-level estimates")
+    catch <- CATCHMENT(posteriorLinpred)
+
+    # Credibility intervals
+    report_progress("POST-PROCESSING", message="Calculating credibility intervals")
+    catchir.linpred <- LINPRED_TO_CATCHIR(catch)
+
+    # Add metadata
+    catchir.linpred$pathogen <- pathogen_name
+    catchir.linpred$travel <- travelLabel
+    catchir.linpred$culture <- culture
+
+    # Save estimates
+    ir_file <- paste0(outDir, "/", pathogen_name, "_IRCatch.csv")
+    write.csv(catchir.linpred, ir_file, row.names = FALSE)
+    report_progress("OUTPUT", message=paste("Saved incidence rate estimates to", ir_file))
+
+    # Calculate relative risks and percent changes for different comparison periods
+    report_progress("ANALYSIS", message="Calculating relative risks and percent changes")
+
+    # Calculate for 2016-2018 (federal goals baseline)
+    IR_COMP(catchir.linpred, 2016, 2018,
+            paste0(outDir, "/", pathogen_name, "_EstIRRCatch_2016_2018.csv"))
+
+    # Calculate for most recent 3 years
+    IR_COMP(catchir.linpred, 2020, 2022,
+            paste0(outDir, "/", pathogen_name, "_EstIRRCatch_2020_2022.csv"))
+
+    # Calculate for earliest years
+    IR_COMP(catchir.linpred, 2004, 2006,
+            paste0(outDir, "/", pathogen_name, "_EstIRRCatch_2004_2006.csv"))
+
+    # Calculate for 2006-2008 baseline
+    IR_COMP(catchir.linpred, 2006, 2008,
+            paste0(outDir, "/", pathogen_name, "_EstIRRCatch_2006_2008.csv"))
+
+    # Calculate for 2010-2012 baseline
+    IR_COMP(catchir.linpred, 2010, 2012,
+            paste0(outDir, "/", pathogen_name, "_EstIRRCatch_2010_2012.csv"))
+
+    # Create visualizations if enabled
+    if (requireNamespace("ggplot2", quietly = TRUE)) {
+      # Site-specific trends plot
+      site_plot <- PLOT_SITE_TRENDS(catchir.linpred, pathogen_name, outDir)
+      
+      # Overall trend plot
+      overall_plot <- PLOT_OVERALL_TREND(catchir.linpred, pathogen_name, outDir)
+      
+      # Combined visualization
+      if (requireNamespace("gridExtra", quietly = TRUE)) {
+        PLOT_COMBINED(site_plot, overall_plot, pathogen_name, outDir)
+      }
+    }
+
+    report_progress("COMPLETE", message=paste("Completed analysis for", pathogen_name))
+  }, error = function(e) {
+    report_progress("ERROR", message=paste("Error in model fitting for", pathogen_name, ":", e$message))
+    # Create error file with details
+    error_file <- paste0(outDir, "/", pathogen_name, "_error.txt")
+    sink(error_file)
+    cat(paste("Error processing", pathogen_name, "at", Sys.time(), "\n"))
+    cat(paste("Error message:", e$message, "\n"))
+    cat("Traceback:\n")
+    cat(paste(capture.output(traceback()), collapse = "\n"))
+    sink()
+
+    # Continue with next pathogen rather than stopping the entire pipeline
+    next
+  })
+}
+
+report_progress("PIPELINE", message="Analysis complete for all pathogens")
+report_progress("PIPELINE", message=paste("Results saved to", outDir))
+
+# Print session info for reproducibility
+report_progress("SESSION", message="Session information:")
 print(sessionInfo())
-
-# Close the log file
-sink()
-

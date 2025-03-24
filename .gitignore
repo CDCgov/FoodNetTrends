@@ -27,3 +27,4 @@ null/
 # log files
 *.log*
 FoodNetTrends.*
+results/

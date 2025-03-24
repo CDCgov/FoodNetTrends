@@ -28,10 +28,15 @@ done
 timestamp=$(date +%Y%m%d_%H%M%S)
 
 # Build the base command
-cmd="nextflow run main.nf -profile singularity -entry FoodNetTrends \
+cmd="nextflow run main.nf -profile singularity -entry SPLINE \
   --mmwrFile \"$dataDir/mmwr9623_Jan2024.sas7bdat\" \
-  --censusFile_B \"$dataDir/cen9623.sas7bdat\" \
-  --censusFile_P \"$dataDir/cen9623_para.sas7bdat\" \
+  --censusFileB \"$dataDir/cen9623.sas7bdat\" \
+  --censusFileP \"$dataDir/cen9623_para.sas7bdat\" \
+  --iterations 500 \
+  --chains 2 \
+  --adapt_delta 0.95 \
+  --max_treedepth 10 \
+  --seed 123 \
   --outdir \"$outDir\""
 
 # Add background option if requested
@@ -42,10 +47,14 @@ fi
 # Run with different options based on flag
 if [[ $flag == "test" || $flag == "" ]]; then
   # Test run with minimal pathogens (default)
-  eval $cmd
+  # Use reduced parameters for faster testing
+  test_cmd="${cmd/--iterations 500/--iterations 100}"
+  test_cmd="${test_cmd/--chains 2/--chains 1}"
+  test_cmd="${test_cmd/--adapt_delta 0.95/--adapt_delta 0.8}"
+  test_cmd="${test_cmd/--max_treedepth 10/--max_treedepth 8}"
+  eval $test_cmd
 elif [[ $flag == "full" ]]; then
-  # Full run with all pathogens (not implemented yet)
-  echo "Full run not implemented yet. Using test mode with 2 pathogens."
+  # Full run with production parameters
   eval $cmd
 elif [[ $flag == "resume" ]]; then
   # Resume a previous run
@@ -55,11 +64,10 @@ else
   echo "Usage: ./run_workflow.sh [test|full|resume] [--bg] [--outdir=path]"
   echo ""
   echo "Options:"
-  echo "  test    Run with test dataset (default)"
-  echo "  full    Run with full dataset (not implemented yet)"
+  echo "  test    Run with minimal parameters for testing (default)"
+  echo "  full    Run with production parameters"
   echo "  resume  Resume previous run"
   echo "  --bg    Run in background"
   echo "  --outdir=path  Specify output directory (default: ./output)"
   exit 1
 fi
-
