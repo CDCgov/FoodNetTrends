@@ -6,6 +6,13 @@
 # foodborne illness surveillance data from the FoodNet program. It processes
 # multiple pathogens, fits models, and generates incidence rate estimates.
 #
+# Usage:
+#   ...
+#
+# Example:
+#   ...
+#
+################################################################################
 
 # Suppress warnings during package loading
 suppressPackageStartupMessages(library("argparse"))
@@ -323,8 +330,15 @@ tryCatch({
       mutate(pathogentype = ifelse(pathogen %in% c("CRYPTOSPORIDIUM", "CYCLOSPORA"),
                                 "Parasitic", "Bacterial"))
   }
-
-  # Convert column names to be consistent
+  
+  # Create separate data sets for each "group of pathogens that have unique exclusions. Note to adapt this to Non-FoodNet datasets
+  # we will need to modify this code
+  mmwrdata<-gtools::smartbind(as.data.frame(mmwrdata%>% filter(pathogen %in%  pathogens)), # all pathogens but Listeria
+                              as.data.frame(mmwrdata%>% filter(pathogen == "STEC" & stec_class=="STEC O157")%>%mutate(pathogen="STEC O157")), # make a dataset for STEC O157
+                              as.data.frame(mmwrdata%>% filter(pathogen == "STEC" & (stec_class=="STEC NONO157" | stec_class== "STEC O AG UNDET"))%>%mutate(pathogen="STEC NONO157")), # make a dataset for STEC NONO157
+                              as.data.frame(mmwrdata%>% filter(pathogen == "LISTERIA" & cste=="YES")))
+  
+    # Convert column names to be consistent
   names(mmwrdata) <- tolower(names(mmwrdata))
   
   # Ensure required columns exist
@@ -333,10 +347,7 @@ tryCatch({
   if (length(missing_cols) > 0) {
     stop("Required columns missing from MMWR data: ", paste(missing_cols, collapse=", "))
   }
-  
-  # Standardize column naming convention for key fields
-  if ("pathogen" %in% names(mmwrdata)) mmwrdata$pathogen <- toupper(mmwrdata$pathogen)
-  
+
   # Ensure pathogentype column exists
   if (!"pathogentype" %in% names(mmwrdata)) {
     mmwrdata$pathogentype <- ifelse(mmwrdata$pathogen %in% c("CRYPTOSPORIDIUM", "CYCLOSPORA"), 

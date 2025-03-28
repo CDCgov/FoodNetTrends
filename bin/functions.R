@@ -1,4 +1,21 @@
 # FUNCTIONS.R
+################################################################################
+# can we add text similar to calcIR.R? maybe for each function that explains how/where it fits into the workflow? I am having trouble linking these functions to trendy.R and calcIR.R
+# functions.R
+#
+# Purpose:
+#   This script ...
+#
+#   This includes:
+#     - ...
+#
+# Usage:
+#   ...
+#
+# Example:
+#   ...
+#
+################################################################################
 
 # Load required libraries
 suppressPackageStartupMessages({
@@ -60,7 +77,13 @@ PATH_ANALYSIS <- function(mmwrdata, census) {
     complete(year, state, pathogen = unique(pathogen), fill = list(count = 0)) %>%
     left_join(census %>% filter(pathogentype == "Bacterial"), by = c("year", "state")) %>%
     mutate(year = as.numeric(as.character(year))) %>%
-    filter(state %in% c("CA", "CO", "CT", "GA", "MD", "MN", "NM", "NY", "OR", "TN"))
+    
+    # Drop year-state combinations from the dataset for years before the given state entered the FoodNet catchment
+    ## To make the function more flexible for non-FoodNet datasets, is there a way we can have users upload a file with a column for year and a column for state
+    ## that can be used in this step to drop states in years where they weren't part of a catchment? This is a want not a need. I'd be interested in learning how to do this too
+    ## maybe we could do it on a Teams session together?
+    subset((state=="CA") | (state=="CO" & year>=2001) | (state=="CT") | (state=="GA") | (state=="MD" & year>=1998) | (state=="MN") | (state=="NM" & year>=2004) | 
+             (state=="NY" & year>=1998) | (state=="OR") | (state=="TN" & year>=2000))
 
   return(selectDf)
 }
@@ -72,7 +95,14 @@ CYCLOSPORA_ANALYSIS <- function(mmwrdata, census) {
     group_by(year, state) %>%
     summarise(count = n(), .groups = "drop") %>%
     complete(year, state, fill = list(count = 0)) %>%
-    left_join(census %>% filter(pathogentype == "Parasitic"), by = c("year", "state"))
+    left_join(census %>% filter(pathogentype == "Parasitic"), by = c("year", "state"))%>%
+    
+    # Drop year-state combinations from the dataset for years before the given state entered the FoodNet catchment
+    ## To make the function more flexible for non-FoodNet datasets, is there a way we can have users upload a file with a column for year and a column for state
+    ## that can be used in this step to drop states in years where they weren't part of a catchment? This is a want not a need. I'd be interested in learning how to do this too
+    ## maybe we could do it on a Teams session together?
+    subset((state=="CA") | (state=="CO" & year>=2001) | (state=="CT") | (state=="GA") | (state=="MD" & year>=1998) | (state=="MN") | (state=="NM" & year>=2004) | 
+             (state=="NY" & year>=1998) | (state=="OR") | (state=="TN" & year>=2000))
 
   return(cyclo)
 }
@@ -84,7 +114,14 @@ SALMONELLA_ANALYSIS <- function(mmwrdata, census) {
     group_by(year, state) %>%
     summarise(count = n(), .groups = "drop") %>%
     complete(year, state, fill = list(count = 0)) %>%
-    left_join(census %>% filter(pathogentype == "Bacterial"), by = c("year", "state"))
+    left_join(census %>% filter(pathogentype == "Bacterial"), by = c("year", "state"))%>%
+    
+    # Drop year-state combinations from the dataset for years before the given state entered the FoodNet catchment
+    ## To make the function more flexible for non-FoodNet datasets, is there a way we can have users upload a file with a column for year and a column for state
+    ## that can be used in this step to drop states in years where they weren't part of a catchment? This is a want not a need. I'd be interested in learning how to do this too
+    ## maybe we could do it on a Teams session together?
+    subset((state=="CA") | (state=="CO" & year>=2001) | (state=="CT") | (state=="GA") | (state=="MD" & year>=1998) | (state=="MN") | (state=="NM" & year>=2004) | 
+             (state=="NY" & year>=1998) | (state=="OR") | (state=="TN" & year>=2000))
 
   return(sal)
 }
