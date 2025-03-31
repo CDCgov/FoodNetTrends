@@ -424,6 +424,7 @@ tryCatch({
     if (nrow(bact) == 0) {
       # Instead of stopping, create a minimal dataset for the pathogen
       # This will allow the pipeline to continue but produce empty results
+          ## What is the benefit of this? Instead, can we return an error that no illnesses of the requested disease were found?
       report_progress("WARNING", message=paste("No data found for pathogen:", opts$pathogen, "- Creating minimal dataset"))
       
       # Create a minimal dataset with the requested pathogen for all sites
@@ -523,13 +524,17 @@ for (pathogen_name in target_pathogens) {
       data = (current_data %>% group_by(state)),
       model = proposed
     )
-
+    
+    # site-level estimates
+    report_progress("POST-PROCESSING", message="Calculating catchment-level draws")
+    site <- LINPRED_TO_SITEIR(posteriorLinpred)
+    
+    # Catchment-level draws
+    report_progress("POST-PROCESSING", message="Calculating catchment-level draws")
+    catch <- CATCHMENT(posteriorLinpred)
+    
     # Catchment-level estimates
     report_progress("POST-PROCESSING", message="Calculating catchment-level estimates")
-    catch <- CATCHMENT(posteriorLinpred)
-
-    # Credibility intervals
-    report_progress("POST-PROCESSING", message="Calculating credibility intervals")
     catchir.linpred <- LINPRED_TO_CATCHIR(catch)
 
     # Add metadata

@@ -68,7 +68,7 @@ SAFE_WRITE <- function(data, file_path) {
 
 # PATH_ANALYSIS function
 PATH_ANALYSIS <- function(mmwrdata, census) {
-  pathogens <- c("CAMPYLOBACTER", "CYCLOSPORA", "SALMONELLA", "SHIGELLA", "STEC", "VIBRIO", "YERSINIA")
+  pathogens <- c("CAMPYLOBACTER", "CYCLOSPORA", "SALMONELLA", "SHIGELLA", "STEC", "VIBRIO", "YERSINIA", "LISTERIA", "STEC", "STEC NONO157","STEC O157")
 
   selectDf <- mmwrdata %>%
     filter(pathogen %in% pathogens) %>%
@@ -121,7 +121,7 @@ SALMONELLA_ANALYSIS <- function(mmwrdata, census) {
     ## that can be used in this step to drop states in years where they weren't part of a catchment? This is a want not a need. I'd be interested in learning how to do this too
     ## maybe we could do it on a Teams session together?
     subset((state=="CA") | (state=="CO" & year>=2001) | (state=="CT") | (state=="GA") | (state=="MD" & year>=1998) | (state=="MN") | (state=="NM" & year>=2004) | 
-             (state=="NY" & year>=1998) | (state=="OR") | (state=="TN" & year>=2000))
+               (state=="NY" & year>=1998) | (state=="OR") | (state=="TN" & year>=2000))
 
   return(sal)
 }
@@ -147,81 +147,7 @@ PROPOSED_BM <- function(data, cores = 16, chains = 2, iterations = 500,
   
   # Check if all counts are zero - this will cause model fitting issues
   if (all(data$count == 0) || sum(data$count) == 0) {
-    message("All counts are zero. Creating a dummy model with synthetic data.")
-    
-    # Create a dummy data frame with synthetic data
-    states <- unique(data$state)
-    n_states <- length(states)
-    
-    # Create synthetic data with small counts that are integers
-    synthetic_data <- data.frame(
-      count = c(rep(1L, n_states), rep(2L, n_states), rep(1L, n_states)),
-      year = rep(c(2000, 2010, 2020), each = n_states),
-      state = rep(states, 3),
-      population = rep(1000000, 3 * n_states)
-    )
-    
-    # Create a simple intercept-only model
-    dummy_model <- tryCatch({
-      brm(
-        count ~ 1 + (1|state) + offset(log(population)),
-        data = synthetic_data,
-        family = negbinomial(),
-        chains = 1,  # Use minimal chains
-        iter = 10,   # Use minimal iterations
-        cores = 1,   # Use minimal cores
-        seed = seed,
-        control = list(adapt_delta = 0.8, max_treedepth = 5),
-        backend = "rstan"  # Explicitly use rstan backend for stability
-      )
-    }, error = function(e) {
-      # If even that fails, try an even simpler model
-      message("First dummy model failed. Trying simpler model. Error was: ", e$message)
-      
-      # Create an extremely simple model with just one state
-      very_simple_data <- data.frame(
-        count = c(1L, 2L, 3L),
-        year = c(2000, 2010, 2020),
-        state = c("CA", "CA", "CA"),
-        population = c(1000000, 1000000, 1000000)
-      )
-      
-      tryCatch({
-        brm(
-          count ~ 1 + offset(log(population)),
-          data = very_simple_data,
-          family = poisson(),  # Try poisson instead of negative binomial
-          chains = 1,
-          iter = 10,
-          cores = 1,
-          seed = seed,
-          backend = "rstan"
-        )
-      }, error = function(e2) {
-        # If even that fails, create a minimal model manually
-        message("Even simpler model failed. Creating manual model. Error was: ", e2$message)
-        
-        # Create a dummy model structure without actually fitting
-        dummy_model <- list(
-          family = list(family = "negbinomial"),
-          data = very_simple_data
-        )
-        class(dummy_model) <- c("brmsfit", "list")
-        
-        # Add attributes to indicate this is a fully synthetic model
-        attr(dummy_model, "is_manual_dummy") <- TRUE
-        attr(dummy_model, "reason") <- paste("Could not fit any model. Errors:", 
-                                          e$message, e2$message)
-        
-        return(dummy_model)
-      })
-    })
-    
-    # Add attributes to indicate this is a dummy model
-    attr(dummy_model, "is_dummy") <- TRUE
-    attr(dummy_model, "reason") <- "All zero counts"
-    
-    return(dummy_model)
+    stop("All counts zero. Cannot fit model")
   }
   
   # Ensure year is numeric (not factor) for the spline
@@ -251,148 +177,17 @@ PROPOSED_BM <- function(data, cores = 16, chains = 2, iterations = 500,
       backend = "rstan"  # Explicitly use rstan backend for stability
     )
   }, error = function(e) {
-    # If spline model fails, try a simpler model
-    message("Spline model failed. Trying simpler model. Error was: ", e$message)
-    
-    # Try a simpler model without splines
-    tryCatch({
-      simpler_model <- brm(
-        count ~ year + state + offset(log(population)),
-        data = data,
-        family = negbinomial(),
-        chains = chains,
-        iter = iterations,
-        cores = cores,
-        seed = seed,
-        control = list(adapt_delta = adapt_delta, max_treedepth = max_treedepth),
-        backend = "rstan"
-      )
-      
-      attr(simpler_model, "used_fallback") <- TRUE
-      attr(simpler_model, "original_error") <- e$message
-      
-      return(simpler_model)
-    }, error = function(e2) {
-      # If even the simpler model fails, create a dummy model with synthetic data
-      message("Even simpler model failed. Creating dummy model. Error was: ", e2$message)
-      
-      # Create a very simple model with synthetic data
-      synthetic_data <- data.frame(
-        count = c(1L, 2L, 3L),
-        year = c(2000, 2010, 2020),
-        state = factor(c("CA", "CA", "CA")),
-        population = c(1000000, 2000000, 3000000)
-      )
-      
-      tryCatch({
-        minimal_model <- brm(
-          count ~ 1 + offset(log(population)),
-          data = synthetic_data,
-          family = negbinomial(),
-          chains = 1,
-          iter = 10,
-          cores = 1,
-          seed = seed,
-          backend = "rstan"
-        )
-        
-        attr(minimal_model, "is_dummy") <- TRUE
-        attr(minimal_model, "reason") <- paste("Both models failed. Original error:", e$message, 
-                                            "Secondary error:", e2$message)
-        
-        return(minimal_model)
-      }, error = function(e3) {
-        # If even that fails, create a minimal model manually
-        message("Even minimal model failed. Creating manual model. Error was: ", e3$message)
-        
-        # Create a dummy model structure without actually fitting
-        dummy_model <- list(
-          family = list(family = "negbinomial"),
-          data = synthetic_data
-        )
-        class(dummy_model) <- c("brmsfit", "list")
-        
-        # Add attributes to indicate this is a fully synthetic model
-        attr(dummy_model, "is_manual_dummy") <- TRUE
-        attr(dummy_model, "reason") <- paste("Could not fit any model. Errors:", 
-                                          e$message, e2$message, e3$message)
-        
-        return(dummy_model)
-      })
-    })
+    stop("Model did not converge. May need to run a simpler version, use more iterations, or more robust adapt_delta/max_treedepth values.")
   })
   
   return(model)
 }
 
 # LINPREAD_DRAW_FN function
+## Draw untransformed (link-level) predictions for a new (or the original) data using add_linpred (which is an alternate spelling of add_fitted_draws) and transform them
+## This generates a distribution of estimates for each site
 LINPREAD_DRAW_FN <- function(data, model) {
-  # Check if this is a manual dummy model
-  if (!is.null(attr(model, "is_manual_dummy")) && attr(model, "is_manual_dummy")) {
-    message("Using fully synthetic model to generate synthetic predictions.")
-    
-    # Convert data to tibble, ungroup
-    data <- as_tibble(data) %>% ungroup()
-    
-    # Create synthetic draws - 100 samples of very low numbers
-    draw_count <- 100  # Number of posterior draws to simulate
-    
-    # Create a dataframe with multiple draws
-    synthetic_draws <- data %>%
-      mutate(
-        .row = row_number(),
-        Population = if ("Population" %in% names(.)) {
-          as.numeric(Population)
-        } else if ("population" %in% names(.)) {
-          as.numeric(population)
-        } else {
-          rep(1000000, n())  # Default population if missing
-        }
-      ) %>%
-      crossing(.draw = 1:draw_count) %>%
-      # Generate very small random values close to zero
-      mutate(.epred = runif(n(), 0.001, 0.1)) %>%
-      # Calculate predicted incidence
-      mutate(pred_incidence = .epred / (Population / 100000))
-    
-    return(synthetic_draws)
-  }
-  
-  # Check if this is a dummy model
-  if (!is.null(attr(model, "is_dummy")) && attr(model, "is_dummy")) {
-    # For dummy models, create synthetic predictions instead
-    message("Using dummy model to generate synthetic predictions.")
-    
-    # Convert data to tibble, ungroup
-    data <- as_tibble(data) %>% ungroup()
-    
-    # Create synthetic draws - 100 samples of very low numbers
-    draw_count <- 100  # Number of posterior draws to simulate
-    
-    # Create a dataframe with multiple draws
-    synthetic_draws <- data %>%
-      mutate(
-        .row = row_number(),
-        Population = if ("Population" %in% names(.)) {
-          as.numeric(Population)
-        } else if ("population" %in% names(.)) {
-          as.numeric(population)
-        } else {
-          rep(1000000, n())  # Default population if missing
-        }
-      ) %>%
-      crossing(.draw = 1:draw_count) %>%
-      # Generate very small random values close to zero
-      mutate(.epred = runif(n(), 0.001, 0.1)) %>%
-      # Calculate predicted incidence
-      mutate(pred_incidence = .epred / (Population / 100000))
-    
-    return(synthetic_draws)
-  }
-
-  # Regular processing for normal models
-  # Prepare newdata: convert to tibble, ungroup, add a row identifier,
-  # and force the Population column to be numeric.
+  # Prepare data: convert to tibble, ungroup, add a row identifier, and force the Population column to be numeric.
   data <- as_tibble(data) %>%
     ungroup() %>%
     mutate(
@@ -409,16 +204,6 @@ LINPREAD_DRAW_FN <- function(data, model) {
   # Ensure that Population is numeric and no NA values were introduced.
   if (!is.numeric(data$Population) || any(is.na(data$Population))) {
     stop("Population column is not numeric after conversion")
-  }
-
-  # Handle the case where a fallback model was used
-  if (!is.null(attr(model, "used_fallback")) && attr(model, "used_fallback")) {
-    message("Using fallback model to generate predictions.")
-    
-    # For the simpler model without splines, we need to make sure data is formatted properly
-    if (is.factor(data$year)) {
-      data$year <- as.numeric(as.character(data$year))
-    }
   }
 
   # Get posterior predictive draws (using tidybayes's epred_draws).
@@ -442,60 +227,82 @@ LINPREAD_DRAW_FN <- function(data, model) {
     return(draws)
   }, error = function(e) {
     # If prediction fails, create synthetic draws
-    message("Error generating predictions: ", e$message, ". Creating synthetic predictions.")
-    
-    # Create synthetic draws
-    draw_count <- 100  # Number of posterior draws to simulate
-    
-    # Create a dataframe with multiple draws
-    synthetic_draws <- data %>%
-      crossing(.draw = 1:draw_count) %>%
-      # Generate very small random values close to zero
-      mutate(.epred = runif(n(), 0.001, 0.1)) %>%
-      # Calculate predicted incidence
-      mutate(pred_incidence = .epred / (Population / 100000))
-    
-    return(synthetic_draws)
-  })
+    stop("Error generating predictions")
+    })
 }
 
 # Implementation of CATCHMENT function
+## Convert draws from site-level to catchment-level estimates
+## This uses the output from LINPREAD_DRAW_FN
 CATCHMENT <- function(draws) {
   # Group by relevant variables and calculate summary statistics
   catchment_data <- draws %>%
-    group_by(year, state, .draw) %>%
+    group_by(year, .draw) %>%
     summarise(
-      pred_incidence = mean(pred_incidence),
-      .groups = "drop"
-    ) %>%
-    # Calculate HDI intervals for each Year/State combination
-    group_by(year, state) %>%
-    summarise(
-      mean_incidence = mean(pred_incidence),
-      median_incidence = median(pred_incidence),
-      lower_hdi = hdi(pred_incidence, credMass = 0.95)[1],
-      upper_hdi = hdi(pred_incidence, credMass = 0.95)[2],
+      count = sum(count),
+      population = sum(population),
+      .epred = sum(.epred),
+      Population = sum(Population),
       .groups = "drop"
     )
-
+  
   return(catchment_data)
 }
 
 # Implementation of LINPRED_TO_CATCHIR function
+## Convert catchment-level draws to catchment-level estimates, including equal-tailed credibility interval
 LINPRED_TO_CATCHIR <- function(catchment_data) {
-  # Format the data for output
-  ir_data <- catchment_data %>%
+  ir_data<-catchment_data %>% 
+                  group_by(year) %>% 
+                  summarise(
+                    raw_count=median(count),
+                    raw_check=sd(count),
+                    median=median(.epred),
+                    mean=mean(.epred),
+                    lower_equitailed=quantile(.epred, probs = 0.025, na.rm=TRUE),
+                    upper_equitailed=quantile(.epred, probs = 0.975, na.rm=TRUE),
+                    lower_hdi = (hdi(.epred, credMass = 0.95)[1]),
+                    upper_hdi = (hdi(.epred, credMass = 0.95)[2]),
+                    population=mean(population),
+                    population_check=sd(population))%>%
+                  mutate(
+                    median_ir= round(median/(population/100000),2),
+                    mean_ir= round(mean/(population/100000),2),
+                    lower_equitailed_ir=round(lower_equitailed/(population/100000),2),
+                    upper_equitailed_ir=round(upper_equitailed/(population/100000),2),
+                    lower_hdi_ir = round(lower_hdi/(population/100000),2),
+                    upper_hdi_ir = round(upper_hdi/(population/100000),2)) %>%
+    # Arrange by Year and State for better readability
+    arrange(year)
+  return(ir_data)
+}
+
+# Implementation of LINPRED_TO_SITEIR function
+## Convert catchment-level draws to catchment-level estimates, including equal-tailed credibility interval
+LINPRED_TO_SITEIR <- function(site_data) {
+  ir_data<-site_data %>% 
+    group_by(year, state) %>% 
+    summarise(
+      raw_count=median(count),
+      raw_check=sd(count),
+      median=median(.epred),
+      mean=mean(.epred),
+      lower_equitailed=quantile(.epred, probs = 0.025, na.rm=TRUE),
+      upper_equitailed=quantile(.epred, probs = 0.975, na.rm=TRUE),
+      lower_hdi = (hdi(.epred, credMass = 0.95)[1]),
+      upper_hdi = (hdi(.epred, credMass = 0.95)[2]),
+      population=mean(population),
+      population_check=sd(population))%>%
     mutate(
-      year = as.integer(year),
-      # Round numeric values to 2 decimal places
-      mean_incidence = round(mean_incidence, 2),
-      median_incidence = round(median_incidence, 2),
-      lower_hdi = round(lower_hdi, 2),
-      upper_hdi = round(upper_hdi, 2)
+      median_ir= round(median/(population/100000),2),
+      mean_ir= round(mean/(population/100000),2),
+      lower_equitailed_ir=round(lower_equitailed/(population/100000),2),
+      upper_equitailed_ir=round(upper_equitailed/(population/100000),2),
+      lower_hdi_ir = round(lower_hdi/(population/100000),2),
+      upper_hdi_ir = round(upper_hdi/(population/100000),2)
     ) %>%
     # Arrange by Year and State for better readability
     arrange(year, state)
-
   return(ir_data)
 }
 
