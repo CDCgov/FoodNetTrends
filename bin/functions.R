@@ -306,12 +306,14 @@ LINPRED_TO_SITEIR <- function(site_data) {
   return(ir_data)
 }
 
+##### stopped work here.
+
 # New function: Plot site-specific trends
 PLOT_SITE_TRENDS <- function(catchir_data, pathogen, outDir) {
   # Create a plot for each state showing trends over time
-  p <- ggplot(catchir_data, aes(x = year, y = median_incidence)) +
+  p <- ggplot(catchir_data, aes(x = year, y = median_ir)) +
     geom_line(linewidth = 1) +
-    geom_ribbon(aes(ymin = lower_hdi, ymax = upper_hdi), alpha = 0.3) +
+    geom_ribbon(aes(ymin = lower_hdi_ir, ymax = upper_hdi_ir), alpha = 0.3) +
     facet_wrap(~ state, scales = "free_y") +
     labs(
       title = paste("Site-Specific Trends for", pathogen),
@@ -320,6 +322,7 @@ PLOT_SITE_TRENDS <- function(catchir_data, pathogen, outDir) {
       x = "Year"
     ) +
     theme_minimal() +
+    geom_vline(xintercept = 2004)+
     theme(
       plot.title = element_text(hjust = 0.5, face = "bold"),
       plot.subtitle = element_text(hjust = 0.5),
@@ -346,9 +349,9 @@ PLOT_OVERALL_TREND <- function(catchir_data, pathogen, outDir) {
     )
 
   # Create the plot
-  p <- ggplot(overall_data, aes(x = year, y = median_incidence)) +
+  p <- ggplot(overall_data, aes(x = year, y = median_ir)) +
     geom_line(linewidth = 1.5) +
-    geom_ribbon(aes(ymin = lower_hdi, ymax = upper_hdi), alpha = 0.3) +
+    geom_ribbon(aes(ymin = lower_hdi_ir, ymax = upper_hdi_ir), alpha = 0.3) +
     labs(
       title = paste("Overall Trend for", pathogen),
       subtitle = "Median incidence with 95% HDI intervals",
@@ -382,59 +385,40 @@ PLOT_COMBINED <- function(site_plot, overall_plot, pathogen, outDir) {
 }
 
 # Implementation of IR_COMP function for calculating relative risks
-IR_COMP <- function(catchir_data, start_year, end_year, output_file = NULL) {
+IR_COMP_CATCH <- function(catch, catchir_data, start_year, end_year, output_file = NULL) {
   # Filter data for the comparison period
-  period_data <- catchir_data %>%
+  period_data <- catch %>%
     filter(year >= start_year & year <= end_year)
 
   # Check if we have data for the requested period
   if (nrow(period_data) == 0) {
-    warning(paste("No data available for period", start_year, "to", end_year))
-    # Create minimal output to avoid errors
-    if (!is.null(output_file)) {
-      minimal_result <- data.frame(
-        state = unique(catchir_data$state),
-        year = max(catchir_data$year),
-        comparison_period = paste0(start_year, "-", end_year),
-        current_incidence = 0.01,
-        period_incidence = 0.01,
-        relative_risk = 1.00,
-        percent_change = 0.00
-      )
-      
-      # Create directory if it doesn't exist
-      dir_path <- dirname(output_file)
-      if (!dir.exists(dir_path)) {
-        dir.create(dir_path, recursive = TRUE, showWarnings = FALSE)
-      }
-      
-      write.csv(minimal_result, output_file, row.names = FALSE)
+    stop(paste("No data available for period", start_year, "to", end_year))
     }
-    return(NULL)
-  }
 
-  # Calculate average incidence for the period by state
-  period_avg <- period_data %>%
-    group_by(state) %>%
-    summarise(
-      period_incidence = mean(median_incidence),
-      period_lower = mean(lower_hdi),
-      period_upper = mean(upper_hdi),
-      .groups = "drop"
-    )
+  # Calculate average incidence for the baseline period for the entire catchment. Make sure you go bacl to the draws for this - you should never perform summary statistics on estimates. Instead, go back to the distribution and pull from there
+  period_data <-period_data %>% 
+                  summarise(
+                    baseline_count_lower_hdi = (hdi(.epred, credMass = 0.95)[1]),
+                    baseline_count_upper_hdi = (hdi(.epred, credMass = 0.95)[2]),
+                    baseline_count=mean(.epred),
+                    raw_count=mean(count),
+                    population_mean=mean(population))%>% # should we do the mean or median?
+                mutate(period_incidence=baseline_count/(population_mean/100000),
+                       period_incidence_upper_hdi=baseline_count_upper_hdi/(population_mean/100000),
+                       period_incidence_lower_hdi=baseline_count_lower_hdi/(population_mean/100000))
+  # Calculate relative risks for each year in the dataset relative to the baseline periond
+     # latest_year <- max(catchir_data$year) $ if you only want the more recent year, you can modify the code to use "latest_year"
+     # Get the most recent year's data
+     # latest_data <- catchir_data %>% filter(year == latest_year)
 
-  # Calculate relative risks compared to the most recent year
-  latest_year <- max(catchir_data$year)
-
-  # Get the most recent year's data
-  latest_data <- catchir_data %>%
-    filter(year == latest_year)
-
-  # Join and calculate relative risks
-  result <- latest_data %>%
-    left_join(period_avg, by = "state") %>%
+  # Join and calculate relative risks - huh?
+  result <- catchir_data %>%
+    filter(year < start_year | year > end_year)%>%
+    cbind(period_avg) %>%
     mutate(
       relative_risk = median_incidence / period_incidence,
+      upper_rr = median_incidence / period_incidence,
+      lower_rr = median_incidence / period_incidence,
       percent_change = ((median_incidence / period_incidence) - 1) * 100,
       comparison_period = paste0(start_year, "-", end_year)
     ) %>%
