@@ -5,6 +5,8 @@
 # This script implements a Bayesian hierarchical model with splines to analyze
 # foodborne illness surveillance data from the FoodNet program. It processes
 # multiple pathogens, fits models, and generates incidence rate estimates.
+
+## Can we also add an explanation for how to run this as a single model and in parallel - can we add this here and in the webpage?
 #
 # Usage:
 #   ...
