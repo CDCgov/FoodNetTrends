@@ -3,18 +3,18 @@
 # Please set up paths and files
 
 # Output directory (replace with your desired output path)
-outDir="/scicomp/groups-pure/OID/NCEZID/DFWED/EDEB/foodnet/mmwroutput"
+outDir="/scicomp/groups-pure/OID/NCEZID/DFWED/EDEB/foodnet/trends/mmwroutput"
 # e.g., outDir="/home/user/projects/my_project/output"
 
 # Data directory containing input files (replace with your data directory path)
-dataDir="/scicomp/groups-pure/OID/NCEZID/DFWED/EDEB/foodnet/data"
+dataDir="/scicomp/groups-pure/OID/NCEZID/DFWED/EDEB/foodnet/trends/data"
 # e.g., dataDir="/home/user/data"
 
 # Load necessary modules
 module purge
 module load nextflow/24.04.2
 module load singularity
-module load conda/24.3.0
+module load miniconda
 
 # Housekeeping
 if [[ ! -d $outDir ]]; then mkdir -p $outDir; fi
@@ -22,7 +22,7 @@ flag=$1
 
 if [[ $flag == "run" ]]; then
     nextflow run main.nf \
-        -entry CDC_SPLINE \
+        -entry SPLINE \
         -profile singularity,conda \
         -with-conda \
         -work-dir $outDir/work \
@@ -43,7 +43,7 @@ fi
 
 if [[ $flag == "full" ]]; then
     nextflow run main.nf \
-        -entry CDC_SPLINE \
+        -entry SPLINE \
         -profile singularity,conda \
         -with-conda \
         -work-dir $outDir/work \
