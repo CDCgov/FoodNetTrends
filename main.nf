@@ -20,6 +20,12 @@ if (params.help) {
         --outdir                Base output directory for pipeline reports and results
         --preprocessed          TRUE/FALSE indicating if using preprocessed CSV data
         --cleanFile             Path to cleaned CSV file (if preprocessed is TRUE)
+        --pathogen              Comma-separated list of pathogens to analyze (e.g., CAMPYLOBACTER,SALMONELLA)
+        --chains                Number of MCMC chains
+        --iterations            Number of MCMC iterations
+        --adapt_delta           Adaptation parameter for MCMC
+        --max_treedepth         Maximum tree depth for MCMC
+        --seed                  Random seed for reproducibility
     """
     System.exit(0)
 }
@@ -30,4 +36,3 @@ include { SPLINE } from './workflows/spline.nf'
 workflow FoodNetTrends {
     SPLINE()
 }
-

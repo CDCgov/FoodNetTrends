@@ -7,8 +7,9 @@ include { PREPROCESS } from '../modules/local/preprocess'
 workflow SPLINE {
     // Define input channels
     if (params.pathogen) {
-        // If specific pathogen is requested, use it
-        pathogens = Channel.of(params.pathogen)
+        // Convert comma-separated string to a channel of pathogens
+        def pathogenList = params.pathogen.tokenize(',')
+        pathogens = Channel.fromList(pathogenList)
     } else {
         // Default to CAMPYLOBACTER and CYCLOSPORA for testing
         pathogens = Channel.of('CAMPYLOBACTER', 'CYCLOSPORA')
@@ -40,6 +41,7 @@ workflow SPLINE {
     Census Files  : ${params.censusFileB}, ${params.censusFileP}
     Travel        : ${params.travel}
     CIDT          : ${params.cidt}
+    Pathogens     : ${params.pathogen ?: 'default (CAMPYLOBACTER,CYCLOSPORA)'}
     Cores         : ${params.cpus ?: 'default'}
     Chains        : ${params.chains}
     Iterations    : ${params.iterations}

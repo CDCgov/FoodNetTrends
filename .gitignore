@@ -1,4 +1,5 @@
 # nextflow
+*.old
 .nextflow/
 .nextflow.log*
 .nextflow*
