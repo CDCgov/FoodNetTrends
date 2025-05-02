@@ -343,6 +343,13 @@ tryCatch({
     # Convert column names to be consistent
   names(mmwrdata) <- tolower(names(mmwrdata))
   
+  # Ensure pathogen column has consistent casing for filtering
+  if ("pathogen" %in% names(mmwrdata)) {
+    # Standardize pathogen names to uppercase
+    mmwrdata$pathogen <- toupper(mmwrdata$pathogen)
+    report_progress("DATA", message="Standardized pathogen column for consistent filtering")
+  }
+  
   # Ensure required columns exist
   required_cols <- c("pathogen", "year", "state")
   missing_cols <- required_cols[!required_cols %in% names(mmwrdata)]
@@ -421,44 +428,61 @@ tryCatch({
 
   # Filter and prepare data for modeling
   if (!is.null(opts$pathogen)) {
-    # If a specific pathogen was requested, filter for it
-    bact <- subset(bact, pathogen == opts$pathogen)
+    # If specific pathogens were requested, parse and filter for them
+    pathogens_to_analyze <- unlist(strsplit(opts$pathogen, ","))
+    report_progress("ANALYSIS", message=paste("Filtering for requested pathogens:", 
+                                              paste(pathogens_to_analyze, collapse=", ")))
+    
+    # Ensure consistent case for pathogen filtering
+    bact$pathogen <- toupper(bact$pathogen)
+    pathogens_to_analyze <- toupper(pathogens_to_analyze)
+    
+    # Filter for requested pathogens
+    bact <- subset(bact, pathogen %in% pathogens_to_analyze)
+    
     if (nrow(bact) == 0) {
       # Instead of stopping, create a minimal dataset for the pathogen
       # This will allow the pipeline to continue but produce empty results
-          ## What is the benefit of this? Instead, can we return an error that no illnesses of the requested disease were found?
-      report_progress("WARNING", message=paste("No data found for pathogen:", opts$pathogen, "- Creating minimal dataset"))
+      report_progress("WARNING", message=paste("No data found for requested pathogens - Creating minimal dataset"))
       
       # Create a minimal dataset with the requested pathogen for all sites
       states <- c("CA", "CO", "CT", "GA", "MD", "MN", "NM", "NY", "OR", "TN")
       years <- unique(census$year)
       
-      minimal_data <- expand.grid(
-        year = years,
-        state = states,
-        pathogen = opts$pathogen,
-        stringsAsFactors = FALSE
-      )
+      # Create a minimal dataset for each requested pathogen
+      minimal_data_list <- list()
       
-      # Add required columns
-      minimal_data$count <- 0
-      
-      # Merge with census data to get populations
-      if (opts$pathogen %in% c("CRYPTOSPORIDIUM", "CYCLOSPORA")) {
-        pathogen_type <- "Parasitic"
-      } else {
-        pathogen_type <- "Bacterial"
+      for (pathogen_name in pathogens_to_analyze) {
+        minimal_data <- expand.grid(
+          year = years,
+          state = states,
+          pathogen = pathogen_name,
+          stringsAsFactors = FALSE
+        )
+        
+        # Add required columns
+        minimal_data$count <- 0
+        
+        # Determine pathogen type
+        if (pathogen_name %in% c("CRYPTOSPORIDIUM", "CYCLOSPORA")) {
+          pathogen_type <- "Parasitic"
+        } else {
+          pathogen_type <- "Bacterial"
+        }
+        
+        minimal_data$pathogentype <- pathogen_type
+        minimal_data <- left_join(minimal_data, 
+                                census %>% filter(pathogentype == pathogen_type), 
+                                by = c("year", "state"))
+        
+        # Remove any NA rows that might have been created in the join
+        minimal_data <- minimal_data[!is.na(minimal_data$population), ]
+        
+        minimal_data_list[[pathogen_name]] <- minimal_data
       }
       
-      minimal_data$pathogentype <- pathogen_type
-      minimal_data <- left_join(minimal_data, 
-                              census %>% filter(pathogentype == pathogen_type), 
-                              by = c("year", "state"))
-      
-      # Remove any NA rows that might have been created in the join
-      minimal_data <- minimal_data[!is.na(minimal_data$population), ]
-      
-      bact <- minimal_data
+      # Combine all minimal datasets
+      bact <- do.call(rbind, minimal_data_list)
     }
   } else {
     # Otherwise use the default filtering from the original code
