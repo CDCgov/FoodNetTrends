@@ -1,4 +1,21 @@
 # FUNCTIONS.R
+################################################################################
+# can we add text similar to calcIR.R? maybe for each function that explains how/where it fits into the workflow? I am having trouble linking these functions to trendy.R and calcIR.R
+# functions.R
+#
+# Purpose:
+#   This script ...
+#
+#   This includes:
+#     - ...
+#
+# Usage:
+#   ...
+#
+# Example:
+#   ...
+#
+################################################################################
 
 # Load required libraries
 suppressPackageStartupMessages({
@@ -51,8 +68,8 @@ SAFE_WRITE <- function(data, file_path) {
 
 # PATH_ANALYSIS function
 PATH_ANALYSIS <- function(mmwrdata, census) {
-  pathogens <- c("CAMPYLOBACTER", "CYCLOSPORA", "SALMONELLA", "SHIGELLA", "STEC", "VIBRIO", "YERSINIA")
-
+  pathogens <- c("CAMPYLOBACTER", "CYCLOSPORA", "SALMONELLA", "SHIGELLA", "STEC", "VIBRIO", "YERSINIA", "LISTERIA", "STEC", "STEC NONO157","STEC O157")
+  
   selectDf <- mmwrdata %>%
     filter(pathogen %in% pathogens) %>%
     group_by(year, state, pathogen) %>%
@@ -60,8 +77,14 @@ PATH_ANALYSIS <- function(mmwrdata, census) {
     complete(year, state, pathogen = unique(pathogen), fill = list(count = 0)) %>%
     left_join(census %>% filter(pathogentype == "Bacterial"), by = c("year", "state")) %>%
     mutate(year = as.numeric(as.character(year))) %>%
-    filter(state %in% c("CA", "CO", "CT", "GA", "MD", "MN", "NM", "NY", "OR", "TN"))
-
+    
+    # Drop year-state combinations from the dataset for years before the given state entered the FoodNet catchment
+    ## To make the function more flexible for non-FoodNet datasets, is there a way we can have users upload a file with a column for year and a column for state
+    ## that can be used in this step to drop states in years where they weren't part of a catchment? This is a want not a need. I'd be interested in learning how to do this too
+    ## maybe we could do it on a Teams session together?
+    subset((state=="CA") | (state=="CO" & year>=2001) | (state=="CT") | (state=="GA") | (state=="MD" & year>=1998) | (state=="MN") | (state=="NM" & year>=2004) | 
+             (state=="NY" & year>=1998) | (state=="OR") | (state=="TN" & year>=2000))
+  
   return(selectDf)
 }
 
@@ -72,8 +95,15 @@ CYCLOSPORA_ANALYSIS <- function(mmwrdata, census) {
     group_by(year, state) %>%
     summarise(count = n(), .groups = "drop") %>%
     complete(year, state, fill = list(count = 0)) %>%
-    left_join(census %>% filter(pathogentype == "Parasitic"), by = c("year", "state"))
-
+    left_join(census %>% filter(pathogentype == "Parasitic"), by = c("year", "state"))%>%
+    
+    # Drop year-state combinations from the dataset for years before the given state entered the FoodNet catchment
+    ## To make the function more flexible for non-FoodNet datasets, is there a way we can have users upload a file with a column for year and a column for state
+    ## that can be used in this step to drop states in years where they weren't part of a catchment? This is a want not a need. I'd be interested in learning how to do this too
+    ## maybe we could do it on a Teams session together?
+    subset((state=="CA") | (state=="CO" & year>=2001) | (state=="CT") | (state=="GA") | (state=="MD" & year>=1998) | (state=="MN") | (state=="NM" & year>=2004) | 
+             (state=="NY" & year>=1998) | (state=="OR") | (state=="TN" & year>=2000))
+  
   return(cyclo)
 }
 
@@ -84,8 +114,15 @@ SALMONELLA_ANALYSIS <- function(mmwrdata, census) {
     group_by(year, state) %>%
     summarise(count = n(), .groups = "drop") %>%
     complete(year, state, fill = list(count = 0)) %>%
-    left_join(census %>% filter(pathogentype == "Bacterial"), by = c("year", "state"))
-
+    left_join(census %>% filter(pathogentype == "Bacterial"), by = c("year", "state"))%>%
+    
+    # Drop year-state combinations from the dataset for years before the given state entered the FoodNet catchment
+    ## To make the function more flexible for non-FoodNet datasets, is there a way we can have users upload a file with a column for year and a column for state
+    ## that can be used in this step to drop states in years where they weren't part of a catchment? This is a want not a need. I'd be interested in learning how to do this too
+    ## maybe we could do it on a Teams session together?
+    subset((state=="CA") | (state=="CO" & year>=2001) | (state=="CT") | (state=="GA") | (state=="MD" & year>=1998) | (state=="MN") | (state=="NM" & year>=2004) | 
+             (state=="NY" & year>=1998) | (state=="OR") | (state=="TN" & year>=2000))
+  
   return(sal)
 }
 
@@ -110,81 +147,7 @@ PROPOSED_BM <- function(data, cores = 16, chains = 2, iterations = 500,
   
   # Check if all counts are zero - this will cause model fitting issues
   if (all(data$count == 0) || sum(data$count) == 0) {
-    message("All counts are zero. Creating a dummy model with synthetic data.")
-    
-    # Create a dummy data frame with synthetic data
-    states <- unique(data$state)
-    n_states <- length(states)
-    
-    # Create synthetic data with small counts that are integers
-    synthetic_data <- data.frame(
-      count = c(rep(1L, n_states), rep(2L, n_states), rep(1L, n_states)),
-      year = rep(c(2000, 2010, 2020), each = n_states),
-      state = rep(states, 3),
-      population = rep(1000000, 3 * n_states)
-    )
-    
-    # Create a simple intercept-only model
-    dummy_model <- tryCatch({
-      brm(
-        count ~ 1 + (1|state) + offset(log(population)),
-        data = synthetic_data,
-        family = negbinomial(),
-        chains = 1,  # Use minimal chains
-        iter = 10,   # Use minimal iterations
-        cores = 1,   # Use minimal cores
-        seed = seed,
-        control = list(adapt_delta = 0.8, max_treedepth = 5),
-        backend = "rstan"  # Explicitly use rstan backend for stability
-      )
-    }, error = function(e) {
-      # If even that fails, try an even simpler model
-      message("First dummy model failed. Trying simpler model. Error was: ", e$message)
-      
-      # Create an extremely simple model with just one state
-      very_simple_data <- data.frame(
-        count = c(1L, 2L, 3L),
-        year = c(2000, 2010, 2020),
-        state = c("CA", "CA", "CA"),
-        population = c(1000000, 1000000, 1000000)
-      )
-      
-      tryCatch({
-        brm(
-          count ~ 1 + offset(log(population)),
-          data = very_simple_data,
-          family = poisson(),  # Try poisson instead of negative binomial
-          chains = 1,
-          iter = 10,
-          cores = 1,
-          seed = seed,
-          backend = "rstan"
-        )
-      }, error = function(e2) {
-        # If even that fails, create a minimal model manually
-        message("Even simpler model failed. Creating manual model. Error was: ", e2$message)
-        
-        # Create a dummy model structure without actually fitting
-        dummy_model <- list(
-          family = list(family = "negbinomial"),
-          data = very_simple_data
-        )
-        class(dummy_model) <- c("brmsfit", "list")
-        
-        # Add attributes to indicate this is a fully synthetic model
-        attr(dummy_model, "is_manual_dummy") <- TRUE
-        attr(dummy_model, "reason") <- paste("Could not fit any model. Errors:", 
-                                          e$message, e2$message)
-        
-        return(dummy_model)
-      })
-    })
-    
-    # Add attributes to indicate this is a dummy model
-    attr(dummy_model, "is_dummy") <- TRUE
-    attr(dummy_model, "reason") <- "All zero counts"
-    
-    return(dummy_model)
+    stop("All counts zero. Cannot fit model")
   }
   
   # Ensure year is numeric (not factor) for the spline
@@ -214,176 +177,35 @@ PROPOSED_BM <- function(data, cores = 16, chains = 2, iterations = 500,
       backend = "rstan"  # Explicitly use rstan backend for stability
     )
   }, error = function(e) {
-    # If spline model fails, try a simpler model
-    message("Spline model failed. Trying simpler model. Error was: ", e$message)
-    
-    # Try a simpler model without splines
-    tryCatch({
-      simpler_model <- brm(
-        count ~ year + state + offset(log(population)),
-        data = data,
-        family = negbinomial(),
-        chains = chains,
-        iter = iterations,
-        cores = cores,
-        seed = seed,
-        control = list(adapt_delta = adapt_delta, max_treedepth = max_treedepth),
-        backend = "rstan"
-      )
-      
-      attr(simpler_model, "used_fallback") <- TRUE
-      attr(simpler_model, "original_error") <- e$message
-      
-      return(simpler_model)
-    }, error = function(e2) {
-      # If even the simpler model fails, create a dummy model with synthetic data
-      message("Even simpler model failed. Creating dummy model. Error was: ", e2$message)
-      
-      # Create a very simple model with synthetic data
-      synthetic_data <- data.frame(
-        count = c(1L, 2L, 3L),
-        year = c(2000, 2010, 2020),
-        state = factor(c("CA", "CA", "CA")),
-        population = c(1000000, 2000000, 3000000)
-      )
-      
-      tryCatch({
-        minimal_model <- brm(
-          count ~ 1 + offset(log(population)),
-          data = synthetic_data,
-          family = negbinomial(),
-          chains = 1,
-          iter = 10,
-          cores = 1,
-          seed = seed,
-          backend = "rstan"
-        )
-        
-        attr(minimal_model, "is_dummy") <- TRUE
-        attr(minimal_model, "reason") <- paste("Both models failed. Original error:", e$message, 
-                                            "Secondary error:", e2$message)
-        
-        return(minimal_model)
-      }, error = function(e3) {
-        # If even that fails, create a minimal model manually
-        message("Even minimal model failed. Creating manual model. Error was: ", e3$message)
-        
-        # Create a dummy model structure without actually fitting
-        dummy_model <- list(
-          family = list(family = "negbinomial"),
-          data = synthetic_data
-        )
-        class(dummy_model) <- c("brmsfit", "list")
-        
-        # Add attributes to indicate this is a fully synthetic model
-        attr(dummy_model, "is_manual_dummy") <- TRUE
-        attr(dummy_model, "reason") <- paste("Could not fit any model. Errors:", 
-                                          e$message, e2$message, e3$message)
-        
-        return(dummy_model)
-      })
-    })
+    stop("Model did not converge. May need to run a simpler version, use more iterations, or more robust adapt_delta/max_treedepth values.")
   })
   
   return(model)
 }
 
 # LINPREAD_DRAW_FN function
+## Draw untransformed (link-level) predictions for a new (or the original) data using add_linpred (which is an alternate spelling of add_fitted_draws) and transform them
+## This generates a distribution of estimates for each site
 LINPREAD_DRAW_FN <- function(data, model) {
-  # Check if this is a manual dummy model
-  if (!is.null(attr(model, "is_manual_dummy")) && attr(model, "is_manual_dummy")) {
-    message("Using fully synthetic model to generate synthetic predictions.")
-    
-    # Convert data to tibble, ungroup
-    data <- as_tibble(data) %>% ungroup()
-    
-    # Create synthetic draws - 100 samples of very low numbers
-    draw_count <- 100  # Number of posterior draws to simulate
-    
-    # Create a dataframe with multiple draws
-    synthetic_draws <- data %>%
-      mutate(
-        .row = row_number(),
-        Population = if ("Population" %in% names(.)) {
-          as.numeric(Population)
-        } else if ("population" %in% names(.)) {
-          as.numeric(population)
-        } else {
-          rep(1000000, n())  # Default population if missing
-        }
-      ) %>%
-      crossing(.draw = 1:draw_count) %>%
-      # Generate very small random values close to zero
-      mutate(.epred = runif(n(), 0.001, 0.1)) %>%
-      # Calculate predicted incidence
-      mutate(pred_incidence = .epred / (Population / 100000))
-    
-    return(synthetic_draws)
-  }
-  
-  # Check if this is a dummy model
-  if (!is.null(attr(model, "is_dummy")) && attr(model, "is_dummy")) {
-    # For dummy models, create synthetic predictions instead
-    message("Using dummy model to generate synthetic predictions.")
-    
-    # Convert data to tibble, ungroup
-    data <- as_tibble(data) %>% ungroup()
-    
-    # Create synthetic draws - 100 samples of very low numbers
-    draw_count <- 100  # Number of posterior draws to simulate
-    
-    # Create a dataframe with multiple draws
-    synthetic_draws <- data %>%
-      mutate(
-        .row = row_number(),
-        Population = if ("Population" %in% names(.)) {
-          as.numeric(Population)
-        } else if ("population" %in% names(.)) {
-          as.numeric(population)
-        } else {
-          rep(1000000, n())  # Default population if missing
-        }
-      ) %>%
-      crossing(.draw = 1:draw_count) %>%
-      # Generate very small random values close to zero
-      mutate(.epred = runif(n(), 0.001, 0.1)) %>%
-      # Calculate predicted incidence
-      mutate(pred_incidence = .epred / (Population / 100000))
-    
-    return(synthetic_draws)
-  }
-
-  # Regular processing for normal models
-  # Prepare newdata: convert to tibble, ungroup, add a row identifier,
-  # and force the Population column to be numeric.
+  # Prepare data: convert to tibble, ungroup, add a row identifier, and force the Population column to be numeric.
   data <- as_tibble(data) %>%
     ungroup() %>%
     mutate(
       .row = row_number(),
       Population = if ("Population" %in% names(.)) {
-          parse_number(as.character(Population))
-        } else if ("population" %in% names(.)) {
-          parse_number(as.character(population))
-        } else {
-          stop("No population column found")
-        }
+        parse_number(as.character(Population))
+      } else if ("population" %in% names(.)) {
+        parse_number(as.character(population))
+      } else {
+        stop("No population column found")
+      }
     )
-
+  
   # Ensure that Population is numeric and no NA values were introduced.
   if (!is.numeric(data$Population) || any(is.na(data$Population))) {
     stop("Population column is not numeric after conversion")
   }
-
-  # Handle the case where a fallback model was used
-  if (!is.null(attr(model, "used_fallback")) && attr(model, "used_fallback")) {
-    message("Using fallback model to generate predictions.")
-    
-    # For the simpler model without splines, we need to make sure data is formatted properly
-    if (is.factor(data$year)) {
-      data$year <- as.numeric(as.character(data$year))
-    }
-  }
-
+  
   # Get posterior predictive draws (using tidybayes's epred_draws).
   tryCatch({
     epred <- epred_draws(model, newdata = data) %>% ungroup()
@@ -405,69 +227,93 @@ LINPREAD_DRAW_FN <- function(data, model) {
     return(draws)
   }, error = function(e) {
     # If prediction fails, create synthetic draws
-    message("Error generating predictions: ", e$message, ". Creating synthetic predictions.")
-    
-    # Create synthetic draws
-    draw_count <- 100  # Number of posterior draws to simulate
-    
-    # Create a dataframe with multiple draws
-    synthetic_draws <- data %>%
-      crossing(.draw = 1:draw_count) %>%
-      # Generate very small random values close to zero
-      mutate(.epred = runif(n(), 0.001, 0.1)) %>%
-      # Calculate predicted incidence
-      mutate(pred_incidence = .epred / (Population / 100000))
-    
-    return(synthetic_draws)
+    stop("Error generating predictions")
   })
 }
 
 # Implementation of CATCHMENT function
+## Convert draws from site-level to catchment-level estimates
+## This uses the output from LINPREAD_DRAW_FN
 CATCHMENT <- function(draws) {
   # Group by relevant variables and calculate summary statistics
   catchment_data <- draws %>%
-    group_by(year, state, .draw) %>%
+    group_by(year, .draw) %>%
     summarise(
-      pred_incidence = mean(pred_incidence),
-      .groups = "drop"
-    ) %>%
-    # Calculate HDI intervals for each Year/State combination
-    group_by(year, state) %>%
-    summarise(
-      mean_incidence = mean(pred_incidence),
-      median_incidence = median(pred_incidence),
-      lower_hdi = hdi(pred_incidence, credMass = 0.95)[1],
-      upper_hdi = hdi(pred_incidence, credMass = 0.95)[2],
+      count = sum(count),
+      population = sum(population),
+      .epred = sum(.epred),
+      Population = sum(Population),
       .groups = "drop"
     )
-
+  
   return(catchment_data)
 }
 
 # Implementation of LINPRED_TO_CATCHIR function
+## Convert catchment-level draws to catchment-level estimates, including equal-tailed credibility interval
 LINPRED_TO_CATCHIR <- function(catchment_data) {
-  # Format the data for output
-  ir_data <- catchment_data %>%
+  ir_data<-catchment_data %>% 
+    group_by(year) %>% 
+    summarise(
+      raw_count=median(count),
+      raw_check=sd(count),
+      median=median(.epred),
+      mean=mean(.epred),
+      lower_equitailed=quantile(.epred, probs = 0.025, na.rm=TRUE),
+      upper_equitailed=quantile(.epred, probs = 0.975, na.rm=TRUE),
+      lower_hdi = (hdi(.epred, credMass = 0.95)[1]),
+      upper_hdi = (hdi(.epred, credMass = 0.95)[2]),
+      population=mean(population),
+      population_check=sd(population))%>%
     mutate(
-      year = as.integer(year),
-      # Round numeric values to 2 decimal places
-      mean_incidence = round(mean_incidence, 2),
-      median_incidence = round(median_incidence, 2),
-      lower_hdi = round(lower_hdi, 2),
-      upper_hdi = round(upper_hdi, 2)
+      median_ir= round(median/(population/100000),2),
+      mean_ir= round(mean/(population/100000),2),
+      lower_equitailed_ir=round(lower_equitailed/(population/100000),2),
+      upper_equitailed_ir=round(upper_equitailed/(population/100000),2),
+      lower_hdi_ir = round(lower_hdi/(population/100000),2),
+      upper_hdi_ir = round(upper_hdi/(population/100000),2)) %>%
+    # Arrange by Year and State for better readability
+    arrange(year)
+  return(ir_data)
+}
+
+# Implementation of LINPRED_TO_SITEIR function
+## Convert catchment-level draws to catchment-level estimates, including equal-tailed credibility interval
+LINPRED_TO_SITEIR <- function(site_data) {
+  ir_data<-site_data %>% 
+    group_by(year, state) %>% 
+    summarise(
+      raw_count=median(count),
+      raw_check=sd(count),
+      median=median(.epred),
+      mean=mean(.epred),
+      lower_equitailed=quantile(.epred, probs = 0.025, na.rm=TRUE),
+      upper_equitailed=quantile(.epred, probs = 0.975, na.rm=TRUE),
+      lower_hdi = (hdi(.epred, credMass = 0.95)[1]),
+      upper_hdi = (hdi(.epred, credMass = 0.95)[2]),
+      population=mean(population),
+      population_check=sd(population))%>%
+    mutate(
+      median_ir= round(median/(population/100000),2),
+      mean_ir= round(mean/(population/100000),2),
+      lower_equitailed_ir=round(lower_equitailed/(population/100000),2),
+      upper_equitailed_ir=round(upper_equitailed/(population/100000),2),
+      lower_hdi_ir = round(lower_hdi/(population/100000),2),
+      upper_hdi_ir = round(upper_hdi/(population/100000),2)
     ) %>%
     # Arrange by Year and State for better readability
     arrange(year, state)
-
   return(ir_data)
 }
+
+##### stopped work here.
 
 # New function: Plot site-specific trends
 PLOT_SITE_TRENDS <- function(catchir_data, pathogen, outDir) {
   # Create a plot for each state showing trends over time
-  p <- ggplot(catchir_data, aes(x = year, y = median_incidence)) +
+  p <- ggplot(catchir_data, aes(x = year, y = median_ir)) +
     geom_line(linewidth = 1) +
-    geom_ribbon(aes(ymin = lower_hdi, ymax = upper_hdi), alpha = 0.3) +
+    geom_ribbon(aes(ymin = lower_hdi_ir, ymax = upper_hdi_ir), alpha = 0.3) +
     facet_wrap(~ state, scales = "free_y") +
     labs(
       title = paste("Site-Specific Trends for", pathogen),
@@ -476,16 +322,17 @@ PLOT_SITE_TRENDS <- function(catchir_data, pathogen, outDir) {
       x = "Year"
     ) +
     theme_minimal() +
+    geom_vline(xintercept = 2004)+
     theme(
       plot.title = element_text(hjust = 0.5, face = "bold"),
       plot.subtitle = element_text(hjust = 0.5),
       strip.text = element_text(face = "bold")
     )
-
+  
   # Save the plot
   plot_file <- file.path(outDir, paste0(pathogen, "_site_trends.png"))
   ggsave(plot_file, p, width = 12, height = 8, dpi = 300)
-
+  
   return(p)
 }
 
@@ -500,11 +347,11 @@ PLOT_OVERALL_TREND <- function(catchir_data, pathogen, outDir) {
       upper_hdi = mean(upper_hdi),
       .groups = "drop"
     )
-
+  
   # Create the plot
-  p <- ggplot(overall_data, aes(x = year, y = median_incidence)) +
+  p <- ggplot(overall_data, aes(x = year, y = median_ir)) +
     geom_line(linewidth = 1.5) +
-    geom_ribbon(aes(ymin = lower_hdi, ymax = upper_hdi), alpha = 0.3) +
+    geom_ribbon(aes(ymin = lower_hdi_ir, ymax = upper_hdi_ir), alpha = 0.3) +
     labs(
       title = paste("Overall Trend for", pathogen),
       subtitle = "Median incidence with 95% HDI intervals",
@@ -516,11 +363,11 @@ PLOT_OVERALL_TREND <- function(catchir_data, pathogen, outDir) {
       plot.title = element_text(hjust = 0.5, face = "bold"),
       plot.subtitle = element_text(hjust = 0.5)
     )
-
+  
   # Save the plot
   plot_file <- file.path(outDir, paste0(pathogen, "_overall_trend.png"))
   ggsave(plot_file, p, width = 10, height = 6, dpi = 300)
-
+  
   return(p)
 }
 
@@ -529,68 +376,49 @@ PLOT_COMBINED <- function(site_plot, overall_plot, pathogen, outDir) {
   # Combine the plots
   combined_plot <- gridExtra::grid.arrange(overall_plot, site_plot,
                                            ncol = 1, heights = c(1, 2))
-
+  
   # Save the combined plot
   plot_file <- file.path(outDir, paste0(pathogen, "_combined.png"))
   ggsave(plot_file, combined_plot, width = 12, height = 14, dpi = 300)
-
+  
   return(combined_plot)
 }
 
 # Implementation of IR_COMP function for calculating relative risks
-IR_COMP <- function(catchir_data, start_year, end_year, output_file = NULL) {
+IR_COMP_CATCH <- function(catch, catchir_data, start_year, end_year, output_file = NULL) {
   # Filter data for the comparison period
-  period_data <- catchir_data %>%
+  period_data <- catch %>%
     filter(year >= start_year & year <= end_year)
-
+  
   # Check if we have data for the requested period
   if (nrow(period_data) == 0) {
-    warning(paste("No data available for period", start_year, "to", end_year))
-    # Create minimal output to avoid errors
-    if (!is.null(output_file)) {
-      minimal_result <- data.frame(
-        state = unique(catchir_data$state),
-        year = max(catchir_data$year),
-        comparison_period = paste0(start_year, "-", end_year),
-        current_incidence = 0.01,
-        period_incidence = 0.01,
-        relative_risk = 1.00,
-        percent_change = 0.00
-      )
-      
-      # Create directory if it doesn't exist
-      dir_path <- dirname(output_file)
-      if (!dir.exists(dir_path)) {
-        dir.create(dir_path, recursive = TRUE, showWarnings = FALSE)
-      }
-      
-      write.csv(minimal_result, output_file, row.names = FALSE)
-    }
-    return(NULL)
+    stop(paste("No data available for period", start_year, "to", end_year))
   }
-
-  # Calculate average incidence for the period by state
-  period_avg <- period_data %>%
-    group_by(state) %>%
+  
+  # Calculate average incidence for the baseline period for the entire catchment. Make sure you go bacl to the draws for this - you should never perform summary statistics on estimates. Instead, go back to the distribution and pull from there
+  period_data <-period_data %>% 
     summarise(
-      period_incidence = mean(median_incidence),
-      period_lower = mean(lower_hdi),
-      period_upper = mean(upper_hdi),
-      .groups = "drop"
-    )
-
-  # Calculate relative risks compared to the most recent year
-  latest_year <- max(catchir_data$year)
-
+      baseline_count_lower_hdi = (hdi(.epred, credMass = 0.95)[1]),
+      baseline_count_upper_hdi = (hdi(.epred, credMass = 0.95)[2]),
+      baseline_count=mean(.epred),
+      raw_count=mean(count),
+      population_mean=mean(population))%>% # should we do the mean or median?
+    mutate(period_incidence=baseline_count/(population_mean/100000),
+           period_incidence_upper_hdi=baseline_count_upper_hdi/(population_mean/100000),
+           period_incidence_lower_hdi=baseline_count_lower_hdi/(population_mean/100000))
+  # Calculate relative risks for each year in the dataset relative to the baseline periond
+  # latest_year <- max(catchir_data$year) $ if you only want the more recent year, you can modify the code to use "latest_year"
   # Get the most recent year's data
-  latest_data <- catchir_data %>%
-    filter(year == latest_year)
-
-  # Join and calculate relative risks
-  result <- latest_data %>%
-    left_join(period_avg, by = "state") %>%
+  # latest_data <- catchir_data %>% filter(year == latest_year)
+  
+  # Join and calculate relative risks - huh?
+  result <- catchir_data %>%
+    filter(year < start_year | year > end_year)%>%
+    cbind(period_avg) %>%
     mutate(
       relative_risk = median_incidence / period_incidence,
+      upper_rr = median_incidence / period_incidence,
+      lower_rr = median_incidence / period_incidence,
       percent_change = ((median_incidence / period_incidence) - 1) * 100,
       comparison_period = paste0(start_year, "-", end_year)
     ) %>%
@@ -602,11 +430,11 @@ IR_COMP <- function(catchir_data, start_year, end_year, output_file = NULL) {
       percent_change
     ) %>%
     arrange(state)
-
+  
   # Round numeric columns for readability
   result <- result %>%
     mutate(across(where(is.numeric), ~round(., 2)))
-
+  
   # Write to file if specified
   if (!is.null(output_file)) {
     # Create directory if it doesn't exist
@@ -617,6 +445,6 @@ IR_COMP <- function(catchir_data, start_year, end_year, output_file = NULL) {
     
     write.csv(result, output_file, row.names = FALSE)
   }
-
+  
   return(result)
 }

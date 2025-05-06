@@ -1,4 +1,21 @@
 #!/usr/bin/env Rscript
+################################################################################
+# can we add text similar to calcIR.R? 
+# functions.R
+#
+# Purpose:
+#   This script ...
+#
+#   This includes:
+#     - ...
+#
+# Usage:
+#   ...
+#
+# Example:
+#   ...
+#
+################################################################################
 
 # Load required libraries
 suppressPackageStartupMessages(library("argparse"))
