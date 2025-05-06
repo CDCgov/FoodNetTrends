@@ -335,6 +335,8 @@ tryCatch({
   
   # Create separate data sets for each "group of pathogens that have unique exclusions. Note to adapt this to Non-FoodNet datasets
   # we will need to modify this code
+  pathogens<-c("CAMPYLOBACTER", "CYCLOSPORA", "SALMONELLA", "SHIGELLA", "STEC", "VIBRIO", "YERSINIA")
+
   mmwrdata<-gtools::smartbind(as.data.frame(mmwrdata%>% filter(pathogen %in%  pathogens)), # all pathogens but Listeria
                               as.data.frame(mmwrdata%>% filter(pathogen == "STEC" & stec_class=="STEC O157")%>%mutate(pathogen="STEC O157")), # make a dataset for STEC O157
                               as.data.frame(mmwrdata%>% filter(pathogen == "STEC" & (stec_class=="STEC NONO157" | stec_class== "STEC O AG UNDET"))%>%mutate(pathogen="STEC NONO157")), # make a dataset for STEC NONO157
@@ -351,10 +353,10 @@ tryCatch({
   }
   
   # Ensure pathogentype column exists
-  if (!"pathogentype" %in% names(mmwrdata)) {
-    mmwrdata$pathogentype <- ifelse(mmwrdata$pathogen %in% c("CRYPTOSPORIDIUM", "CYCLOSPORA"), 
-                                    "Parasitic", "Bacterial")
-  }
+  # if (!"pathogentype" %in% names(mmwrdata)) {
+  #  mmwrdata$pathogentype <- ifelse(mmwrdata$pathogen %in% c("CRYPTOSPORIDIUM", "CYCLOSPORA"), 
+  #                                  "Parasitic", "Bacterial")
+  #}
   
   report_progress("DATA", message=paste("Processed", nrow(mmwrdata), "MMWR records"))
 }, error = function(e) {
@@ -393,7 +395,7 @@ tryCatch({
 # Process pathogen data
 report_progress("ANALYSIS", message="Processing pathogen data")
 tryCatch({
-  pathDf <- PATH_ANALYSIS(mmwrdata, census)
+  pathDf <- PATH_ANALYSIS(mmwrdata, census)%>%as.data.frame()
   report_progress("ANALYSIS", message=paste("Processed",
                                             length(unique(pathDf$pathogen)),
                                             "pathogens"))
@@ -401,10 +403,10 @@ tryCatch({
   # Process Cyclospora and Salmonella if CIDT+ is included
   if("CIDT+" %in% cidt) {
     report_progress("ANALYSIS", message="Processing Cyclospora data")
-    cyloDF <- CYCLOSPORA_ANALYSIS(mmwrdata, census)
+    cyloDF <- CYCLOSPORA_ANALYSIS(mmwrdata, census)%>%as.data.frame()
     
     report_progress("ANALYSIS", message="Processing Salmonella data")
-    salDF <- SALMONELLA_ANALYSIS(mmwrdata, census)
+    salDF <- SALMONELLA_ANALYSIS(mmwrdata, census)%>%as.data.frame()
     
     # Combine all pathogen data
     bact <- gtools::smartbind(pathDf, cyloDF) %>%
@@ -426,7 +428,10 @@ tryCatch({
     if (nrow(bact) == 0) {
       # Instead of stopping, create a minimal dataset for the pathogen
       # This will allow the pipeline to continue but produce empty results
-      ## What is the benefit of this? Instead, can we return an error that no illnesses of the requested disease were found?
+      #################################
+      ################################
+      ###############################
+      ### What is the benefit of this? Instead, can we return an error that no illnesses of the requested disease were found?
       report_progress("WARNING", message=paste("No data found for pathogen:", opts$pathogen, "- Creating minimal dataset"))
       
       # Create a minimal dataset with the requested pathogen for all sites
@@ -530,6 +535,10 @@ for (pathogen_name in target_pathogens) {
     # site-level estimates
     report_progress("POST-PROCESSING", message="Calculating catchment-level draws")
     site <- LINPRED_TO_SITEIR(posteriorLinpred)
+   
+     # Save site-level estimates
+    ir_file <- paste0(outDir, "/", pathogen_name, "_IRSite.csv")
+    write.csv(site, ir_file, row.names = FALSE)
     
     # Catchment-level draws
     report_progress("POST-PROCESSING", message="Calculating catchment-level draws")

@@ -386,53 +386,59 @@ PLOT_COMBINED <- function(site_plot, overall_plot, pathogen, outDir) {
 
 # Implementation of IR_COMP function for calculating relative risks
 IR_COMP_CATCH <- function(catch, catchir_data, start_year, end_year, output_file = NULL) {
+  
   # Filter data for the comparison period
   period_data <- catch %>%
-    filter(year >= start_year & year <= end_year)
+    filter(year >= start_year & year <= end_year)%>% group_by(.draw)%>%
+    summarise_at(.vars = c("count", "population", ".epred"), 
+                 .funs = list(mean=mean))%>%
+    mutate(baseline_ir=.epred_mean/(population_mean/100000))
+  colnames(period_data)<-c(".draw", "baseline_count", "baseline_population", "baseline_.epred", "baseline_ir")
   
   # Check if we have data for the requested period
   if (nrow(period_data) == 0) {
     stop(paste("No data available for period", start_year, "to", end_year))
   }
-  
-  # Calculate average incidence for the baseline period for the entire catchment. Make sure you go bacl to the draws for this - you should never perform summary statistics on estimates. Instead, go back to the distribution and pull from there
-  period_data <-period_data %>% 
-    summarise(
-      baseline_count_lower_hdi = (hdi(.epred, credMass = 0.95)[1]),
-      baseline_count_upper_hdi = (hdi(.epred, credMass = 0.95)[2]),
-      baseline_count=mean(.epred),
-      raw_count=mean(count),
-      population_mean=mean(population))%>% # should we do the mean or median?
-    mutate(period_incidence=baseline_count/(population_mean/100000),
-           period_incidence_upper_hdi=baseline_count_upper_hdi/(population_mean/100000),
-           period_incidence_lower_hdi=baseline_count_lower_hdi/(population_mean/100000))
-  # Calculate relative risks for each year in the dataset relative to the baseline periond
+ # Join the data for the baseline period with the data for all other years. This is because you do all calcualtions on the draws THEN average
+ comb<-left_join(catch, period_data, by=c(".draw"))%>%
+   group_by(year)%>%
+ # calculate the IR for each draw and year
+   mutate(
+     raw_ir=count/(population/100000),
+     est_ir=.epred/(population/100000))%>%
+ # calculate relative risk and percent change by draw
+   mutate(relative_risk=  est_ir/baseline_ir,
+          percent_change= ((est_ir / baseline_ir) - 1) * 100)%>%
+ # extract estimates from the draws
+   summarise(
+      count=mean(count),
+      population=mean(population),
+      raw_ir=mean(raw_ir),
+      baseline_count=mean(baseline_count),
+      baseline_population=mean(baseline_population),
+      baseline_.epred_lower_hdi = (hdi(baseline_.epred, credMass = 0.95)[1]),
+      baseline_.epred_upper_hdi = (hdi(baseline_.epred, credMass = 0.95)[2]),
+      baseline_.epred_est=mean(baseline_.epred),
+      baseline_ir_lower_hdi = (hdi(baseline_ir, credMass = 0.95)[1]),
+      baseline_ir_upper_hdi = (hdi(baseline_ir, credMass = 0.95)[2]),
+      baseline_ir=mean(baseline_ir),
+      est_ir_lower_hdi = (hdi(est_ir, credMass = 0.95)[1]),
+      est_ir_upper_hdi = (hdi(est_ir, credMass = 0.95)[2]),
+      est_ir=mean(est_ir),
+      relative_risk_lower_hdi = (hdi(relative_risk, credMass = 0.95)[1]),
+      relative_risk_upper_hdi = (hdi(relative_risk, credMass = 0.95)[2]),
+      relative_risk_est=mean(relative_risk),
+      percent_change_lower_hdi = (hdi(percent_change, credMass = 0.95)[1]),
+      percent_change_upper_hdi = (hdi(percent_change, credMass = 0.95)[2]),
+      percent_change_est=mean(percent_change))%>% # should we do the mean or median?
+    mutate(comparison_period = paste0(start_year, "-", end_year))
+  # Calculate relative risks for each year in the dataset relative to the baseline period
   # latest_year <- max(catchir_data$year) $ if you only want the more recent year, you can modify the code to use "latest_year"
   # Get the most recent year's data
   # latest_data <- catchir_data %>% filter(year == latest_year)
   
-  # Join and calculate relative risks - huh?
-  result <- catchir_data %>%
-    filter(year < start_year | year > end_year)%>%
-    cbind(period_avg) %>%
-    mutate(
-      relative_risk = median_incidence / period_incidence,
-      upper_rr = median_incidence / period_incidence,
-      lower_rr = median_incidence / period_incidence,
-      percent_change = ((median_incidence / period_incidence) - 1) * 100,
-      comparison_period = paste0(start_year, "-", end_year)
-    ) %>%
-    select(
-      state, year, comparison_period,
-      current_incidence = median_incidence,
-      period_incidence,
-      relative_risk,
-      percent_change
-    ) %>%
-    arrange(state)
-  
   # Round numeric columns for readability
-  result <- result %>%
+  result <- comb %>%
     mutate(across(where(is.numeric), ~round(., 2)))
   
   # Write to file if specified
