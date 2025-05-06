@@ -91,7 +91,7 @@ mmwrdata<-gtools::smartbind(as.data.frame(mmwrdata%>% filter(pathogen %in%  path
 # We assume that if Pathogen is one of "CRYPTOSPORIDIUM" or "CYCLOSPORA", it is "Parasitic"; otherwise "Bacterial".
 if(!"pathogentype" %in% names(mmwrdata)) {
   mmwrdata <- mmwrdata %>%
-    mutate(pathogentype = ifelse(Pathogen %in% c("CRYPTOSPORIDIUM", "CYCLOSPORA"), "Parasitic", "Bacterial"))
+    mutate(pathogentype = ifelse(pathogen %in% c("CRYPTOSPORIDIUM", "CYCLOSPORA"), "Parasitic", "Bacterial"))
 }
 
 # --- Write Cleaned Data to CSV ---
