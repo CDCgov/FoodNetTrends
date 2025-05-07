@@ -263,7 +263,7 @@ LINPRED_TO_CATCHIR <- function(catchment_data) {
       upper_equitailed=quantile(.epred, probs = 0.975, na.rm=TRUE),
       lower_hdi = (hdi(.epred, credMass = 0.95)[1]),
       upper_hdi = (hdi(.epred, credMass = 0.95)[2]),
-      population=mean(population),
+      population=median(population),
       population_check=sd(population))%>%
     mutate(
       median_ir= round(median/(population/100000),2),
@@ -291,7 +291,7 @@ LINPRED_TO_SITEIR <- function(site_data) {
       upper_equitailed=quantile(.epred, probs = 0.975, na.rm=TRUE),
       lower_hdi = (hdi(.epred, credMass = 0.95)[1]),
       upper_hdi = (hdi(.epred, credMass = 0.95)[2]),
-      population=mean(population),
+      population=median(population),
       population_check=sd(population))%>%
     mutate(
       median_ir= round(median/(population/100000),2),
@@ -369,8 +369,8 @@ IR_COMP_CATCH <- function(catch, catchir_data, start_year, end_year, output_file
   period_data <- catch %>%
     filter(year >= start_year & year <= end_year)%>% group_by(.draw)%>%
     summarise_at(.vars = c("count", "population", ".epred"), 
-                 .funs = list(mean=mean))%>%
-    mutate(baseline_ir=.epred_mean/(population_mean/100000))
+                 .funs = list(median=median))%>%
+    mutate(baseline_ir=.epred_median/(population_median/100000))
   colnames(period_data)<-c(".draw", "baseline_count", "baseline_population", "baseline_.epred", "baseline_ir")
   
   # Check if we have data for the requested period
@@ -390,26 +390,26 @@ IR_COMP_CATCH <- function(catch, catchir_data, start_year, end_year, output_file
    
  # extract estimates from the draws
    summarise(
-      count=mean(count),
-      population=mean(population),
-      raw_ir=mean(raw_ir),
-      baseline_count=mean(baseline_count),
-      baseline_population=mean(baseline_population),
+      count=median(count),
+      population=median(population),
+      raw_ir=median(raw_ir),
+      baseline_count=median(baseline_count),
+      baseline_population=median(baseline_population),
       baseline_.epred_lower_hdi = (hdi(baseline_.epred, credMass = 0.95)[1]),
       baseline_.epred_upper_hdi = (hdi(baseline_.epred, credMass = 0.95)[2]),
-      baseline_.epred_est=mean(baseline_.epred),
+      baseline_.epred_est=median(baseline_.epred),
       baseline_ir_lower_hdi = (hdi(baseline_ir, credMass = 0.95)[1]),
       baseline_ir_upper_hdi = (hdi(baseline_ir, credMass = 0.95)[2]),
-      baseline_ir=mean(baseline_ir),
+      baseline_ir=median(baseline_ir),
       est_ir_lower_hdi = (hdi(est_ir, credMass = 0.95)[1]),
       est_ir_upper_hdi = (hdi(est_ir, credMass = 0.95)[2]),
-      est_ir=mean(est_ir),
+      est_ir=median(est_ir),
       relative_risk_lower_hdi = (hdi(relative_risk, credMass = 0.95)[1]),
       relative_risk_upper_hdi = (hdi(relative_risk, credMass = 0.95)[2]),
-      relative_risk_est=mean(relative_risk),
+      relative_risk_est=median(relative_risk),
       percent_change_lower_hdi = (hdi(percent_change, credMass = 0.95)[1]),
       percent_change_upper_hdi = (hdi(percent_change, credMass = 0.95)[2]),
-      percent_change_est=mean(percent_change))%>% # should we do the mean or median?
+      percent_change_est=median(percent_change))%>% # should we do the mean or median?
     mutate(comparison_period = paste0(start_year, "-", end_year))
   # Calculate relative risks for each year in the dataset relative to the baseline period
   # latest_year <- max(catchir_data$year) $ if you only want the more recent year, you can modify the code to use "latest_year"

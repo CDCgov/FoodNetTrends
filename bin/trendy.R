@@ -535,10 +535,15 @@ for (pathogen_name in target_pathogens) {
     # site-level estimates
     report_progress("POST-PROCESSING", message="Calculating catchment-level draws")
     site <- LINPRED_TO_SITEIR(posteriorLinpred)
-   
-     # Save site-level estimates
-    ir_file <- paste0(outDir, "/", pathogen_name, "_IRSite.csv")
-    write.csv(site, ir_file, row.names = FALSE)
+    # Add metadata
+    site$pathogen <- pathogen_name
+    site$travel <- travelLabel
+    site$culture <- culture
+    
+    # Save site-level estimates
+    siteir_file <- paste0(outDir, "/", pathogen_name, "_IRSite.csv")
+    write.csv(site, siteir_file, row.names = FALSE)
+    report_progress("OUTPUT", message=paste("Saved site incidence rate estimates to", siteir_file))
     
     # Catchment-level draws
     report_progress("POST-PROCESSING", message="Calculating catchment-level draws")
