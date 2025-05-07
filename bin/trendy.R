@@ -262,11 +262,11 @@ tryCatch({
 
 # Set travel label based on included travel types
 if (("YES" %in% travel) || ("UNKNOWN" %in% travel)) {
-  travelLabel <- "Travel Included"
+  travelLabel <- "All Cases"
 } else if (!("YES" %in% travel) & ("UNKNOWN" %in% travel)) {
-  travelLabel <- "Unknown Travel Included"
+  travelLabel <- "Domestically-Acquired (UNK Travel Included)"
 } else {
-  travelLabel <- "Excluded"
+  travelLabel <- "Domestically-Acquired (UNK Travel Excluded)"
 }
 
 # Set culture label based on included diagnostic methods
