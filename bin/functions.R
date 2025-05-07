@@ -309,9 +309,9 @@ LINPRED_TO_SITEIR <- function(site_data) {
 ##### stopped work here.
 
 # New function: Plot site-specific trends
-PLOT_SITE_TRENDS <- function(catchir_data, pathogen, outDir) {
+PLOT_SITE_TRENDS <- function(site, pathogen, outDir) {
   # Create a plot for each state showing trends over time
-  p <- ggplot(catchir_data, aes(x = year, y = median_ir)) +
+  p <- ggplot(site, aes(x = year, y = median_ir)) +
     geom_line(linewidth = 1) +
     geom_ribbon(aes(ymin = lower_hdi_ir, ymax = upper_hdi_ir), alpha = 0.3) +
     facet_wrap(~ state, scales = "free_y") +
@@ -322,7 +322,7 @@ PLOT_SITE_TRENDS <- function(catchir_data, pathogen, outDir) {
       x = "Year"
     ) +
     theme_minimal() +
-    geom_vline(xintercept = 2004)+
+    geom_vline(aes(xintercept = 2004), type="dashed", color="red")+
     theme(
       plot.title = element_text(hjust = 0.5, face = "bold"),
       plot.subtitle = element_text(hjust = 0.5),
@@ -338,20 +338,11 @@ PLOT_SITE_TRENDS <- function(catchir_data, pathogen, outDir) {
 
 # New function: Plot overall trend
 PLOT_OVERALL_TREND <- function(catchir_data, pathogen, outDir) {
-  # Calculate overall incidence by year (weighted by population)
-  overall_data <- catchir_data %>%
-    group_by(year) %>%
-    summarise(
-      median_incidence = mean(median_incidence),
-      lower_hdi = mean(lower_hdi),
-      upper_hdi = mean(upper_hdi),
-      .groups = "drop"
-    )
-  
-  # Create the plot
-  p <- ggplot(overall_data, aes(x = year, y = median_ir)) +
+# Create the plot
+  p <- ggplot(catchir_data, aes(x = year, y = median_ir)) +
     geom_line(linewidth = 1.5) +
     geom_ribbon(aes(ymin = lower_hdi_ir, ymax = upper_hdi_ir), alpha = 0.3) +
+    geom_vline(aes(xintercept = 2004), type="dashed", color="red")+
     labs(
       title = paste("Overall Trend for", pathogen),
       subtitle = "Median incidence with 95% HDI intervals",
@@ -369,19 +360,6 @@ PLOT_OVERALL_TREND <- function(catchir_data, pathogen, outDir) {
   ggsave(plot_file, p, width = 10, height = 6, dpi = 300)
   
   return(p)
-}
-
-# New function: Create a combined visualization
-PLOT_COMBINED <- function(site_plot, overall_plot, pathogen, outDir) {
-  # Combine the plots
-  combined_plot <- gridExtra::grid.arrange(overall_plot, site_plot,
-                                           ncol = 1, heights = c(1, 2))
-  
-  # Save the combined plot
-  plot_file <- file.path(outDir, paste0(pathogen, "_combined.png"))
-  ggsave(plot_file, combined_plot, width = 12, height = 14, dpi = 300)
-  
-  return(combined_plot)
 }
 
 # Implementation of IR_COMP function for calculating relative risks
@@ -408,7 +386,8 @@ IR_COMP_CATCH <- function(catch, catchir_data, start_year, end_year, output_file
      est_ir=.epred/(population/100000))%>%
  # calculate relative risk and percent change by draw
    mutate(relative_risk=  est_ir/baseline_ir,
-          percent_change= ((est_ir / baseline_ir) - 1) * 100)%>%
+          percent_change= ((est_ir-baseline_ir)/baseline_ir)*100)%>%
+   
  # extract estimates from the draws
    summarise(
       count=mean(count),
@@ -453,4 +432,45 @@ IR_COMP_CATCH <- function(catch, catchir_data, start_year, end_year, output_file
   }
   
   return(result)
+}
+
+
+# New function: Plot percent change trend
+PLOT_PCTCHange_TREND <- function(hp30) {
+  # Create the plot
+  p <- ggplot(hp30, aes(x = year, y = relative_risk_est)) +
+    geom_line(linewidth = 1.5) +
+    geom_ribbon(aes(ymin = relative_risk_lower_hdi, ymax = relative_risk_upper_hdi), alpha = 0.3) +
+    geom_vline(aes(xintercept = 2004), type="dashed", color="red")+
+    labs(
+      title = paste("Overall Trend for", pathogen),
+      subtitle = "Median incidence with 95% HDI intervals",
+      y = "Incidence per 100,000 population",
+      x = "Year"
+    ) +
+    theme_minimal() +
+    theme(
+      plot.title = element_text(hjust = 0.5, face = "bold"),
+      plot.subtitle = element_text(hjust = 0.5)
+    )
+  
+  # Save the plot
+  plot_file <- file.path(outDir, paste0(pathogen, "_overall_trend.png"))
+  ggsave(plot_file, p, width = 10, height = 6, dpi = 300)
+  
+  return(p)
+}
+
+# This allows you to pull in our outputs for the same time period and combine into a single file. Helpful for making multi-pathogen tables and graphs
+combine_files<-function(file_path, pattern){
+  dir_path <- dirname(file_path)
+  setwd(dir_path) 
+  df = list.files(all.files = T,  pattern = pattern, full.names = F, recursive = TRUE) 
+  df %>%
+    set_names(.) %>%
+    map_df(~mutate_all(read.csv(.x), as.character), .id = 'grp') %>%
+    mutate(grp = str_remove(basename(grp), ".xlsx")) %>%
+    separate(grp, c('pathogen', 'drop'), sep = '_', extra = 'merge')%>%
+    select(-c(drop)) -> datas
+  return(datas)
 }

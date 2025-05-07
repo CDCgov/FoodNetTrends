@@ -528,7 +528,7 @@ for (pathogen_name in target_pathogens) {
     # Draw untransformed (link-level) predictions
     report_progress("POST-PROCESSING", message=paste("Generating predictions for", pathogen_name))
     posteriorLinpred <- LINPREAD_DRAW_FN(
-      data = (current_data %>% group_by(state)),
+      data = (proposed$data %>% group_by(state)),
       model = proposed
     )
     
@@ -562,7 +562,7 @@ for (pathogen_name in target_pathogens) {
     report_progress("ANALYSIS", message="Calculating relative risks and percent changes")
     
     # Calculate for 2016-2018 (the Healthy People 2030 baseline period)
-    IR_COMP_CATCH(catch, catchir.linpred, 2016, 2018,
+    hp30<-IR_COMP_CATCH(catch, catchir.linpred, 2016, 2018,
                   paste0(outDir, "/", pathogen_name, "_EstIRRCatch_2016_2018.csv"))
     
     # Calculate for COVID-19
@@ -580,15 +580,10 @@ for (pathogen_name in target_pathogens) {
     # Create visualizations if enabled
     if (requireNamespace("ggplot2", quietly = TRUE)) {
       # Site-specific trends plot
-      site_plot <- PLOT_SITE_TRENDS(catchir.linpred, pathogen_name, outDir)
+      site_plot <- PLOT_SITE_TRENDS(site, pathogen_name, outDir)
       
       # Overall trend plot
       overall_plot <- PLOT_OVERALL_TREND(catchir.linpred, pathogen_name, outDir)
-      
-      # Combined visualization
-      if (requireNamespace("gridExtra", quietly = TRUE)) {
-        PLOT_COMBINED(site_plot, overall_plot, pathogen_name, outDir)
-      }
     }
     
     report_progress("COMPLETE", message=paste("Completed analysis for", pathogen_name))
