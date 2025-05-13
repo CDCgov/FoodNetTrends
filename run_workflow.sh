@@ -226,9 +226,9 @@ fi
 # Build the base command - USING EXACT SAME FORMAT AS ORIGINAL
 if [[ "$flag" == "resume" ]]; then
     cmd="nextflow run main.nf -profile singularity -resume -entry SPLINE \
-  --mmwrFile \"$dataDir/mmwr9623_Jan2024.sas7bdat\" \
-  --censusFileB \"$dataDir/cen9623.sas7bdat\" \
-  --censusFileP \"$dataDir/cen9623_para.sas7bdat\" \
+  --mmwrFile \"$dataDir/mmwr9624_May2025.sas7bdat\" \
+  --censusFileB \"$dataDir/cen9624.sas7bdat\" \
+  --censusFileP \"$dataDir/cen9624_para.sas7bdat\" \
   --iterations $iterations \
   --chains $chains \
   --adapt_delta $adapt_delta \
@@ -238,9 +238,9 @@ if [[ "$flag" == "resume" ]]; then
   --pathogen \"$pathogens\""
 else
     cmd="nextflow run main.nf -profile singularity -entry SPLINE \
-  --mmwrFile \"$dataDir/mmwr9623_Jan2024.sas7bdat\" \
-  --censusFileB \"$dataDir/cen9623.sas7bdat\" \
-  --censusFileP \"$dataDir/cen9623_para.sas7bdat\" \
+  --mmwrFile \"$dataDir/mmwr9624_May2025.sas7bdat\" \
+  --censusFileB \"$dataDir/cen9624.sas7bdat\" \
+  --censusFileP \"$dataDir/cen9624_para.sas7bdat\" \
   --iterations $iterations \
   --chains $chains \
   --adapt_delta $adapt_delta \

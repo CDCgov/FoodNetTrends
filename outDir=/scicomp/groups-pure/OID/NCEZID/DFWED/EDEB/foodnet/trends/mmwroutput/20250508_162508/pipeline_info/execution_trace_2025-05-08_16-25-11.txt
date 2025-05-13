@@ -1,0 +1,2 @@
+task_id	hash	native_id	name	status	exit	submit	duration	realtime	%cpu	peak_rss	peak_vmem	rchar	wchar
+1	ec/d273cb	2711659	SPLINE:PREPROCESS (Preprocessing MMWR data)	ABORTED	-	2025-05-08 16:25:14.640	-	-	-	-	-	-	-

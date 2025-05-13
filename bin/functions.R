@@ -266,12 +266,12 @@ LINPRED_TO_CATCHIR <- function(catchment_data) {
       population=median(population),
       population_check=sd(population))%>%
     mutate(
-      median_ir= round(median/(population/100000),2),
-      mean_ir= round(mean/(population/100000),2),
-      lower_equitailed_ir=round(lower_equitailed/(population/100000),2),
-      upper_equitailed_ir=round(upper_equitailed/(population/100000),2),
-      lower_hdi_ir = round(lower_hdi/(population/100000),2),
-      upper_hdi_ir = round(upper_hdi/(population/100000),2)) %>%
+      median_ir= round(median/(population/100000),4),
+      mean_ir= round(mean/(population/100000),4),
+      lower_equitailed_ir=round(lower_equitailed/(population/100000),4),
+      upper_equitailed_ir=round(upper_equitailed/(population/100000),4),
+      lower_hdi_ir = round(lower_hdi/(population/100000),4),
+      upper_hdi_ir = round(upper_hdi/(population/100000),4)) %>%
     # Arrange by Year and State for better readability
     arrange(year)
   return(ir_data)
@@ -294,12 +294,12 @@ LINPRED_TO_SITEIR <- function(site_data) {
       population=median(population),
       population_check=sd(population))%>%
     mutate(
-      median_ir= round(median/(population/100000),2),
-      mean_ir= round(mean/(population/100000),2),
-      lower_equitailed_ir=round(lower_equitailed/(population/100000),2),
-      upper_equitailed_ir=round(upper_equitailed/(population/100000),2),
-      lower_hdi_ir = round(lower_hdi/(population/100000),2),
-      upper_hdi_ir = round(upper_hdi/(population/100000),2)
+      median_ir= round(median/(population/100000),4),
+      mean_ir= round(mean/(population/100000),4),
+      lower_equitailed_ir=round(lower_equitailed/(population/100000),4),
+      upper_equitailed_ir=round(upper_equitailed/(population/100000),4),
+      lower_hdi_ir = round(lower_hdi/(population/100000),4),
+      upper_hdi_ir = round(upper_hdi/(population/100000),4)
     ) %>%
     # Arrange by Year and State for better readability
     arrange(year, state)
@@ -418,7 +418,7 @@ IR_COMP_CATCH <- function(catch, catchir_data, start_year, end_year, output_file
   
   # Round numeric columns for readability
   result <- comb %>%
-    mutate(across(where(is.numeric), ~round(., 2)))
+    mutate(across(where(is.numeric), ~round(., 4)))
   
   # Write to file if specified
   if (!is.null(output_file)) {

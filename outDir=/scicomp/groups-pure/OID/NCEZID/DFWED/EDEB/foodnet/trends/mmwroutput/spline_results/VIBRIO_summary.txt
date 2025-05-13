@@ -1,0 +1,50 @@
+ Family: negbinomial 
+  Links: mu = log; shape = identity 
+Formula: count ~ s(year, by = state) + state + offset(log(population)) 
+   Data: data (Number of observations: 259) 
+  Draws: 4 chains, each with iter = 5001; warmup = 2500; thin = 1;
+         total post-warmup draws = 10004
+
+Smoothing Spline Hyperparameters:
+                    Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+sds(syearstateCA_1)     0.92      0.86     0.03     3.21 1.00     3077     4894
+sds(syearstateCO_1)     2.23      1.42     0.34     5.81 1.00     4203     3903
+sds(syearstateCT_1)     0.88      0.77     0.05     2.93 1.00     3496     4542
+sds(syearstateGA_1)     1.69      1.36     0.10     5.18 1.00     1971     3063
+sds(syearstateMD_1)     0.58      0.59     0.02     2.20 1.00     4204     4871
+sds(syearstateMN_1)     1.02      0.81     0.05     3.04 1.00     3524     4078
+sds(syearstateNM_1)     1.69      1.61     0.05     5.88 1.00     4045     5021
+sds(syearstateNY_1)     1.02      0.97     0.03     3.59 1.00     3452     4929
+sds(syearstateOR_1)     1.06      0.88     0.04     3.27 1.00     3389     4845
+sds(syearstateTN_1)     1.09      0.94     0.04     3.52 1.00     3762     4314
+
+Regression Coefficients:
+                Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+Intercept         -11.82      0.07   -11.95   -11.69 1.00     4734     6284
+stateCO            -0.80      0.15    -1.08    -0.51 1.00     6743     6768
+stateCT            -0.17      0.10    -0.36     0.02 1.00     6537     7407
+stateGA            -0.74      0.09    -0.92    -0.56 1.00     6218     7606
+stateMD            -0.04      0.09    -0.23     0.14 1.00     6217     7479
+stateMN            -1.03      0.11    -1.23    -0.82 1.00     7203     7403
+stateNM            -1.97      0.30    -2.57    -1.36 1.00     5531     4953
+stateNY            -1.23      0.13    -1.49    -1.00 1.00     6652     6292
+stateOR            -0.46      0.10    -0.65    -0.27 1.00     6321     7216
+stateTN            -1.30      0.12    -1.54    -1.07 1.00     6628     7293
+syear:stateCA_1    -0.72      2.15    -6.03     2.76 1.00     5030     3730
+syear:stateCO_1     3.50      5.63    -8.91    14.80 1.00     5634     5645
+syear:stateCT_1     4.17      2.10    -0.53     8.26 1.00     5734     4939
+syear:stateGA_1     2.26      2.91    -3.85     8.34 1.00     6919     4477
+syear:stateMD_1     4.03      1.74     0.50     8.04 1.00     5747     4962
+syear:stateMN_1     5.59      2.66    -0.93     9.78 1.00     4476     5189
+syear:stateNM_1     2.41      6.63   -14.42    13.19 1.00     3894     3123
+syear:stateNY_1     5.37      3.22     0.24    13.70 1.00     4814     2959
+syear:stateOR_1     1.91      2.49    -4.09     5.73 1.00     4910     5870
+syear:stateTN_1     4.28      3.24    -2.01    11.35 1.00     4990     4397
+
+Further Distributional Parameters:
+      Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+shape    14.06      2.55     9.83    19.86 1.00     8193     6971
+
+Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS
+and Tail_ESS are effective sample size measures, and Rhat is the potential
+scale reduction factor on split chains (at convergence, Rhat = 1).
