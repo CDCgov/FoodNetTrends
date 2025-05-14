@@ -11,16 +11,19 @@ if (params.help) {
 
     Options:
         --help                  Show this help message
-        --mmwrFile              Path to the MMWR data file (or cleaned CSV if preprocessed is TRUE)
+        --mmwrFile              Path to the MMWR data file (raw SAS or preprocessed CSV)
         --censusFile_B          Path to the bacterial census data file
         --censusFile_P          Path to the parasitic census data file
         --travel                Travel types (e.g., NO,UNKNOWN)
         --cidt                  CIDT types (e.g., CIDT+,CX+,PARASITIC)
         --projID                Project ID (e.g., 20240705)
         --outdir                Base output directory for pipeline reports and results
+        --outputBase            Base name for output files (preprocessing mode)
         --preprocessed          TRUE/FALSE indicating if using preprocessed CSV data
-        --cleanFile             Path to cleaned CSV file (if preprocessed is TRUE)
+        --metadata              Path to metadata JSON file (for preprocessed data)
         --pathogen              Comma-separated list of pathogens to analyze (e.g., CAMPYLOBACTER,SALMONELLA)
+        --states                Comma-separated list of states to analyze (e.g., CA,NY,GA)
+        --salmonella_serotypes  Comma-separated list of Salmonella serotypes to analyze
         --chains                Number of MCMC chains
         --iterations            Number of MCMC iterations
         --adapt_delta           Adaptation parameter for MCMC
@@ -30,9 +33,16 @@ if (params.help) {
     System.exit(0)
 }
 
-// Include the SPLINE workflow
+// Include the workflows
 include { SPLINE } from './workflows/spline.nf'
+include { PREPROCESS_WORKFLOW } from './workflows/preprocess.nf'
 
-workflow FoodNetTrends {
+// Default workflow
+workflow {
     SPLINE()
+}
+
+// PREPROCESS_ONLY workflow entry point
+workflow PREPROCESS_ONLY {
+    PREPROCESS_WORKFLOW()
 }

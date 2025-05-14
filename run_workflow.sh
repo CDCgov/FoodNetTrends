@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # set up paths, files
-dataDir="/scicomp/groups-pure/OID/NCEZID/DFWED/EDEB/foodnet/trends/data/"
+DEFAULT_DATA_DIR="/scicomp/groups-pure/OID/NCEZID/DFWED/EDEB/foodnet/trends/data/"
 outDir="output"  # Default to "output" directory in current location
 
 # set up modules
@@ -20,15 +20,290 @@ RED='\033[0;31m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-# Define all available pathogens
-ALL_PATHOGENS="CAMPYLOBACTER,CYCLOSPORA,SALMONELLA,SHIGELLA,STEC,VIBRIO,YERSINIA"
-
+echo "Your Nextflow temporary/cache files will be placed in $TMPDIR/nextflow/ by default"
 echo -e "${BLUE}=========================================${NC}"
 echo -e "${BLUE}   FoodNet Trends Analysis Pipeline      ${NC}"
 echo -e "${BLUE}=========================================${NC}"
 echo ""
 
+# Ask for workflow mode
+echo -e "Select mode:"
+echo "1) Preprocess data (clean raw data files and generate metadata)"
+echo "2) Run analysis (with complete pipeline)"
+echo "3) Use existing preprocessed data"
+read -p "Enter selection [1]: " workflow_mode
+workflow_mode=${workflow_mode:-1}
+
+# Handle preprocessed data
+preprocessed_data=""
+preprocessed_metadata=""
+
+# Mode 1: Preprocessing
+if [[ "$workflow_mode" == "1" ]]; then
+    echo ""
+    echo -e "${BLUE}======== Input Files ========${NC}"
+    
+    # Default data file
+    defaultMmwrFile="${DEFAULT_DATA_DIR}/mmwr9623_Jan2024.sas7bdat"
+    
+    read -p "MMWR data file [${defaultMmwrFile}]: " mmwrFile
+    mmwrFile=${mmwrFile:-$defaultMmwrFile}
+    
+    # Validate file exists
+    if [ ! -f "$mmwrFile" ]; then
+        echo -e "${RED}Error: MMWR file does not exist: $mmwrFile${NC}"
+        echo -e "${RED}Exiting.${NC}"
+        exit 1
+    fi
+    
+    # Set output location
+    echo ""
+    echo -e "${BLUE}======== Output Settings ========${NC}"
+    
+    # Default output directory for preprocessed data
+    defaultPreprocessedDir="preprocessed_$(date +%Y%m%d_%H%M%S)"
+    read -p "Output directory for preprocessed data [${defaultPreprocessedDir}]: " preprocessedDir
+    preprocessedDir=${preprocessedDir:-$defaultPreprocessedDir}
+    
+    # Default output base name (derived from input filename)
+    fileBasename=$(basename "$mmwrFile" | sed 's/\.[^.]*$//')
+    defaultOutputBase="foodnet_data_${fileBasename}"
+    read -p "Base name for output files [${defaultOutputBase}]: " outputBase
+    outputBase=${outputBase:-$defaultOutputBase}
+    
+    # Ask about metadata generation
+    echo ""
+    read -p "Generate metadata JSON? (y/n) [y]: " generate_metadata
+    generate_metadata=${generate_metadata:-y}
+    if [[ "$generate_metadata" =~ ^[Yy]$ ]]; then
+        metadata_param="--generateMetadata true"
+    else
+        metadata_param="--generateMetadata false"
+    fi
+    
+    echo -e "${GREEN}Running preprocessing...${NC}"
+    
+    # Run the preprocessing workflow
+    preprocess_cmd="nextflow run main.nf -profile singularity -entry PREPROCESS_WORKFLOW \
+      --mmwrFile \"$mmwrFile\" \
+      --outdir \"$preprocessedDir\" \
+      --outputBase \"$outputBase\" \
+      $metadata_param"
+    
+    if ! eval $preprocess_cmd; then
+        echo -e "${RED}Preprocessing failed.${NC}"
+        echo -e "${RED}Check .nextflow.log for details.${NC}"
+        exit 1
+    fi
+    
+    # Set paths to preprocessed data and metadata
+    preprocessed_data="$preprocessedDir/preprocessed/${outputBase}.csv"
+    preprocessed_metadata="$preprocessedDir/preprocessed/${outputBase}_metadata.json"
+    
+    # Check if files were created
+    if [ ! -f "$preprocessed_data" ]; then
+        echo -e "${RED}Preprocessing failed to create expected CSV file.${NC}"
+        echo -e "${RED}Check logs for details.${NC}"
+        exit 1
+    fi
+    
+    echo -e "${GREEN}Preprocessing complete!${NC}"
+    echo -e "- Cleaned data: ${GREEN}$preprocessed_data${NC}"
+    
+    if [[ "$generate_metadata" =~ ^[Yy]$ ]] && [ -f "$preprocessed_metadata" ]; then
+        echo -e "- Metadata: ${GREEN}$preprocessed_metadata${NC}"
+    fi
+    
+    echo ""
+    read -p "Proceed to analysis with this preprocessed data? (y/n) [y]: " proceed_to_analysis
+    proceed_to_analysis=${proceed_to_analysis:-y}
+    
+    if [[ ! "$proceed_to_analysis" =~ ^[Yy]$ ]]; then
+        echo -e "${GREEN}Preprocessing complete. You can run analysis later using mode 3.${NC}"
+        exit 0
+    fi
+    
+    # Continue to analysis using the preprocessed data
+    echo -e "${GREEN}Proceeding to analysis...${NC}"
+
+# Mode 3: Use existing preprocessed data
+elif [[ "$workflow_mode" == "3" ]]; then
+    echo ""
+    echo -e "${BLUE}======== Preprocessed Data ========${NC}"
+    
+    read -p "Path to preprocessed CSV file: " preprocessed_data
+    
+    # Validate path exists
+    if [ ! -f "$preprocessed_data" ]; then
+        echo -e "${RED}Error: Preprocessed file does not exist: $preprocessed_data${NC}"
+        echo -e "${RED}Exiting.${NC}"
+        exit 1
+    fi
+    
+    # Check for metadata file in same directory with _metadata.json suffix
+    base_path=${preprocessed_data%.csv}
+    auto_metadata="${base_path}_metadata.json"
+    
+    if [ -f "$auto_metadata" ]; then
+        echo -e "${GREEN}Found metadata: $auto_metadata${NC}"
+        preprocessed_metadata="$auto_metadata"
+    else
+        echo -e "${YELLOW}No metadata file found with naming pattern ${base_path}_metadata.json${NC}"
+        read -p "Path to metadata JSON file (leave empty to skip): " user_metadata
+        
+        if [ -n "$user_metadata" ]; then
+            if [ -f "$user_metadata" ]; then
+                preprocessed_metadata="$user_metadata"
+                echo -e "${GREEN}Using metadata: $preprocessed_metadata${NC}"
+            else
+                echo -e "${RED}Metadata file does not exist: $user_metadata${NC}"
+                echo -e "${YELLOW}Continuing without metadata. Discovery will be limited.${NC}"
+            fi
+        else
+            echo -e "${YELLOW}Continuing without metadata. Discovery will be limited.${NC}"
+        fi
+    fi
+fi
+
+# Load metadata if available
+ALL_PATHOGENS="CAMPYLOBACTER,CYCLOSPORA,SALMONELLA,SHIGELLA,STEC,VIBRIO,YERSINIA"
+ALL_STATES="CA,CO,CT,GA,MD,MN,NM,NY,OR,TN"
+DEFAULT_PATHOGENS="CAMPYLOBACTER,CYCLOSPORA"
+has_serotypes=false
+
+if [[ -n "$preprocessed_metadata" && -f "$preprocessed_metadata" ]]; then
+    echo -e "${BLUE}Reading metadata from: $preprocessed_metadata${NC}"
+    
+    if command -v jq &> /dev/null; then
+        echo -e "${BLUE}======== Available Data ========${NC}"
+        
+        # Try to read pathogens with error handling
+        if ! pathogens_list=$(jq -r '.pathogens[]' "$preprocessed_metadata" 2>/dev/null); then
+            echo -e "${YELLOW}Error reading pathogens from metadata.${NC}"
+        else
+            echo -e "${BLUE}Pathogens in dataset:${NC}"
+            echo "$pathogens_list" | sort | sed 's/^/- /'
+            
+            # Count pathogens
+            if ! pathogen_count=$(jq -r '.pathogens | length' "$preprocessed_metadata" 2>/dev/null); then
+                pathogen_count="Unknown"
+            fi
+            echo -e "${GREEN}Total: $pathogen_count pathogens${NC}"
+            
+            # Create comma-separated list
+            ALL_PATHOGENS=$(echo "$pathogens_list" | tr '\n' ',' | sed 's/,$//')
+        fi
+        
+        echo ""
+        # Try to read states with error handling
+        if ! states_list=$(jq -r '.states[]' "$preprocessed_metadata" 2>/dev/null); then
+            echo -e "${YELLOW}Error reading states from metadata.${NC}"
+        else
+            echo -e "${BLUE}States in dataset:${NC}"
+            echo "$states_list" | sort | sed 's/^/- /'
+            
+            # Count states
+            if ! state_count=$(jq -r '.states | length' "$preprocessed_metadata" 2>/dev/null); then
+                state_count="Unknown"
+            fi
+            echo -e "${GREEN}Total: $state_count states${NC}"
+            
+            # Create comma-separated list
+            ALL_STATES=$(echo "$states_list" | tr '\n' ',' | sed 's/,$//')
+        fi
+        
+        # Set intelligent defaults based on discovery
+        # Pick the first 2 pathogens instead of hardcoding
+        if [[ -n "$ALL_PATHOGENS" ]]; then
+            DEFAULT_PATHOGENS=$(echo "$ALL_PATHOGENS" | cut -d',' -f1,2)
+        fi
+        
+        # Check for Salmonella serotypes with robust error handling
+        if jq -e '.salmonella_serotypes' "$preprocessed_metadata" > /dev/null 2>&1; then
+            has_serotypes=true
+            echo ""
+            echo -e "${BLUE}Top Salmonella serotypes in dataset:${NC}"
+            jq_cmd='.salmonella_serotypes | to_entries | sort_by(.value) | reverse | .[0:10] | .[] | "\(.key): \(.value) isolates"'
+            if ! top_serotypes=$(jq -r "$jq_cmd" "$preprocessed_metadata" 2>/dev/null); then
+                echo -e "${YELLOW}Could not process serotype information with jq. Displaying raw counts instead.${NC}"
+                jq -r '.salmonella_serotypes | keys | .[0:10]' "$preprocessed_metadata" 2>/dev/null | sed 's/^/- /'
+            else
+                echo "$top_serotypes" | sed 's/^/- /'
+            fi
+        fi
+    else
+        echo -e "${YELLOW}jq not installed. Cannot parse JSON metadata.${NC}"
+        echo -e "${YELLOW}Continuing with default values.${NC}"
+    fi
+fi
+
+# For mode 2 (without preprocessing first), ask for input files
+if [[ "$workflow_mode" == "2" ]]; then
+    echo ""
+    echo -e "${BLUE}======== Input Files ========${NC}"
+    
+    # Default data files
+    defaultMmwrFile="${DEFAULT_DATA_DIR}/mmwr9623_Jan2024.sas7bdat"
+    defaultCensusFileB="${DEFAULT_DATA_DIR}/cen9623.sas7bdat"
+    defaultCensusFileP="${DEFAULT_DATA_DIR}/cen9623_para.sas7bdat"
+    
+    read -p "MMWR data file [${defaultMmwrFile}]: " mmwrFile
+    mmwrFile=${mmwrFile:-$defaultMmwrFile}
+    
+    read -p "Census file (bacterial) [${defaultCensusFileB}]: " censusFileB
+    censusFileB=${censusFileB:-$defaultCensusFileB}
+    
+    read -p "Census file (parasitic) [${defaultCensusFileP}]: " censusFileP
+    censusFileP=${censusFileP:-$defaultCensusFileP}
+    
+    # Validate that files exist
+    for file in "$mmwrFile" "$censusFileB" "$censusFileP"; do
+        if [ ! -f "$file" ]; then
+            echo -e "${RED}Warning: File does not exist: $file${NC}"
+            read -p "Continue anyway? (y/n) [n]: " continue_choice
+            continue_choice=${continue_choice:-n}
+            if [[ ! "$continue_choice" =~ ^[Yy]$ ]]; then
+                echo -e "${RED}Exiting.${NC}"
+                exit 1
+            fi
+        fi
+    done
+else
+    # For modes 1 and 3, we need to ask for census files since they're not preprocessed
+    echo ""
+    echo -e "${BLUE}======== Census Files ========${NC}"
+    
+    # Default census data files
+    defaultCensusFileB="${DEFAULT_DATA_DIR}/cen9623.sas7bdat"
+    defaultCensusFileP="${DEFAULT_DATA_DIR}/cen9623_para.sas7bdat"
+    
+    read -p "Census file (bacterial) [${defaultCensusFileB}]: " censusFileB
+    censusFileB=${censusFileB:-$defaultCensusFileB}
+    
+    read -p "Census file (parasitic) [${defaultCensusFileP}]: " censusFileP
+    censusFileP=${censusFileP:-$defaultCensusFileP}
+    
+    # Validate census files exist
+    for file in "$censusFileB" "$censusFileP"; do
+        if [ ! -f "$file" ]; then
+            echo -e "${RED}Warning: Census file does not exist: $file${NC}"
+            read -p "Continue anyway? (y/n) [n]: " continue_choice
+            continue_choice=${continue_choice:-n}
+            if [[ ! "$continue_choice" =~ ^[Yy]$ ]]; then
+                echo -e "${RED}Exiting.${NC}"
+                exit 1
+            fi
+        fi
+    done
+    
+    # For preprocessed modes, set mmwrFile to the preprocessed CSV
+    mmwrFile=$preprocessed_data
+fi
+
+# === Analysis Setup (All Modes) ===
+
 # Ask for run mode
+echo ""
 echo -e "Select run mode:"
 echo "1) Test run (minimal settings - automatically sets: chains=1, iterations=100)"
 echo "2) Full analysis (custom settings - you'll specify parameters)"
@@ -64,9 +339,73 @@ echo ""
 read -p "Output directory [${outDir}]: " user_outdir
 outDir=${user_outdir:-$outDir}
 
-# Ask about pathogens for all modes
+# Ask about travel status
 echo ""
-echo -e "Pathogen selection:"
+echo -e "${BLUE}======== Travel Status Filter ========${NC}"
+echo "Select travel status to include:"
+echo "1) All travel statuses (NO, UNKNOWN, YES)"
+echo "2) Only non-travel related (NO only)"
+echo "3) Non-travel and unknown (NO, UNKNOWN)"
+echo "4) Travel-related only (YES only)"
+echo "5) Custom selection"
+read -p "Enter selection [1]: " travel_choice
+travel_choice=${travel_choice:-1}
+
+case $travel_choice in
+    1) travel="NO,UNKNOWN,YES" ;;
+    2) travel="NO" ;;
+    3) travel="NO,UNKNOWN" ;;
+    4) travel="YES" ;;
+    5)
+        echo "Enter comma-separated travel statuses (NO,UNKNOWN,YES):"
+        read -p "Travel statuses: " travel
+        # Default if empty
+        travel=${travel:-"NO,UNKNOWN,YES"}
+        ;;
+    *)
+        echo -e "${RED}Invalid selection. Using default (All travel statuses).${NC}"
+        travel="NO,UNKNOWN,YES"
+        ;;
+esac
+
+# Ask about CIDT/culture method
+echo ""
+echo -e "${BLUE}======== CIDT/Culture Method Filter ========${NC}"
+echo "Select CIDT/culture methods to include:"
+echo "1) All methods (CIDT+, CX+, PARASITIC)"
+echo "2) Culture positive only (CX+)"
+echo "3) CIDT positive only (CIDT+)"
+echo "4) Custom selection"
+read -p "Enter selection [1]: " cidt_choice
+cidt_choice=${cidt_choice:-1}
+
+case $cidt_choice in
+    1) cidt="CIDT+,CX+,PARASITIC" ;;
+    2) cidt="CX+" ;;
+    3) cidt="CIDT+" ;;
+    4)
+        echo "Enter comma-separated CIDT/culture methods (CIDT+,CX+,PARASITIC):"
+        read -p "CIDT/culture methods: " cidt
+        # Default if empty
+        cidt=${cidt:-"CIDT+,CX+,PARASITIC"}
+        ;;
+    *)
+        echo -e "${RED}Invalid selection. Using default (All methods).${NC}"
+        cidt="CIDT+,CX+,PARASITIC"
+        ;;
+esac
+
+# Ask about pathogens
+echo ""
+echo -e "${BLUE}======== Pathogen Selection ========${NC}"
+echo "Available pathogens in this dataset:"
+# Parse the comma-separated list and display each pathogen
+IFS=',' read -ra PATHOGEN_ARRAY <<< "$ALL_PATHOGENS"
+for p in "${PATHOGEN_ARRAY[@]}"; do
+    echo "- $p"
+done
+echo ""
+
 echo "1) Run ALL available pathogens"
 echo "2) Select specific pathogens"
 read -p "Enter selection [2]: " pathogen_mode
@@ -79,27 +418,18 @@ if [[ "$pathogen_mode" == "1" ]]; then
 else
     # Ask for specific pathogens
     echo ""
-    echo -e "Available pathogens:"
-    echo "- CAMPYLOBACTER"
-    echo "- CYCLOSPORA"
-    echo "- SALMONELLA"
-    echo "- SHIGELLA"
-    echo "- STEC"
-    echo "- VIBRIO"
-    echo "- YERSINIA"
-    echo ""
-    echo "Enter pathogens to analyze (comma-separated with NO spaces)"
-    read -p "Leave blank for default (CAMPYLOBACTER,CYCLOSPORA): " pathogens
-    pathogens=${pathogens:-"CAMPYLOBACTER,CYCLOSPORA"}
+    echo -e "Enter pathogens to analyze (comma-separated with NO spaces)"
+    read -p "Leave blank for default (${DEFAULT_PATHOGENS}): " pathogens
+    pathogens=${pathogens:-"$DEFAULT_PATHOGENS"}
 
-    # Validate pathogens
-    valid_pathogens=("CAMPYLOBACTER" "CYCLOSPORA" "SALMONELLA" "SHIGELLA" "STEC" "VIBRIO" "YERSINIA")
-    IFS=',' read -ra pathogen_array <<< "$pathogens"
+    # Validate pathogens against the discovered list
+    IFS=',' read -ra PATHOGEN_ARRAY <<< "$pathogens"
+    IFS=',' read -ra VALID_PATHOGENS <<< "$ALL_PATHOGENS"
     invalid_found=false
 
-    for p in "${pathogen_array[@]}"; do
+    for p in "${PATHOGEN_ARRAY[@]}"; do
         valid=false
-        for vp in "${valid_pathogens[@]}"; do
+        for vp in "${VALID_PATHOGENS[@]}"; do
             if [[ "$p" == "$vp" ]]; then
                 valid=true
                 break
@@ -107,7 +437,7 @@ else
         done
         
         if [[ "$valid" == false ]]; then
-            echo -e "${YELLOW}Warning: '$p' is not a recognized pathogen and may cause errors.${NC}"
+            echo -e "${YELLOW}Warning: '$p' is not in the discovered pathogen list and may cause errors.${NC}"
             invalid_found=true
         fi
     done
@@ -120,6 +450,121 @@ else
             echo -e "${RED}Exiting.${NC}"
             exit 1
         fi
+    fi
+fi
+
+# Add state selection
+echo ""
+echo -e "${BLUE}======== State Selection ========${NC}"
+echo "Available states in this dataset:"
+# Parse the comma-separated list and display each state
+IFS=',' read -ra STATE_ARRAY <<< "$ALL_STATES"
+for s in "${STATE_ARRAY[@]}"; do
+    echo "- $s"
+done
+echo ""
+
+echo "1) Use ALL available states"
+echo "2) Select specific states"
+read -p "Enter selection [1]: " state_mode
+state_mode=${state_mode:-1}
+
+if [[ "$state_mode" == "1" ]]; then
+    # Use all states
+    states=$ALL_STATES
+    echo -e "${GREEN}Selected: ALL states (${ALL_STATES})${NC}"
+else
+    # Ask for specific states
+    echo ""
+    echo -e "Enter states to analyze (comma-separated with NO spaces)"
+    read -p "Leave blank for all states: " states
+    states=${states:-"$ALL_STATES"}
+
+    # Validate states against the discovered list
+    IFS=',' read -ra STATE_ARRAY <<< "$states"
+    IFS=',' read -ra VALID_STATES <<< "$ALL_STATES"
+    invalid_found=false
+
+    for s in "${STATE_ARRAY[@]}"; do
+        valid=false
+        for vs in "${VALID_STATES[@]}"; do
+            if [[ "$s" == "$vs" ]]; then
+                valid=true
+                break
+            fi
+        done
+        
+        if [[ "$valid" == false ]]; then
+            echo -e "${YELLOW}Warning: '$s' is not in the discovered state list and may cause errors.${NC}"
+            invalid_found=true
+        fi
+    done
+
+    if [[ "$invalid_found" == true ]]; then
+        echo ""
+        read -p "Continue anyway? (y/n) [n]: " continue_choice
+        continue_choice=${continue_choice:-n}
+        if [[ ! "$continue_choice" =~ ^[Yy]$ ]]; then
+            echo -e "${RED}Exiting.${NC}"
+            exit 1
+        fi
+    fi
+fi
+
+# Salmonella serotype selection - ONLY when SALMONELLA is in the pathogens list
+serotype_param=""
+if [[ ",$pathogens," == *",SALMONELLA,"* ]] && [[ "$has_serotypes" == true ]] && [[ -n "$preprocessed_metadata" ]]; then
+    # Check if serotypes are available with error handling
+    if jq -e '.salmonella_serotypes' "$preprocessed_metadata" > /dev/null 2>&1; then
+        echo ""
+        echo -e "${BLUE}======== Salmonella Serotype Analysis ========${NC}"
+        echo "Salmonella was selected. Do you want to:"
+        echo "1) Analyze ALL Salmonella serotypes together"
+        echo "2) Analyze specific serotypes separately"
+        echo "3) Focus on a single top serotype only"
+        read -p "Enter selection [1]: " serotype_mode
+        serotype_mode=${serotype_mode:-1}
+        
+        if [[ "$serotype_mode" == "2" ]]; then
+            # Display available serotypes (top 20 to keep it manageable) with error handling
+            echo ""
+            echo -e "${BLUE}Top Salmonella serotypes in dataset:${NC}"
+            jq_cmd='.salmonella_serotypes | to_entries | sort_by(.value) | reverse | .[0:20] | .[] | "\(.key): \(.value) isolates"'
+            if ! top_serotypes=$(jq -r "$jq_cmd" "$preprocessed_metadata" 2>/dev/null); then
+                echo -e "${YELLOW}Could not process serotype information. Showing serotype names only.${NC}"
+                jq -r '.salmonella_serotypes | keys | .[0:20]' "$preprocessed_metadata" 2>/dev/null | sed 's/^/- /'
+            else
+                echo "$top_serotypes" | sed 's/^/- /'
+            fi
+            
+            echo ""
+            echo -e "Enter serotypes to analyze (comma-separated with NO spaces)"
+            read -p "Serotypes: " serotypes
+            
+            # Validate serotypes
+            if [[ -n "$serotypes" ]]; then
+                # Add parameter for serotypes
+                serotype_param="--salmonella_serotypes \"$serotypes\""
+            else
+                echo -e "${YELLOW}No serotypes specified. Analyzing all Salmonella together.${NC}"
+                serotype_param=""
+            fi
+        elif [[ "$serotype_mode" == "3" ]]; then
+            # Get top serotype automatically with error handling
+            if ! top_serotype=$(jq -r '.salmonella_serotypes | to_entries | sort_by(.value) | reverse | .[0].key' "$preprocessed_metadata" 2>/dev/null); then
+                echo -e "${YELLOW}Could not determine top serotype. Analyzing all Salmonella together.${NC}"
+                serotype_param=""
+            else
+                echo -e "${GREEN}Will focus on top serotype: $top_serotype${NC}"
+                serotype_param="--salmonella_serotypes \"$top_serotype\""
+            fi
+        else
+            # Analyze all serotypes together (default)
+            serotype_param=""
+        fi
+    else
+        echo -e "${YELLOW}No Salmonella serotype information available.${NC}"
+        serotype_param=""
     fi
 fi
 
@@ -223,47 +668,101 @@ elif [[ "$flag" == "resume" ]]; then
     echo -e "${BLUE}Resume Mode: Using parameters from previous run${NC}"
 fi
 
-# Build the base command - USING EXACT SAME FORMAT AS ORIGINAL
+# Build the command with appropriate parameters
 if [[ "$flag" == "resume" ]]; then
     cmd="nextflow run main.nf -profile singularity -resume -entry SPLINE \
-  --mmwrFile \"$dataDir/mmwr9623_Jan2024.sas7bdat\" \
-  --censusFileB \"$dataDir/cen9623.sas7bdat\" \
-  --censusFileP \"$dataDir/cen9623_para.sas7bdat\" \
+  --censusFileB \"$censusFileB\" \
+  --censusFileP \"$censusFileP\" \
+  --travel \"$travel\" \
+  --cidt \"$cidt\" \
   --iterations $iterations \
   --chains $chains \
   --adapt_delta $adapt_delta \
   --max_treedepth $max_treedepth \
   --seed 123 \
   --outdir \"$outDir\" \
-  --pathogen \"$pathogens\""
+  --pathogen \"$pathogens\" \
+  --states \"$states\" \
+  $serotype_param"
 else
     cmd="nextflow run main.nf -profile singularity -entry SPLINE \
-  --mmwrFile \"$dataDir/mmwr9623_Jan2024.sas7bdat\" \
-  --censusFileB \"$dataDir/cen9623.sas7bdat\" \
-  --censusFileP \"$dataDir/cen9623_para.sas7bdat\" \
+  --censusFileB \"$censusFileB\" \
+  --censusFileP \"$censusFileP\" \
+  --travel \"$travel\" \
+  --cidt \"$cidt\" \
   --iterations $iterations \
   --chains $chains \
   --adapt_delta $adapt_delta \
   --max_treedepth $max_treedepth \
   --seed 123 \
   --outdir \"$outDir\" \
-  --pathogen \"$pathogens\""
+  --pathogen \"$pathogens\" \
+  --states \"$states\" \
+  $serotype_param"
+fi
+
+# Add mmwrFile parameter, which could be either raw SAS or preprocessed CSV
+if [[ -n "$mmwrFile" ]]; then
+    cmd="$cmd --mmwrFile \"$mmwrFile\""
+fi
+
+# Add preprocessed flag if using preprocessed data
+if [[ "$workflow_mode" == "1" || "$workflow_mode" == "3" ]]; then
+    cmd="$cmd --preprocessed true"
+fi
+
+# Add metadata parameter if available
+if [[ -n "$preprocessed_metadata" && -f "$preprocessed_metadata" ]]; then
+    cmd="$cmd --metadata \"$preprocessed_metadata\""
 fi
 
 # Add background option if requested
 if [[ $background == true ]]; then
-  bg_cmd="nohup $cmd > foodnet_run_${timestamp}.log 2>&1 &"
-  final_cmd="$bg_cmd"
-  echo -e "${YELLOW}Process will run in background with log: foodnet_run_${timestamp}.log${NC}"
+    log_file="foodnet_run_${timestamp}.log"
+    bg_cmd="nohup $cmd > $log_file 2>&1 &"
+    final_cmd="$bg_cmd"
+    echo -e "${YELLOW}Process will run in background with log: $log_file${NC}"
 else
-  final_cmd="$cmd"
+    final_cmd="$cmd"
 fi
 
 # Review and confirm
 echo ""
-echo -e "${BLUE}========= Analysis Summary ==========${NC}"
-echo -e "Mode: ${GREEN}$([ "$flag" == "test" ] && echo "Test run" || [ "$flag" == "full" ] && echo "Full analysis" || echo "Resume previous run")${NC}"
+echo -e "${BLUE}========= Analysis Summary ===========${NC}"
+# Fixed conditional for mode:
+if [ "$flag" == "test" ]; then
+  mode_string="Test run"
+elif [ "$flag" == "full" ]; then
+  mode_string="Full analysis"
+else
+  mode_string="Resume previous run"
+fi
+echo -e "Mode: ${GREEN}${mode_string}${NC}"
+
+# Fixed conditional for preprocessed data:
+if [ "$workflow_mode" == "1" ] || [ "$workflow_mode" == "3" ]; then
+  echo -e "Using preprocessed data: ${GREEN}Yes${NC}"
+else
+  echo -e "Using preprocessed data: ${GREEN}No${NC}"
+fi
+
 echo -e "Pathogens: ${GREEN}$pathogens${NC}"
+echo -e "States: ${GREEN}$states${NC}"echo -e "Pathogens: ${GREEN}$pathogens${NC}"
+echo -e "States: ${GREEN}$states${NC}"
+echo -e "Travel status: ${GREEN}$travel${NC}"
+echo -e "CIDT/culture methods: ${GREEN}$cidt${NC}"
+if [[ -n "$serotype_param" ]]; then
+    # Extract just the serotype names from the parameter
+    serotypes=$(echo $serotype_param | sed 's/--salmonella_serotypes //; s/"//g')
+    echo -e "Salmonella serotypes: ${GREEN}$serotypes${NC}"
+fi
+echo -e "Input files:"
+echo -e "  Data file: ${GREEN}$mmwrFile${NC}"
+echo -e "  Census file (bacterial): ${GREEN}$censusFileB${NC}" 
+echo -e "  Census file (parasitic): ${GREEN}$censusFileP${NC}"
+if [[ -n "$preprocessed_metadata" ]]; then
+    echo -e "  Metadata: ${GREEN}$preprocessed_metadata${NC}"
+fi
 
 if [[ "$flag" != "resume" ]]; then
     echo -e "Chains: ${GREEN}$chains${NC}"
@@ -284,11 +783,23 @@ proceed=${proceed:-y}
 
 if [[ "$proceed" =~ ^[Yy]$ ]]; then
     echo -e "${GREEN}Starting analysis...${NC}"
-    eval $final_cmd
     
-    if [[ $background == true ]]; then
-        echo -e "${GREEN}Process started in background. Check status with:${NC}"
-        echo -e "${YELLOW}tail -f foodnet_run_${timestamp}.log${NC}"
+    # Create the output directory if it doesn't exist
+    mkdir -p "$outDir"
+    
+    # Run the command
+    if eval $final_cmd; then
+        if [[ $background == true ]]; then
+            echo -e "${GREEN}Process started in background. Check status with:${NC}"
+            echo -e "${YELLOW}tail -f $log_file${NC}"
+        else
+            echo -e "${GREEN}Analysis completed successfully.${NC}"
+            echo -e "${GREEN}Results are available in: $outDir${NC}"
+        fi
+    else
+        echo -e "${RED}Error running analysis command.${NC}"
+        echo -e "${RED}Check .nextflow.log for details.${NC}"
+        exit 1
     fi
 else
     echo -e "${RED}Analysis cancelled.${NC}"

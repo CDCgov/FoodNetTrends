@@ -4,22 +4,23 @@ process PREPROCESS {
     shell "/bin/bash"
     container 'foodnet.sif'
 
-    publishDir "${params.outdir}/${projID}/preprocessed", mode: 'copy'
+    publishDir "${params.outdir}/preprocessed", mode: 'copy'
 
     input:
     path mmwrFile
-    val projID
+    val outputBase
+    val generateMetadata
 
     output:
-    path "clean_mmwr.csv", emit: cleanFile
+    path "${outputBase}.csv", emit: cleanedData
+    path "${outputBase}_metadata.json", optional: true, emit: metadata
 
     script:
-    // Use absolute path to the script or a relative path from the current directory
-    def scriptPath = "${workflow.projectDir}/bin/calcIR.R"
-
     """
-    Rscript ${scriptPath} \\
-      --mmwrFile ${mmwrFile} \\
-      --outputFile clean_mmwr.csv
+    # Use calcIR.R with metadata generation enabled if requested
+    Rscript ${workflow.projectDir}/bin/calcIR.R \
+      --mmwrFile ${mmwrFile} \
+      --outputFile ${outputBase}.csv \
+      --generate_metadata ${generateMetadata}
     """
 }

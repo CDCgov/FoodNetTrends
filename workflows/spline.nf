@@ -15,10 +15,25 @@ workflow SPLINE {
         pathogens = Channel.of('CAMPYLOBACTER', 'CYCLOSPORA')
     }
 
+    // Check that required parameters are provided
+    if (!params.mmwrFile) {
+        error "Missing required parameter: --mmwrFile must be specified"
+    }
+    if (!params.censusFileB) {
+        error "Missing required parameter: --censusFileB must be specified"
+    }
+    if (!params.censusFileP) {
+        error "Missing required parameter: --censusFileP must be specified"
+    }
+
     // Input files
     mmwrFile = file(params.mmwrFile)
     censusFileB = file(params.censusFileB)
     censusFileP = file(params.censusFileP)
+    metadataFile = params.metadata ? file(params.metadata) : null
+    
+    // Flag for preprocessed data
+    isPreprocessed = params.preprocessed ?: false
 
     // Check if files exist
     if (!mmwrFile.exists()) {
@@ -30,75 +45,71 @@ workflow SPLINE {
     if (!censusFileP.exists()) {
         error "Census parasitic file not found: ${params.censusFileP}"
     }
+    if (metadataFile != null && !metadataFile.exists()) {
+        error "Metadata file not found: ${params.metadata}"
+    }
 
     // Log pipeline start
     log.info """
     ==============================================
     FoodNet Trends Pipeline
     ==============================================
-    Project ID    : ${params.projID}
+    Project ID    : ${params.projID ?: new Date().format('yyyyMMdd_HHmmss')}
     MMWR File     : ${params.mmwrFile}
+    Preprocessed  : ${isPreprocessed}
     Census Files  : ${params.censusFileB}, ${params.censusFileP}
     Travel        : ${params.travel}
     CIDT          : ${params.cidt}
     Pathogens     : ${params.pathogen ?: 'default (CAMPYLOBACTER,CYCLOSPORA)'}
+    States        : ${params.states ?: 'all'}
     Cores         : ${params.cpus ?: 'default'}
     Chains        : ${params.chains}
     Iterations    : ${params.iterations}
     Adapt Delta   : ${params.adapt_delta}
     Max Treedepth : ${params.max_treedepth}
     Seed          : ${params.seed}
-    Output Dir    : ${params.outdir}/${params.projID}
+    Output Dir    : ${params.outdir}/${params.projID ?: new Date().format('yyyyMMdd_HHmmss')}
     ==============================================
     """
 
-    // Conditional preprocessing
-    if (params.preprocessed) {
-        log.info "Using preprocessed data from: ${params.cleanFile}"
-        cleanFile = file(params.cleanFile)
-        if (!cleanFile.exists()) {
-            error "Preprocessed file not found: ${params.cleanFile}"
-        }
+    // Set default projID if not specified
+    def projID = params.projID ?: new Date().format('yyyyMMdd_HHmmss')
 
-        // Run TRENDY with preprocessed data
-        TRENDY(
-            pathogens,
-            mmwrFile,
-            censusFileB,
-            censusFileP,
-            params.travel,
-            params.cidt,
-            params.projID,
-            params.trendyScript,
-            params.preprocessed,
-            cleanFile
-        )
-    } else {
+    // Always run preprocessing first if not using preprocessed data
+    if (!isPreprocessed) {
         log.info "Preprocessing raw data files"
-
-        // Run preprocessing step
         PREPROCESS(
             mmwrFile,
-            params.projID
+            projID,
+            true  // Generate metadata
         )
-
-        // Create a proper channel from the preprocessed file
-        processedFile = PREPROCESS.out.cleanFile.first()
-
-        // Run TRENDY with processed data
-        TRENDY(
-            pathogens,
-            mmwrFile,
-            censusFileB,
-            censusFileP,
-            params.travel,
-            params.cidt,
-            params.projID,
-            params.trendyScript,
-            params.preprocessed,
-            processedFile
-        )
+        
+        // Use the preprocessed file for downstream analysis
+        processedFile = PREPROCESS.out.cleanedData.first()
+        metadataFromProcess = PREPROCESS.out.metadata.first()
+    } else {
+        // If using preprocessed data, skip preprocessing step
+        log.info "Using preprocessed data: ${mmwrFile}"
+        processedFile = mmwrFile
     }
+
+    // Default script path if not provided
+    def trendyScript = params.trendyScript ?: "${workflow.projectDir}/bin/trendy.R"
+
+    // Run TRENDY with input data - stage metadataFile as a real input file
+    TRENDY(
+        pathogens,
+        processedFile,
+        censusFileB,
+        censusFileP,
+        params.travel,
+        params.cidt,
+        projID,
+        trendyScript,
+        isPreprocessed,
+        metadataFile, // Pass the actual file, not just the name
+        params.states
+    )
 
     // Log completion
     log.info "Pipeline completed successfully"

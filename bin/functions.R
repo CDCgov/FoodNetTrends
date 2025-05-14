@@ -49,7 +49,7 @@ SAFE_WRITE <- function(data, file_path) {
   })
 }
 
-# PATH_ANALYSIS function
+# PATH_ANALYSIS function - Updated to remove hardcoded state filtering
 PATH_ANALYSIS <- function(mmwrdata, census) {
   pathogens <- c("CAMPYLOBACTER", "CYCLOSPORA", "SALMONELLA", "SHIGELLA", "STEC", "VIBRIO", "YERSINIA")
 
@@ -59,9 +59,10 @@ PATH_ANALYSIS <- function(mmwrdata, census) {
     summarise(count = n(), .groups = "drop") %>%
     complete(year, state, pathogen = unique(pathogen), fill = list(count = 0)) %>%
     left_join(census %>% filter(pathogentype == "Bacterial"), by = c("year", "state")) %>%
-    mutate(year = as.numeric(as.character(year))) %>%
-    filter(state %in% c("CA", "CO", "CT", "GA", "MD", "MN", "NM", "NY", "OR", "TN"))
-
+    mutate(year = as.numeric(as.character(year)))
+  
+  # State filtering is now handled in the main script
+  
   return(selectDf)
 }
 
@@ -462,6 +463,32 @@ LINPRED_TO_CATCHIR <- function(catchment_data) {
   return(ir_data)
 }
 
+# Implementation of LINPRED_TO_SITEIR function
+LINPRED_TO_SITEIR <- function(draws) {
+  # Format the data for site-specific outputs
+  ir_data <- draws %>%
+    group_by(year, state) %>%
+    summarise(
+      mean_incidence = mean(pred_incidence),
+      median_incidence = median(pred_incidence),
+      lower_hdi = hdi(pred_incidence, credMass = 0.95)[1],
+      upper_hdi = hdi(pred_incidence, credMass = 0.95)[2],
+      .groups = "drop"
+    ) %>%
+    # Round numeric values to 2 decimal places
+    mutate(
+      year = as.integer(year),
+      mean_incidence = round(mean_incidence, 2),
+      median_incidence = round(median_incidence, 2),
+      lower_hdi = round(lower_hdi, 2),
+      upper_hdi = round(upper_hdi, 2)
+    ) %>%
+    # Arrange by state and year for better readability
+    arrange(state, year)
+
+  return(ir_data)
+}
+
 # New function: Plot site-specific trends
 PLOT_SITE_TRENDS <- function(catchir_data, pathogen, outDir) {
   # Create a plot for each state showing trends over time
@@ -539,6 +566,90 @@ PLOT_COMBINED <- function(site_plot, overall_plot, pathogen, outDir) {
 
 # Implementation of IR_COMP function for calculating relative risks
 IR_COMP <- function(catchir_data, start_year, end_year, output_file = NULL) {
+  # Filter data for the comparison period
+  period_data <- catchir_data %>%
+    filter(year >= start_year & year <= end_year)
+
+  # Check if we have data for the requested period
+  if (nrow(period_data) == 0) {
+    warning(paste("No data available for period", start_year, "to", end_year))
+    # Create minimal output to avoid errors
+    if (!is.null(output_file)) {
+      minimal_result <- data.frame(
+        state = unique(catchir_data$state),
+        year = max(catchir_data$year),
+        comparison_period = paste0(start_year, "-", end_year),
+        current_incidence = 0.01,
+        period_incidence = 0.01,
+        relative_risk = 1.00,
+        percent_change = 0.00
+      )
+      
+      # Create directory if it doesn't exist
+      dir_path <- dirname(output_file)
+      if (!dir.exists(dir_path)) {
+        dir.create(dir_path, recursive = TRUE, showWarnings = FALSE)
+      }
+      
+      write.csv(minimal_result, output_file, row.names = FALSE)
+    }
+    return(NULL)
+  }
+
+  # Calculate average incidence for the period by state
+  period_avg <- period_data %>%
+    group_by(state) %>%
+    summarise(
+      period_incidence = mean(median_incidence),
+      period_lower = mean(lower_hdi),
+      period_upper = mean(upper_hdi),
+      .groups = "drop"
+    )
+
+  # Calculate relative risks compared to the most recent year
+  latest_year <- max(catchir_data$year)
+
+  # Get the most recent year's data
+  latest_data <- catchir_data %>%
+    filter(year == latest_year)
+
+  # Join and calculate relative risks
+  result <- latest_data %>%
+    left_join(period_avg, by = "state") %>%
+    mutate(
+      relative_risk = median_incidence / period_incidence,
+      percent_change = ((median_incidence / period_incidence) - 1) * 100,
+      comparison_period = paste0(start_year, "-", end_year)
+    ) %>%
+    select(
+      state, year, comparison_period,
+      current_incidence = median_incidence,
+      period_incidence,
+      relative_risk,
+      percent_change
+    ) %>%
+    arrange(state)
+
+  # Round numeric columns for readability
+  result <- result %>%
+    mutate(across(where(is.numeric), ~round(., 2)))
+
+  # Write to file if specified
+  if (!is.null(output_file)) {
+    # Create directory if it doesn't exist
+    dir_path <- dirname(output_file)
+    if (!dir.exists(dir_path)) {
+      dir.create(dir_path, recursive = TRUE, showWarnings = FALSE)
+    }
+    
+    write.csv(result, output_file, row.names = FALSE)
+  }
+
+  return(result)
+}
+
+# Implementation of IR_COMP_CATCH function for calculating relative risks
+IR_COMP_CATCH <- function(catch, catchir_data, start_year, end_year, output_file = NULL) {
   # Filter data for the comparison period
   period_data <- catchir_data %>%
     filter(year >= start_year & year <= end_year)

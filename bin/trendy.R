@@ -79,13 +79,19 @@ parser$add_argument("--projID", type="character",
 parser$add_argument("--outDir", type="character", default="output",
                     help="Base output directory (default: output)")
 parser$add_argument("--pathogen", type="character",
-                    help="Specific pathogen to analyze (if not processing all)")
+                    help="Comma-separated list of pathogens to analyze")
+parser$add_argument("--states", type="character", default=NULL,
+                    help="Comma-separated list of states to include")
+parser$add_argument("--salmonella_serotypes", type="character", default=NULL,
+                    help="Comma-separated list of Salmonella serotypes to include")
 
 # Preprocessing parameters
 parser$add_argument("--preprocessed", type="logical", default=FALSE,
                     help="Use preprocessed CSV data (default: FALSE)")
 parser$add_argument("--cleanFile", type="character", default=NULL,
                     help="Path to cleaned CSV file if preprocessed is TRUE")
+parser$add_argument("--discovery_data", type="character", default=NULL,
+                    help="Path to discovery data JSON file from previous run")
 
 # Model parameters
 parser$add_argument("--cores", type="integer", default=16,
@@ -157,6 +163,7 @@ if (opts$debug == FALSE) {
   # Preprocessing parameters
   preprocessed <- opts$preprocessed
   cleanFile <- opts$cleanFile
+  discovery_data <- opts$discovery_data
 
 } else {
   # Use debug defaults
@@ -184,6 +191,7 @@ if (opts$debug == FALSE) {
   # Preprocessing parameters
   preprocessed <- FALSE
   cleanFile <- NULL
+  discovery_data <- NULL
 }
 
 # Validate required parameters
@@ -214,6 +222,12 @@ validate_params <- function() {
       errors <- c(errors, paste("Clean file does not exist:", cleanFile))
   }
 
+  # Check discovery data if specified
+  if (!is.null(discovery_data) && discovery_data != "") {
+    if (!file.exists(discovery_data))
+      errors <- c(errors, paste("Discovery data file does not exist:", discovery_data))
+  }
+
   # Check project ID
   if (is.null(projID) || projID == "") {
     projID <<- format(Sys.time(), "%Y%m%d%H%M")
@@ -236,6 +250,42 @@ validate_params()
 dir.create(outDir, showWarnings = FALSE, recursive = TRUE)
 if (!dir.exists(outDir)) {
   stop("Failed to create output directory: ", outDir)
+}
+
+# Load discovery data if available
+if (!is.null(discovery_data) && discovery_data != "" && file.exists(discovery_data)) {
+  report_progress("SETUP", message=paste("Loading discovery data from:", discovery_data))
+  
+  tryCatch({
+    # Load packages needed for JSON
+    suppressPackageStartupMessages(library(jsonlite))
+    
+    # Read the discovery data
+    discovery <- jsonlite::read_json(discovery_data)
+    
+    # Log what was found
+    report_progress("SETUP", message=paste("Found", length(discovery$pathogens), "pathogens and", 
+                                         length(discovery$states), "states in discovery data"))
+    
+    # Check if we need to override pathogen and state lists
+    if (is.null(opts$pathogen)) {
+      # If no pathogen was specified, use the first two from discovery
+      if (length(discovery$pathogens) >= 2) {
+        opts$pathogen <- paste(discovery$pathogens[1:2], collapse=",")
+        report_progress("SETUP", message=paste("No pathogens specified, using first two from discovery:", opts$pathogen))
+      }
+    }
+    
+    if (is.null(opts$states)) {
+      # If no states were specified, use all from discovery
+      opts$states <- paste(discovery$states, collapse=",")
+      report_progress("SETUP", message=paste("No states specified, using all from discovery"))
+    }
+    
+  }, error = function(e) {
+    report_progress("WARNING", message=paste("Error loading discovery data:", e$message))
+    report_progress("WARNING", message="Continuing with command-line parameters only")
+  })
 }
 
 # Load required packages
@@ -283,6 +333,18 @@ report_progress("ANALYSIS DETAILS", message=paste0(
   "iterations: ", iterations
 ))
 
+# If state filtering is specified, report it
+if (!is.null(opts$states)) {
+  states_to_analyze <- CLEAN_LIST(opts$states)
+  report_progress("ANALYSIS DETAILS", message=paste("Filtering states:", paste(states_to_analyze, collapse=",")))
+}
+
+# If Salmonella serotype filtering is specified, report it
+if (!is.null(opts$salmonella_serotypes)) {
+  serotypes_to_analyze <- CLEAN_LIST(opts$salmonella_serotypes)
+  report_progress("ANALYSIS DETAILS", message=paste("Filtering Salmonella serotypes:", paste(serotypes_to_analyze, collapse=",")))
+}
+
 ##############################################################
 # Data Import and Preprocessing
 ##############################################################
@@ -294,39 +356,36 @@ tryCatch({
     report_progress("DATA", message=paste("Using preprocessed data from:", cleanFile))
     # Read the preprocessed CSV file
     mmwrdata <- readr::read_csv(cleanFile, show_col_types = FALSE)
+    
+    # Make column names consistent - ensure key columns are lowercase
+    names(mmwrdata) <- gsub("^Pathogen$", "pathogen", names(mmwrdata), ignore.case = TRUE)
+    names(mmwrdata) <- gsub("^State$", "state", names(mmwrdata), ignore.case = TRUE) 
+    names(mmwrdata) <- gsub("^Year$", "year", names(mmwrdata), ignore.case = TRUE)
+    
+    report_progress("DATA", message="Standardized column names from preprocessed file")
   } else {
-    # Process the raw SAS file
-    mmwrdata <- haven::read_sas(mmwrFile) %>%
-      filter(SiteID != "COEX")
-
-    # Convert to data frame
-    mmwrdata <- as.data.frame(mmwrdata)
-
-    # Update serotype information
-    seroList <- c("NOT SPECIATED", "UNKNOWN", "PARTIAL SERO", "NOT SERO", "")
-    mmwrdata$SERO2 <- ifelse(mmwrdata$SERO1 %in% seroList, "Missing", mmwrdata$SERO1)
-    mmwrdata$SERO2 <- ifelse(grepl("UNDET", mmwrdata$SERO2), "Missing", mmwrdata$SERO2)
-    mmwrdata$serotypesummary <- mmwrdata$SERO2
-
-    # Clean and filter data
-    mmwrdata <- mmwrdata %>%
-      setNames(tolower(names(.))) %>%
-      # Filter by detection method and travel status
-      filter((cxcidt %in% cidt) & (travelint %in% travel)) %>%
-      # Fix county names
-      filter(!county %in% c("OUT OF STATE", "UNKNOWN", "99997")) %>%
-      mutate(county = if_else(county %in% c("ST. MARYS'S", "ST. MARYS"), "ST. MARY'S", county)) %>%
-      mutate(county = if_else(county %in% c("PRINCE GEORGES"), "PRINCE GEORGE'S", county)) %>%
-      mutate(county = if_else(county %in% c("QUEEN ANNES"), "QUEEN ANNE'S", county)) %>%
-      mutate(county = if_else(county %in% c("DE BACA"), "DEBACA", county)) %>%
-      # Create pathogen type variable
-      mutate(pathogentype = ifelse(pathogen %in% c("CRYPTOSPORIDIUM", "CYCLOSPORA"),
-                                "Parasitic", "Bacterial"))
+    # Read raw SAS data
+    report_progress("DATA", message=paste("Reading raw SAS data from:", mmwrFile))
+    mmwrdata <- haven::read_sas(mmwrFile) %>% as.data.frame()
+    
+    # Convert all column names to lowercase for consistency
+    names(mmwrdata) <- tolower(names(mmwrdata))
+    
+    # Additional data cleaning as needed
+    report_progress("DATA", message="Standardized column names from raw SAS file")
   }
 
-  # Convert column names to be consistent
-  names(mmwrdata) <- tolower(names(mmwrdata))
-  
+  # Define standard list of pathogens for filtering
+  pathogens <- c("CAMPYLOBACTER", "CYCLOSPORA", "SALMONELLA", "SHIGELLA", "STEC", "VIBRIO", "YERSINIA")
+  report_progress("DATA", message="Defined standard pathogen list")
+
+  # Ensure pathogen column has consistent casing for filtering
+  if ("pathogen" %in% names(mmwrdata)) {
+    # Standardize pathogen names to uppercase
+    mmwrdata$pathogen <- toupper(mmwrdata$pathogen)
+    report_progress("DATA", message="Standardized pathogen column for consistent filtering")
+  }
+
   # Ensure required columns exist
   required_cols <- c("pathogen", "year", "state")
   missing_cols <- required_cols[!required_cols %in% names(mmwrdata)]
@@ -334,13 +393,56 @@ tryCatch({
     stop("Required columns missing from MMWR data: ", paste(missing_cols, collapse=", "))
   }
   
-  # Standardize column naming convention for key fields
-  if ("pathogen" %in% names(mmwrdata)) mmwrdata$pathogen <- toupper(mmwrdata$pathogen)
-  
   # Ensure pathogentype column exists
   if (!"pathogentype" %in% names(mmwrdata)) {
     mmwrdata$pathogentype <- ifelse(mmwrdata$pathogen %in% c("CRYPTOSPORIDIUM", "CYCLOSPORA"), 
                                    "Parasitic", "Bacterial")
+  }
+
+  # Apply state filtering if specified
+  if (!is.null(opts$states)) {
+    states_to_analyze <- CLEAN_LIST(opts$states)
+    report_progress("DATA", message=paste("Filtering for states:", paste(states_to_analyze, collapse=", ")))
+    
+    # Filter data by states
+    original_count <- nrow(mmwrdata)
+    mmwrdata <- mmwrdata[toupper(mmwrdata$state) %in% toupper(states_to_analyze), ]
+    new_count <- nrow(mmwrdata)
+    
+    report_progress("DATA", message=paste("Filtered from", original_count, 
+                                        "to", new_count, "records based on state selection"))
+  }
+
+  # Apply Salmonella serotype filtering if specified
+  if (!is.null(opts$salmonella_serotypes)) {
+    serotypes_to_analyze <- CLEAN_LIST(opts$salmonella_serotypes)
+    report_progress("DATA", message=paste("Filtering for Salmonella serotypes:", 
+                                        paste(serotypes_to_analyze, collapse=", ")))
+    
+    # Find the likely serotype column
+    serotype_col <- NULL
+    if ("serotypesummary" %in% names(mmwrdata)) {
+      serotype_col <- "serotypesummary"
+    } else if ("sero2" %in% names(mmwrdata)) {
+      serotype_col <- "sero2"
+    } else if ("sero1" %in% names(mmwrdata)) {
+      serotype_col <- "sero1"
+    }
+    
+    if (!is.null(serotype_col)) {
+      # Filter Salmonella data by serotypes
+      # This creates a mask for the entire dataset where only the specified serotypes are TRUE
+      original_count <- nrow(mmwrdata)
+      sal_rows <- mmwrdata$pathogen == "SALMONELLA" & mmwrdata[[serotype_col]] %in% serotypes_to_analyze
+      other_path_rows <- mmwrdata$pathogen != "SALMONELLA"
+      mmwrdata <- mmwrdata[sal_rows | other_path_rows, ]
+      new_count <- nrow(mmwrdata)
+      
+      report_progress("DATA", message=paste("Filtered from", original_count, 
+                                          "to", new_count, "records based on Salmonella serotype selection"))
+    } else {
+      report_progress("WARNING", message="Could not identify serotype column for filtering")
+    }
   }
 
   report_progress("DATA", message=paste("Processed", nrow(mmwrdata), "MMWR records"))
@@ -364,6 +466,15 @@ tryCatch({
         mutate(pathogentype = "Parasitic")
     ) %>%
     ungroup()
+
+  # Apply state filtering to census data if specified
+  if (!is.null(opts$states)) {
+    states_to_analyze <- CLEAN_LIST(opts$states)
+    # Filter census data by states
+    census <- census[toupper(census$state) %in% toupper(states_to_analyze), ]
+    report_progress("DATA", message=paste("Filtered census data to", 
+                                        length(unique(census$state)), "states"))
+  }
 
   census <- as.data.frame(census)
   report_progress("DATA", message=paste("Processed census data with",
@@ -408,48 +519,66 @@ tryCatch({
 
   # Filter and prepare data for modeling
   if (!is.null(opts$pathogen)) {
-    # If a specific pathogen was requested, filter for it
-    bact <- subset(bact, pathogen == opts$pathogen)
+    # If specific pathogens were requested, parse and filter for them
+    pathogens_to_analyze <- unlist(strsplit(opts$pathogen, ","))
+    report_progress("ANALYSIS", message=paste("Filtering for requested pathogens:",
+                                              paste(pathogens_to_analyze, collapse=", ")))
+
+    # Ensure consistent case for pathogen filtering
+    bact$pathogen <- toupper(bact$pathogen)
+    pathogens_to_analyze <- toupper(pathogens_to_analyze)
+
+    # Filter for requested pathogens
+    bact <- subset(bact, pathogen %in% pathogens_to_analyze)
+
     if (nrow(bact) == 0) {
       # Instead of stopping, create a minimal dataset for the pathogen
       # This will allow the pipeline to continue but produce empty results
-      report_progress("WARNING", message=paste("No data found for pathogen:", opts$pathogen, "- Creating minimal dataset"))
-      
+      report_progress("WARNING", message=paste("No data found for requested pathogens - Creating minimal dataset"))
+
       # Create a minimal dataset with the requested pathogen for all sites
-      states <- c("CA", "CO", "CT", "GA", "MD", "MN", "NM", "NY", "OR", "TN")
+      states <- unique(census$state)
       years <- unique(census$year)
-      
-      minimal_data <- expand.grid(
-        year = years,
-        state = states,
-        pathogen = opts$pathogen,
-        stringsAsFactors = FALSE
-      )
-      
-      # Add required columns
-      minimal_data$count <- 0
-      
-      # Merge with census data to get populations
-      if (opts$pathogen %in% c("CRYPTOSPORIDIUM", "CYCLOSPORA")) {
-        pathogen_type <- "Parasitic"
-      } else {
-        pathogen_type <- "Bacterial"
+
+      # Create a minimal dataset for each requested pathogen
+      minimal_data_list <- list()
+
+      for (pathogen_name in pathogens_to_analyze) {
+        minimal_data <- expand.grid(
+          year = years,
+          state = states,
+          pathogen = pathogen_name,
+          stringsAsFactors = FALSE
+        )
+
+        # Add required columns
+        minimal_data$count <- 0
+
+        # Determine pathogen type
+        if (pathogen_name %in% c("CRYPTOSPORIDIUM", "CYCLOSPORA")) {
+          pathogen_type <- "Parasitic"
+        } else {
+          pathogen_type <- "Bacterial"
+        }
+
+        minimal_data$pathogentype <- pathogen_type
+        minimal_data <- left_join(minimal_data,
+                                census %>% filter(pathogentype == pathogen_type),
+                                by = c("year", "state"))
+
+        # Remove any NA rows that might have been created in the join
+        minimal_data <- minimal_data[!is.na(minimal_data$population), ]
+
+        minimal_data_list[[pathogen_name]] <- minimal_data
       }
-      
-      minimal_data$pathogentype <- pathogen_type
-      minimal_data <- left_join(minimal_data, 
-                              census %>% filter(pathogentype == pathogen_type), 
-                              by = c("year", "state"))
-      
-      # Remove any NA rows that might have been created in the join
-      minimal_data <- minimal_data[!is.na(minimal_data$population), ]
-      
-      bact <- minimal_data
+
+      # Combine all minimal datasets
+      bact <- do.call(rbind, minimal_data_list)
     }
   } else {
     # Otherwise use the default filtering from the original code
     bact <- subset(bact, pathogen == "CAMPYLOBACTER" | pathogen == "CYCLOSPORA")
-    
+
     # Check if any data exists for the default pathogens
     if (nrow(bact) == 0) {
       stop("No data found for default pathogens (CAMPYLOBACTER or CYCLOSPORA)")
@@ -513,12 +642,16 @@ for (pathogen_name in target_pathogens) {
       model = proposed
     )
 
-    # Catchment-level estimates
-    report_progress("POST-PROCESSING", message="Calculating catchment-level estimates")
+    # site-level estimates
+    report_progress("POST-PROCESSING", message="Calculating catchment-level draws")
+    site <- LINPRED_TO_SITEIR(posteriorLinpred)
+
+    # Catchment-level draws
+    report_progress("POST-PROCESSING", message="Calculating catchment-level draws")
     catch <- CATCHMENT(posteriorLinpred)
 
-    # Credibility intervals
-    report_progress("POST-PROCESSING", message="Calculating credibility intervals")
+    # Catchment-level estimates
+    report_progress("POST-PROCESSING", message="Calculating catchment-level estimates")
     catchir.linpred <- LINPRED_TO_CATCHIR(catch)
 
     # Add metadata
@@ -534,34 +667,30 @@ for (pathogen_name in target_pathogens) {
     # Calculate relative risks and percent changes for different comparison periods
     report_progress("ANALYSIS", message="Calculating relative risks and percent changes")
 
-    # Calculate for 2016-2018 (federal goals baseline)
-    IR_COMP(catchir.linpred, 2016, 2018,
+    # Calculate for 2016-2018 (the Healthy People 2030 baseline period)
+    IR_COMP_CATCH(catch, catchir.linpred, 2016, 2018,
             paste0(outDir, "/", pathogen_name, "_EstIRRCatch_2016_2018.csv"))
 
-    # Calculate for most recent 3 years
-    IR_COMP(catchir.linpred, 2020, 2022,
+    # Calculate for COVID-19
+    IR_COMP_CATCH(catch, catchir.linpred, 2020, 2021,
             paste0(outDir, "/", pathogen_name, "_EstIRRCatch_2020_2022.csv"))
 
-    # Calculate for earliest years
-    IR_COMP(catchir.linpred, 2004, 2006,
+    # Calculate for earliest years where the FoodNet catchment were stable
+    IR_COMP_CATCH(catch, catchir.linpred, 2004, 2006,
             paste0(outDir, "/", pathogen_name, "_EstIRRCatch_2004_2006.csv"))
 
-    # Calculate for 2006-2008 baseline
-    IR_COMP(catchir.linpred, 2006, 2008,
+    # Calculate for 2006-2008 baseline (the Healthy People 2020 baseline)
+    IR_COMP_CATCH(catch, catchir.linpred, 2006, 2008,
             paste0(outDir, "/", pathogen_name, "_EstIRRCatch_2006_2008.csv"))
-
-    # Calculate for 2010-2012 baseline
-    IR_COMP(catchir.linpred, 2010, 2012,
-            paste0(outDir, "/", pathogen_name, "_EstIRRCatch_2010_2012.csv"))
 
     # Create visualizations if enabled
     if (requireNamespace("ggplot2", quietly = TRUE)) {
       # Site-specific trends plot
       site_plot <- PLOT_SITE_TRENDS(catchir.linpred, pathogen_name, outDir)
-      
+
       # Overall trend plot
       overall_plot <- PLOT_OVERALL_TREND(catchir.linpred, pathogen_name, outDir)
-      
+
       # Combined visualization
       if (requireNamespace("gridExtra", quietly = TRUE)) {
         PLOT_COMBINED(site_plot, overall_plot, pathogen_name, outDir)

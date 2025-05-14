@@ -1,31 +1,139 @@
-# nextflow
-*.old
+#########################
+# Nextflow specific
+#########################
 .nextflow/
 .nextflow.log*
-.nextflow*
 work/
-# dev_backups
-dev_backups/
-bin/dev_backups/
-workflows/dev_backup/
-# container
-foodnet.sif
-*.sif
-# cleaned mmwr file
-bin/clean_mmwr.csv
-# all backup copies
-*.bak*
-*clean_mmwr.csv
-# output directories
+**/pipeline_info/
+.nextflow*
+**/null/
+
+#########################
+# Project output files
+#########################
 output/
-null/
-# large data files
-*_brm.Rds
-*.png
-*_IRCatch.csv
-# git pack files over certain size
-.git/objects/pack/pack-*.pack
-# log files
-*.log*
-FoodNetTrends.*
 results/
+*_brm.Rds
+*_IRCatch.csv
+*_EstIRRCatch_*.csv
+*_summary.txt
+*.png
+preprocessed_*/
+
+#########################
+# Data files
+#########################
+*.sas7bdat
+*.csv
+*.json
+!samplesheet.csv
+!schema_input.json
+!assets/*.json
+*.tsv
+*.xlsx
+*.xls
+
+#########################
+# Container files
+#########################
+*.sif
+*.img
+*.simg
+
+#########################
+# R specific
+#########################
+# History files
+.Rhistory
+.Rapp.history
+
+# Session Data files
+.RData
+.RDataTmp
+
+# User-specific files
+.Ruserdata
+
+# R Environment Variables
+.Renviron
+.Rprofile
+
+# R Project files
+*.Rproj
+.Rproj.user/
+
+# R Markdown files
+*.Rmd.html
+*.knit.md
+
+# knitr and R markdown default cache directories
+*_cache/
+/cache/
+
+#########################
+# Backup files
+#########################
+*.bak*
+*.old
+*.backup
+*~
+dev_backups/
+**/dev_backups/
+**/dev_backup/
+
+#########################
+# OS specific
+#########################
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+.directory
+.Trash-*
+
+#########################
+# Editor files
+#########################
+# VSCode
+.vscode/
+*.code-workspace
+
+# JetBrains IDEs
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Vim
+[._]*.s[a-v][a-z]
+[._]*.sw[a-p]
+[._]s[a-rt-v][a-z]
+[._]ss[a-gi-z]
+[._]sw[a-p]
+Session.vim
+
+# Emacs
+\#*\#
+.#*
+*~
+
+#########################
+# Log files
+#########################
+*.log
+*.log.*
+FoodNetTrends.*
+
+#########################
+# Git large files
+#########################
+.git/objects/pack/pack-*.pack
