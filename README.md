@@ -40,7 +40,7 @@ FoodNetTrends/
 - Nextflow ≥ 24.10.4
 - Singularity ≥ 4.1.4
 - Java ≥ 17
-- Access to CDC HPC environment (recommended)
+- Access to HPC environment
 
 ## Initial Setup
 
@@ -111,9 +111,9 @@ module load nextflow/24.10.4 singularity/4.1.4 java/17.0.6
 nextflow run main.nf \
   -profile singularity \
   -entry SPLINE \
-  --mmwrFile "path/to/mmwr9623_Jan2024.sas7bdat" \
-  --censusFileB "path/to/cen9623.sas7bdat" \
-  --censusFileP "path/to/cen9623_para.sas7bdat" \
+  --mmwrFile "path/to/mmwr9624_May2025.sas7bdat" \
+  --censusFileB "path/to/cen9624.sas7bdat" \
+  --censusFileP "path/to/cen9624_para.sas7bdat" \
   --travel "NO,UNKNOWN,YES" \
   --cidt "CIDT+,CX+,PARASITIC" \
   --pathogen "CAMPYLOBACTER,SALMONELLA" \
@@ -133,7 +133,7 @@ To preprocess data without performing analysis:
 nextflow run main.nf \
   -profile singularity \
   -entry PREPROCESS_WORKFLOW \
-  --mmwrFile "path/to/mmwr9623_Jan2024.sas7bdat" \
+  --mmwrFile "path/to/mmwr9624_May2025.sas7bdat" \
   --outdir "preprocessed" \
   --outputBase "foodnet_data" \
   --generateMetadata true
@@ -162,10 +162,10 @@ The pipeline supports three operational modes:
 ### Required Files
 
 - **MMWR Data File**: SAS format surveillance data (`*.sas7bdat`)
-  - Example: `/path/to/mmwr9623_Jan2024.sas7bdat`
+  - Example: `/path/to/mmwr9624_May2025.sas7bdat`
 - **Census Files**: Population data for incidence rate calculations
-  - Bacterial pathogens: `/path/to/cen9623.sas7bdat`
-  - Parasitic pathogens: `/path/to/cen9623_para.sas7bdat`
+  - Bacterial pathogens: `/path/to/cen9624.sas7bdat`
+  - Parasitic pathogens: `/path/to/cen9624_para.sas7bdat`
 
 ### Expected Data Structure
 

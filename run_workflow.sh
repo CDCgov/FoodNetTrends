@@ -44,7 +44,7 @@ if [[ "$workflow_mode" == "1" ]]; then
     echo -e "${BLUE}======== Input Files ========${NC}"
     
     # Default data file
-    defaultMmwrFile="${DEFAULT_DATA_DIR}/mmwr9623_Jan2024.sas7bdat"
+    defaultMmwrFile="${DEFAULT_DATA_DIR}/mmwr9624_May2025.sas7bdat"
     
     read -p "MMWR data file [${defaultMmwrFile}]: " mmwrFile
     mmwrFile=${mmwrFile:-$defaultMmwrFile}
@@ -243,9 +243,9 @@ if [[ "$workflow_mode" == "2" ]]; then
     echo -e "${BLUE}======== Input Files ========${NC}"
     
     # Default data files
-    defaultMmwrFile="${DEFAULT_DATA_DIR}/mmwr9623_Jan2024.sas7bdat"
-    defaultCensusFileB="${DEFAULT_DATA_DIR}/cen9623.sas7bdat"
-    defaultCensusFileP="${DEFAULT_DATA_DIR}/cen9623_para.sas7bdat"
+    defaultMmwrFile="${DEFAULT_DATA_DIR}/mmwr9624_May2025.sas7bdat"
+    defaultCensusFileB="${DEFAULT_DATA_DIR}/cen9624.sas7bdat"
+    defaultCensusFileP="${DEFAULT_DATA_DIR}/cen9624_para.sas7bdat"
     
     read -p "MMWR data file [${defaultMmwrFile}]: " mmwrFile
     mmwrFile=${mmwrFile:-$defaultMmwrFile}
@@ -274,8 +274,8 @@ else
     echo -e "${BLUE}======== Census Files ========${NC}"
     
     # Default census data files
-    defaultCensusFileB="${DEFAULT_DATA_DIR}/cen9623.sas7bdat"
-    defaultCensusFileP="${DEFAULT_DATA_DIR}/cen9623_para.sas7bdat"
+    defaultCensusFileB="${DEFAULT_DATA_DIR}/cen9624.sas7bdat"
+    defaultCensusFileP="${DEFAULT_DATA_DIR}/cen9624_para.sas7bdat"
     
     read -p "Census file (bacterial) [${defaultCensusFileB}]: " censusFileB
     censusFileB=${censusFileB:-$defaultCensusFileB}

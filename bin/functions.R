@@ -632,7 +632,7 @@ IR_COMP <- function(catchir_data, start_year, end_year, output_file = NULL) {
 
   # Round numeric columns for readability
   result <- result %>%
-    mutate(across(where(is.numeric), ~round(., 2)))
+    mutate(across(where(is.numeric), ~round(., 4)))
 
   # Write to file if specified
   if (!is.null(output_file)) {
@@ -716,7 +716,7 @@ IR_COMP_CATCH <- function(catch, catchir_data, start_year, end_year, output_file
 
   # Round numeric columns for readability
   result <- result %>%
-    mutate(across(where(is.numeric), ~round(., 2)))
+    mutate(across(where(is.numeric), ~round(., 4)))
 
   # Write to file if specified
   if (!is.null(output_file)) {
