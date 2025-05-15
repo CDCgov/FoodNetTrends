@@ -172,69 +172,33 @@ DEFAULT_PATHOGENS="CAMPYLOBACTER,CYCLOSPORA"
 has_serotypes=false
 
 if [[ -n "$preprocessed_metadata" && -f "$preprocessed_metadata" ]]; then
-    echo -e "${BLUE}Reading metadata from: $preprocessed_metadata${NC}"
+    echo -e "${BLUE}Found metadata file: $preprocessed_metadata${NC}"
+    echo -e "${BLUE}Metadata will be used by the workflow directly.${NC}"
     
-    if command -v jq &> /dev/null; then
-        echo -e "${BLUE}======== Available Data ========${NC}"
-        
-        # Try to read pathogens with error handling
-        if ! pathogens_list=$(jq -r '.pathogens[]' "$preprocessed_metadata" 2>/dev/null); then
-            echo -e "${YELLOW}Error reading pathogens from metadata.${NC}"
-        else
-            echo -e "${BLUE}Pathogens in dataset:${NC}"
-            echo "$pathogens_list" | sort | sed 's/^/- /'
-            
-            # Count pathogens
-            if ! pathogen_count=$(jq -r '.pathogens | length' "$preprocessed_metadata" 2>/dev/null); then
-                pathogen_count="Unknown"
-            fi
-            echo -e "${GREEN}Total: $pathogen_count pathogens${NC}"
-            
-            # Create comma-separated list
-            ALL_PATHOGENS=$(echo "$pathogens_list" | tr '\n' ',' | sed 's/,$//')
-        fi
-        
-        echo ""
-        # Try to read states with error handling
-        if ! states_list=$(jq -r '.states[]' "$preprocessed_metadata" 2>/dev/null); then
-            echo -e "${YELLOW}Error reading states from metadata.${NC}"
-        else
-            echo -e "${BLUE}States in dataset:${NC}"
-            echo "$states_list" | sort | sed 's/^/- /'
-            
-            # Count states
-            if ! state_count=$(jq -r '.states | length' "$preprocessed_metadata" 2>/dev/null); then
-                state_count="Unknown"
-            fi
-            echo -e "${GREEN}Total: $state_count states${NC}"
-            
-            # Create comma-separated list
-            ALL_STATES=$(echo "$states_list" | tr '\n' ',' | sed 's/,$//')
-        fi
-        
-        # Set intelligent defaults based on discovery
-        # Pick the first 2 pathogens instead of hardcoding
-        if [[ -n "$ALL_PATHOGENS" ]]; then
-            DEFAULT_PATHOGENS=$(echo "$ALL_PATHOGENS" | cut -d',' -f1,2)
-        fi
-        
-        # Check for Salmonella serotypes with robust error handling
-        if jq -e '.salmonella_serotypes' "$preprocessed_metadata" > /dev/null 2>&1; then
-            has_serotypes=true
-            echo ""
-            echo -e "${BLUE}Top Salmonella serotypes in dataset:${NC}"
-            jq_cmd='.salmonella_serotypes | to_entries | sort_by(.value) | reverse | .[0:10] | .[] | "\(.key): \(.value) isolates"'
-            if ! top_serotypes=$(jq -r "$jq_cmd" "$preprocessed_metadata" 2>/dev/null); then
-                echo -e "${YELLOW}Could not process serotype information with jq. Displaying raw counts instead.${NC}"
-                jq -r '.salmonella_serotypes | keys | .[0:10]' "$preprocessed_metadata" 2>/dev/null | sed 's/^/- /'
-            else
-                echo "$top_serotypes" | sed 's/^/- /'
-            fi
-        fi
-    else
-        echo -e "${YELLOW}jq not installed. Cannot parse JSON metadata.${NC}"
-        echo -e "${YELLOW}Continuing with default values.${NC}"
+    # Set flag to indicate metadata is available
+    has_metadata=true
+    
+    # Check if file contains serotypes (basic check without parsing)
+    if grep -q "salmonella_serotypes" "$preprocessed_metadata"; then
+        has_serotypes=true
+        echo -e "${BLUE}Metadata contains Salmonella serotype information.${NC}"
     fi
+    
+    # Try to get a few key values for user display, but don't rely on them
+    # We can extract these with grep/sed without needing jq
+    echo -e "${BLUE}Attempting to extract key information for display:${NC}"
+    
+    # Extract record count if available (just for display)
+    record_count=$(grep -o '"record_count":[0-9]*' "$preprocessed_metadata" | grep -o '[0-9]*')
+    if [ -n "$record_count" ]; then
+        echo -e "${GREEN}Dataset contains approximately $record_count records${NC}"
+    fi
+    
+    echo -e "${YELLOW}Using default values for setup. Actual analysis will use the full metadata.${NC}"
+    echo -e "${YELLOW}To see complete metadata details, view the JSON file directly.${NC}"
+else
+    echo -e "${YELLOW}No metadata file found. Using default values.${NC}"
+    has_metadata=false
 fi
 
 # For mode 2 (without preprocessing first), ask for input files
