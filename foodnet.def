@@ -1,10 +1,10 @@
 Bootstrap: docker
-From: ubuntu:22.04
+From: rocker/r-ver:4.4
 
 %labels
     author Josh Forstedt
     date 2025-5-18
-        description FoodNet container with Rscript support
+    description FoodNet container with efficient R package installation
     version v1.0
 
 %post
@@ -14,71 +14,46 @@ From: ubuntu:22.04
     
     # Install system dependencies
     apt-get update && apt-get install -y --no-install-recommends \
-        software-properties-common \
-        dirmngr \
-        gpg-agent \
         wget \
+        bzip2 \
         ca-certificates \
+        libglib2.0-0 \
+        libxext6 \
+        libsm6 \
+        libxrender1 \
+        git \
         && apt-get clean && rm -rf /var/lib/apt/lists/*
         
-    # Add R repository
-    wget -qO- https://cloud.r-project.org/bin/linux/ubuntu/marutter_pubkey.asc | tee -a /etc/apt/trusted.gpg.d/cran_ubuntu_key.asc
-    add-apt-repository "deb https://cloud.r-project.org/bin/linux/ubuntu $(lsb_release -cs)-cran40/"
+    # Install miniconda and add to path
+    wget -q https://repo.anaconda.com/miniconda/Miniconda3-py310_23.10.0-1-Linux-x86_64.sh -O miniconda.sh
+    bash miniconda.sh -b -p /opt/conda
+    rm miniconda.sh
+    export PATH="/opt/conda/bin:$PATH"
     
-    # Install R and dependencies - without version pinning to avoid conflicts
-    apt-get update && apt-get install -y --no-install-recommends \
-        r-base \
-        r-base-dev \
-        libcurl4-openssl-dev \
-        libssl-dev \
-        libxml2-dev \
-        libhdf5-dev \
-        libfontconfig1-dev \
-        libharfbuzz-dev \
-        libfribidi-dev \
-        libfreetype6-dev \
-        libpng-dev \
-        libtiff5-dev \
-        libjpeg-dev \
-        build-essential \
-        && apt-get clean && rm -rf /var/lib/apt/lists/*
+    # Initialize conda and configure channels
+    . /opt/conda/etc/profile.d/conda.sh
+    conda config --add channels conda-forge
+    conda config --add channels bioconda
+    conda config --set channel_priority strict
     
-    # Verify R installation before proceeding
-    R --version
+    # Install essential R packages with conda (much faster than from source)
+    conda install -y -c conda-forge -c bioconda \
+        r-tidyverse \
+        r-brms \
+        r-rstan \
+        r-tidybayes \
+        r-hdinterval \
+        r-argparse \
+        r-gridextra \
+        r-jsonlite \
+        r-gtools \
+        r-reshape2 \
+        r-htmlwidgets \
+        r-plotly \
+        r-dt \
+        r-htmltools \
+        r-base64enc
     
-    # Make R package installation non-interactive
-    echo "options(repos = c(CRAN = 'https://cloud.r-project.org/'), download.file.method = 'libcurl')" >> /usr/lib/R/etc/Rprofile.site
-    
-    # Install required R packages non-interactively
-    # Statistical modeling
-    R -e "options(Ncpus = 4); install.packages('brms', dependencies=TRUE, repos='https://cloud.r-project.org/')"
-    R -e "options(Ncpus = 4); install.packages('rstan', dependencies=TRUE, repos='https://cloud.r-project.org/')"
-    R -e "options(Ncpus = 4); install.packages('tidybayes', dependencies=TRUE, repos='https://cloud.r-project.org/')"
-    R -e "options(Ncpus = 4); install.packages('HDInterval', dependencies=TRUE, repos='https://cloud.r-project.org/')"
-    
-    # Data manipulation
-    R -e "options(Ncpus = 4); install.packages('tidyverse', dependencies=TRUE, repos='https://cloud.r-project.org/')"
-    R -e "options(Ncpus = 4); install.packages('dplyr', dependencies=TRUE, repos='https://cloud.r-project.org/')"
-    R -e "options(Ncpus = 4); install.packages('tidyr', dependencies=TRUE, repos='https://cloud.r-project.org/')"
-    R -e "options(Ncpus = 4); install.packages('readr', dependencies=TRUE, repos='https://cloud.r-project.org/')"
-    R -e "options(Ncpus = 4); install.packages('haven', dependencies=TRUE, repos='https://cloud.r-project.org/')"
-    R -e "options(Ncpus = 4); install.packages('tibble', dependencies=TRUE, repos='https://cloud.r-project.org/')"
-    R -e "options(Ncpus = 4); install.packages('jsonlite', dependencies=TRUE, repos='https://cloud.r-project.org/')"
-    R -e "options(Ncpus = 4); install.packages('gtools', dependencies=TRUE, repos='https://cloud.r-project.org/')"
-    R -e "options(Ncpus = 4); install.packages('reshape2', dependencies=TRUE, repos='https://cloud.r-project.org/')"
-    
-    # Argument parsing
-    R -e "options(Ncpus = 4); install.packages('argparse', dependencies=TRUE, repos='https://cloud.r-project.org/')"
-    
-    # Visualization 
-    R -e "options(Ncpus = 4); install.packages('ggplot2', dependencies=TRUE, repos='https://cloud.r-project.org/')"
-    R -e "options(Ncpus = 4); install.packages('gridExtra', dependencies=TRUE, repos='https://cloud.r-project.org/')"
-    R -e "options(Ncpus = 4); install.packages('htmlwidgets', dependencies=TRUE, repos='https://cloud.r-project.org/')"
-    R -e "options(Ncpus = 4); install.packages('plotly', dependencies=TRUE, repos='https://cloud.r-project.org/')"
-    R -e "options(Ncpus = 4); install.packages('DT', dependencies=TRUE, repos='https://cloud.r-project.org/')"
-    R -e "options(Ncpus = 4); install.packages('htmltools', dependencies=TRUE, repos='https://cloud.r-project.org/')"
-    R -e "options(Ncpus = 4); install.packages('base64enc', dependencies=TRUE, repos='https://cloud.r-project.org/')"
-
     # Create directory for pipeline-specific files
     mkdir -p /opt/foodnet
     chmod -R 777 /opt/foodnet
@@ -86,9 +61,8 @@ From: ubuntu:22.04
 %environment
     export LC_ALL=C
     export LANG=C
-    export R_HOME=/usr/lib/R
-    export PATH=/usr/bin:$PATH
-
+    export PATH=/opt/conda/bin:$PATH
+    
 %runscript
     echo "FoodNet Trends Analysis Pipeline v1.0"
     echo "This container provides the environment for running the FoodNet Trends pipeline."
@@ -107,11 +81,12 @@ From: ubuntu:22.04
     disease surveillance data.
     
     Main dependencies:
-    - R 4.4 with packages:
-      - brms 2.22.0
-      - dplyr 1.1.4
-      - ggplot2 3.5.1
-      - And other required packages with pinned versions
+    - R 4.4 (from rocker/r-ver base image)
+    - Key R packages (installed via conda for efficiency):
+      - tidyverse
+      - brms
+      - rstan
+      - And other required packages
     
     Usage with Nextflow:
       nextflow run main.nf -profile singularity
