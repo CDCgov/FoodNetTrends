@@ -1,4 +1,4 @@
-Bootstrap: library
+Bootstrap: docker
 From: ubuntu:22.04
 
 %labels
@@ -17,13 +17,13 @@ From: ubuntu:22.04
         ca-certificates \
         && apt-get clean && rm -rf /var/lib/apt/lists/*
         
-    # Add R 4.4 repository
+    # Add R repository
     wget -qO- https://cloud.r-project.org/bin/linux/ubuntu/marutter_pubkey.asc | tee -a /etc/apt/trusted.gpg.d/cran_ubuntu_key.asc
     add-apt-repository "deb https://cloud.r-project.org/bin/linux/ubuntu $(lsb_release -cs)-cran40/"
     
-    # Install R 4.4 and dependencies
+    # Install R and dependencies - without version pinning to avoid conflicts
     apt-get update && apt-get install -y --no-install-recommends \
-        r-base=4.4.* \
+        r-base \
         r-base-dev \
         libcurl4-openssl-dev \
         libssl-dev \
@@ -38,31 +38,34 @@ From: ubuntu:22.04
         libjpeg-dev \
         build-essential \
         && apt-get clean && rm -rf /var/lib/apt/lists/*
-
+    
+    # Verify R installation before proceeding
+    R --version
+    
     # Install required R packages with pinned versions matching foodnet.yml
     # Statistical modeling
-    R -e "install.packages('brms', repos='https://cloud.r-project.org/', version='2.22.0')"
-    R -e "install.packages('rstan', repos='https://cloud.r-project.org/', version='2.32.6')"
-    R -e "install.packages('tidybayes', repos='https://cloud.r-project.org/', version='3.0.7')"
-    R -e "install.packages('HDInterval', repos='https://cloud.r-project.org/', version='0.2.4')"
+    R -e "install.packages('brms', repos='https://cloud.r-project.org/')"
+    R -e "install.packages('rstan', repos='https://cloud.r-project.org/')"
+    R -e "install.packages('tidybayes', repos='https://cloud.r-project.org/')"
+    R -e "install.packages('HDInterval', repos='https://cloud.r-project.org/')"
     
     # Data manipulation
-    R -e "install.packages('tidyverse', repos='https://cloud.r-project.org/', version='2.0.0')"
-    R -e "install.packages('dplyr', repos='https://cloud.r-project.org/', version='1.1.4')"
+    R -e "install.packages('tidyverse', repos='https://cloud.r-project.org/')"
+    R -e "install.packages('dplyr', repos='https://cloud.r-project.org/')"
     R -e "install.packages('tidyr', repos='https://cloud.r-project.org/')"
     R -e "install.packages('readr', repos='https://cloud.r-project.org/')"
-    R -e "install.packages('haven', repos='https://cloud.r-project.org/', version='2.5.4')"
+    R -e "install.packages('haven', repos='https://cloud.r-project.org/')"
     R -e "install.packages('tibble', repos='https://cloud.r-project.org/')"
     R -e "install.packages('jsonlite', repos='https://cloud.r-project.org/')"
-    R -e "install.packages('gtools', repos='https://cloud.r-project.org/', version='3.9.5')"
-    R -e "install.packages('reshape2', repos='https://cloud.r-project.org/', version='1.4.4')"
+    R -e "install.packages('gtools', repos='https://cloud.r-project.org/')"
+    R -e "install.packages('reshape2', repos='https://cloud.r-project.org/')"
     
     # Argument parsing
-    R -e "install.packages('argparse', repos='https://cloud.r-project.org/', version='2.2.5')"
+    R -e "install.packages('argparse', repos='https://cloud.r-project.org/')"
     
     # Visualization 
-    R -e "install.packages('ggplot2', repos='https://cloud.r-project.org/', version='3.5.1')"
-    R -e "install.packages('gridExtra', repos='https://cloud.r-project.org/', version='2.3')"
+    R -e "install.packages('ggplot2', repos='https://cloud.r-project.org/')"
+    R -e "install.packages('gridExtra', repos='https://cloud.r-project.org/')"
     R -e "install.packages('htmlwidgets', repos='https://cloud.r-project.org/')"
     R -e "install.packages('plotly', repos='https://cloud.r-project.org/')"
     R -e "install.packages('DT', repos='https://cloud.r-project.org/')"
