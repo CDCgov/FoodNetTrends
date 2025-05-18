@@ -13,7 +13,13 @@ NC='\033[0m' # No Color
 
 # Function to display the welcome banner
 display_welcome() {
-  echo "Your Nextflow temporary/cache files will be placed in $TMPDIR/nextflow/ by default"
+  # Make sure TMPDIR is set before referencing it
+  TMPDIR=${TMPDIR:-/scicomp/scratch/$(whoami)}
+  
+  # Ensure nextflow directory exists
+  mkdir -p "$TMPDIR/nextflow" 2>/dev/null
+  
+  echo "Your Nextflow temporary/cache files will be placed in ${TMPDIR}/nextflow/ by default"
   echo -e "${BLUE}=========================================${NC}"
   echo -e "${BLUE}   FoodNet Trends Analysis Pipeline      ${NC}"
   echo -e "${BLUE}=========================================${NC}"

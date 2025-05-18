@@ -80,5 +80,9 @@ check_jq() {
     echo -e "${YELLOW}Warning: jq is not installed. Basic functionality will work, but advanced serotype filtering will be limited.${NC}"
     have_jq=false
   fi
-  return $have_jq
+  if [ "$have_jq" = true ]; then
+    return 0
+  else
+    return 1
+  fi
 } 
