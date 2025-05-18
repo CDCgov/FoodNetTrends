@@ -20,24 +20,32 @@ display_welcome() {
   mkdir -p "$TMPDIR/nextflow" 2>/dev/null
   
   echo "Your Nextflow temporary/cache files will be placed in ${TMPDIR}/nextflow/ by default"
-  echo -e "${BLUE}=========================================${NC}"
-  echo -e "${BLUE}   FoodNet Trends Analysis Pipeline      ${NC}"
-  echo -e "${BLUE}=========================================${NC}"
+  echo "========================================="
+  echo "   FoodNet Trends Analysis Pipeline      "
+  echo "========================================="
   echo ""
 }
 
 # Function to get workflow mode from the user
 get_workflow_mode() {
-  echo -e "Select mode:"
+  # Explicitly print each option with plain text formatting
+  echo "Select mode:"
+  echo ""
   echo "1) Preprocess data (clean raw data files and generate metadata)"
   echo "2) Run analysis (with complete pipeline)"
   echo "3) Use existing preprocessed data"
+  echo ""
+  # Add debug output
+  echo "Waiting for your selection (enter 1, 2, or 3)..."
   read -p "Enter selection [1]: " workflow_mode
   workflow_mode=${workflow_mode:-1}
   
+  # Echo the selection for debugging
+  echo "You selected: $workflow_mode"
+  
   # Validate workflow mode
   if [[ ! "$workflow_mode" =~ ^[1-3]$ ]]; then
-    echo -e "${RED}Error: Invalid mode selection. Using default (Preprocess data).${NC}"
+    echo "Error: Invalid mode selection. Using default (Preprocess data)."
     echo "$(date): Invalid workflow_mode: ${workflow_mode}" >> "$error_log"
     workflow_mode=1
   fi
