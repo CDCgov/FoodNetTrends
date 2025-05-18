@@ -28,6 +28,9 @@ display_welcome() {
 
 # Function to get workflow mode from the user
 get_workflow_mode() {
+  # Debug output
+  echo "DEBUG: Starting get_workflow_mode function"
+  
   # Explicitly print each option with plain text formatting
   echo "Select mode:"
   echo ""
@@ -41,7 +44,7 @@ get_workflow_mode() {
   workflow_mode=${workflow_mode:-1}
   
   # Echo the selection for debugging
-  echo "You selected: $workflow_mode"
+  echo "DEBUG: You selected: $workflow_mode"
   
   # Validate workflow mode
   if [[ ! "$workflow_mode" =~ ^[1-3]$ ]]; then
