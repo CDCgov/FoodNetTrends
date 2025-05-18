@@ -1,4 +1,4 @@
-# FoodNet Trends Analysis Pipeline
+# FoodNet Trends Analysis Pipeline v1.0
 
 A Nextflow-based pipeline for Bayesian modeling of foodborne disease surveillance data.
 
@@ -11,29 +11,153 @@ The FoodNet Trends pipeline processes food-borne illness surveillance data from 
 - **Data Preprocessing**: Cleans and standardizes raw MMWR SAS data files
 - **Bayesian Modeling**: Implements hierarchical models with splines for flexible trend analysis
 - **Multi-pathogen Support**: Analyzes all pathogen types present in the supplied surveillance data
-- **Trend Visualization**: Generates site-specific and overall trend plots
-- **Comparative Analysis**: Calculates relative risks and percent changes against historical baselines
-- **Containerized Execution**: Ensures reproducible analysis using Singularity containers
+- **Travel-adjustment**: Includes option for travel-adjusted incidence rates
+- **CIDT-adjustment**: Controls for culture-independent diagnostic test effects
+- **Flexible Input**: Works with both raw SAS files and preprocessed CSV data
+- **Interactive Dashboard**: Self-contained HTML visualization of results requiring no server setup
+- **Reproducible Results**: Consistent model settings and complete logging
+- **Low Code Required**: Interactive shell script guides analysis configuration
+
+## Version Information
+
+- **Current Version**: 1.0 (May 2025)
+- **Release Status**: Production/Stable
+- **Dependencies**:
+  - Nextflow ≥ 24.10.4
+  - Singularity ≥ 4.1.4
+  - R ≥ 4.4.0 (via container)
+  - brms R package ≥ 3.0.0 (via container)
+  - R visualization packages: plotly, DT, htmlwidgets (for dashboard)
 
 ## Pipeline Structure
 
+The FoodNet Trends pipeline consists of the following primary components:
+
 ```
 FoodNetTrends/
-├── bin/                  # R scripts for analysis
-│   ├── calcIR.R          # Data preprocessing
-│   ├── trendy.R          # Bayesian modeling
-│   └── functions.R       # Reusable functions
-├── modules/local/        # Nextflow process modules
-│   ├── preprocess.nf     # Preprocessing module
-│   └── trendy.nf         # Analysis module
-├── workflows/            # Nextflow workflows
-│   ├── preprocess.nf     # Preprocessing workflow
-│   └── spline.nf         # Main analysis workflow
-├── main.nf               # Nextflow entry point
-├── foodnet.def           # Singularity container definition
-├── foodnet.yml           # Conda environment specification
-└── run_workflow.sh       # User-friendly execution script
+├── assets/                   # Assets for visualization
+│   └── dashboard_template.html # Dashboard HTML template
+├── bin/                      # Core R scripts for analysis
+│   ├── trendy.R              # Main Bayesian modeling script
+│   ├── functions.R           # Shared statistical functions
+│   ├── calcIR.R              # Data preprocessing script
+│   └── generate_dashboard.R  # Interactive dashboard generator
+├── conf/                     # Configuration profiles
+├── modules/                  # Nextflow processes
+│   └── local/
+│       ├── trendy.nf         # Bayesian modeling process
+│       └── preprocess.nf     # Data preprocessing process
+├── workflows/                # Workflow definitions
+│   ├── spline.nf             # Main spline analysis workflow
+│   └── preprocess.nf         # Data preprocessing workflow
+└── run_workflow.sh           # Interactive execution script
 ```
+
+## Output Files
+
+The pipeline generates output files in a standardized folder structure:
+
+```
+results/
+└── <project_id>/
+    ├── preprocessed/         # Preprocessed data files
+    │   ├── <base>.csv            # Cleaned data
+    │   ├── metadata/             # Dataset metadata directory
+    │   |   └── <base>_metadata.json  # Dataset metadata 
+    │   └── logs/                 # Preprocessing logs
+    ├── spline_results/       # Modeling results for each pathogen
+    │   ├── <pathogen>_brm.Rds          # Saved model (R object)
+    │   ├── <pathogen>_IRCatch.csv      # Incidence rate estimates
+    │   ├── <pathogen>_summary.txt      # Model summary statistics
+    │   ├── <pathogen>_site_trends.png  # Site-specific trend plots
+    │   ├── <pathogen>_overall_trend.png # Overall trend visualization
+    │   ├── <pathogen>_combined.png     # Combined visualization
+    │   ├── <pathogen>_EstIRRCatch_<comparisonYears>.csv # Relative risk comparisons
+    │   └── logs/                       # Per-pathogen log directory
+    ├── <project_id>_YYYYMMDD_dashboard.html # Interactive dashboard
+    └── pipeline_info/        # Pipeline execution information
+```
+
+### Standardized File Naming Convention
+
+The pipeline uses a consistent file naming convention for all outputs to improve organization and discovery:
+
+```
+<identifier>_<filetype>[_<subtype>].<extension>
+```
+
+Where:
+- `<identifier>` is either the pathogen name (e.g., "CAMPYLOBACTER") or the dataset base name
+- `<filetype>` indicates the content type (e.g., "brm", "IRCatch", "site_trends")
+- `<subtype>` (optional) provides additional context for specialized files (e.g., comparison years)
+- `<extension>` is the standard file extension (e.g., "csv", "Rds", "png", "txt")
+
+#### Incidence Rate Estimates (`<pathogen>_IRCatch.csv`)
+
+The main result file contains incidence rate estimates by year and state, with the following columns:
+
+- `state`: State or site abbreviation
+- `year`: Year of estimate
+- `median_incidence`: Median incidence rate per 100,000 population
+- `lower_hdi`, `upper_hdi`: Lower and upper 95% credible interval bounds
+- `pathogen`: Pathogen name
+- `travel`: Travel adjustment status
+- `culture`: Culture confirmation status
+
+#### Relative Risk Files (`<pathogen>_EstIRRCatch_<years>.csv`)
+
+Comparison files show relative risks and percent changes between the most recent year and historical periods:
+
+- `state`: State or site abbreviation 
+- `year`: Current year
+- `comparison_period`: Historical years used for comparison (e.g., "2016-2018")
+- `current_incidence`: Current incidence rate
+- `period_incidence`: Average incidence for comparison period
+- `relative_risk`: Ratio of current to historical incidence 
+- `percent_change`: Percent change from historical period
+
+#### Interactive Dashboard (`<project_id>_YYYYMMDD_dashboard.html`)
+
+The dashboard is a self-contained HTML file that provides an interactive visualization of all analysis results:
+
+- **No server required**: Open directly in any modern web browser
+- **Embedded data**: All data is contained within the HTML file
+- **Interactive visualization**: Filter, zoom, and explore results
+- **Multiple views**: Trend analysis, geographic distribution, and relative risk comparisons
+- **Data tables**: Sortable and searchable data tables for detailed exploration
+
+## Interactive Dashboard
+
+The FoodNet Trends pipeline automatically generates an interactive HTML dashboard that allows users to explore and visualize results without requiring any server setup or additional software.
+
+### Dashboard Features
+
+- **Pathogen filtering**: View results for specific pathogens or compare multiple pathogens
+- **Time period selection**: Focus on specific years or examine long-term trends
+- **Geographic visualization**: View state-by-state distribution of incidence rates
+- **Trend analysis**: Interactive time series plots with confidence intervals
+- **Relative risk comparison**: Compare current rates with historical baselines
+- **Responsive design**: Works on desktop and tablet devices
+- **Data tables**: Sortable and filterable data tables for detailed analysis
+- **Export capability**: Download visualizations and data for presentations or reports
+
+### Accessing the Dashboard
+
+After pipeline completion, the dashboard can be found in the project output directory with the naming pattern `<project_id>_YYYYMMDD_dashboard.html`. To view:
+
+1. Navigate to the output directory
+2. Open the dashboard HTML file with any modern web browser:
+   ```bash
+   firefox results/<project_id>/<project_id>_YYYYMMDD_dashboard.html
+   ```
+
+### Dashboard Customization
+
+The dashboard appearance and behavior can be customized through pipeline parameters:
+
+- `--enable_dashboard`: Enable/disable dashboard generation (default: true)
+- `--dashboard_title`: Custom title for the dashboard
+- `--dashboard_logo`: Path to custom logo image for branding
 
 ## Requirements
 
@@ -216,45 +340,6 @@ The MMWR file should contain the following key columns:
 | `--generateMetadata` | Generate metadata JSON | `true` |
 | `--outputBase` | Base name for output files | Derived from input filename |
 
-## Output Structure
-
-```
-<outdir>/
-├── <projID>/
-│   ├── preprocessed/                    # Preprocessed data
-│   │   ├── <base>_clean.csv            # Cleaned data
-│   │   └── <base>_metadata.json        # Data metadata
-│   └── spline_results/                  # Analysis results by pathogen
-│       ├── <pathogen>_brm.Rds          # Saved model (R object)
-│       ├── <pathogen>_IRCatch.csv      # Incidence rate estimates
-│       ├── <pathogen>_summary.txt      # Model summary statistics
-│       ├── <pathogen>_site_trends.png  # Site-specific trend plots
-│       ├── <pathogen>_overall_trend.png # Overall trend visualization
-│       ├── <pathogen>_combined.png     # Combined visualization
-│       └── <pathogen>_EstIRRCatch_*.csv # Relative risk comparisons
-```
-
-### Output Files
-
-#### Incidence Rate Estimates (`<pathogen>_IRCatch.csv`)
-- Contains annual incidence rate estimates by state
-- Includes mean and median estimates with uncertainty intervals
-- Used for trend analysis and reporting
-
-#### Relative Risk Files (`<pathogen>_EstIRRCatch_*.csv`)
-- Compare current incidence rates to historical baseline periods
-- Include relative risk ratios and percent changes
-- Multiple files represent different comparison periods:
-  - 2016-2018: Healthy People 2030 baseline
-  - 2020-2022: COVID-19 pandemic period
-  - 2004-2006: Early FoodNet baseline
-  - 2006-2008: Healthy People 2020 baseline
-
-#### Visualization Files
-- Site-specific trends: Individual state trends with uncertainty bands
-- Overall trend: Combined national trend with uncertainty
-- Combined visualization: Integrated view of site-specific and overall patterns
-
 ## Performance Considerations
 
 - **Test Mode**: For validation, use 1 chain and ~100 iterations
@@ -262,8 +347,6 @@ The MMWR file should contain the following key columns:
 - **Memory Usage**: Increases with iterations, chains, and pathogen complexity
 - **Runtime**: From ~30 minutes (test) to several hours (full analysis)
 - **Parallelization**: Multiple pathogens are processed in parallel
-
-
 
 ## Troubleshooting
 

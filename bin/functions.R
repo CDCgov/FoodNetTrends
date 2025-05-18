@@ -1,4 +1,17 @@
-# FUNCTIONS.R
+# =========================================================================
+# FoodNet Trends - Core Statistical and Data Processing Functions
+# =========================================================================
+# This file contains the core functions used by the FoodNet trends pipeline
+# for data processing, statistical modeling, and result visualization.
+#
+# The functions handle:
+# - Data preparation and cleaning
+# - Bayesian modeling with brms
+# - Visualization of trends and results
+# - Handling of special cases like zero-count data
+# 
+# Last updated: 2025-05-18
+# =========================================================================
 
 # Load required libraries
 suppressPackageStartupMessages({
@@ -10,29 +23,81 @@ suppressPackageStartupMessages({
   library(tidybayes)
   library(haven)
   library(tibble)
-  library(readr)  # for parse_number()
-  library(HDInterval)  # for hdi() function
-  library(gridExtra)  # for arranging multiple plots
+  library(readr)  
+  library(HDInterval)
+  library(gridExtra)
 })
 
-# Helper: Clean up list strings and handle vector inputs
-CLEAN_LIST <- function(input_string) {
+#' Generate Standardized Filename
+#'
+#' Generates a standardized filename for FoodNet Trends outputs.
+#' This function ensures consistent naming patterns across the pipeline.
+#'
+#' @param pathogen Name of the pathogen (e.g., "CAMPYLOBACTER")
+#' @param file_type Type of file (e.g., "model", "IRCatch", "summary")
+#' @param extension File extension without dot (e.g., "Rds", "csv", "txt", "png")
+#' @param subtype Optional subtype for specialized files (e.g., years for comparison files)
+#' @return A standardized filename string
+#' @examples
+#' get_output_filename("CAMPYLOBACTER", "model", "Rds")
+#' get_output_filename("SALMONELLA", "IRCatch", "csv") 
+#' get_output_filename("CYCLOSPORA", "EstIRRCatch", "csv", "2016_2018")
+get_output_filename <- function(pathogen, file_type, extension, subtype = NULL) {
+  # Ensure inputs are valid
+  if (is.null(pathogen) || is.null(file_type) || is.null(extension)) {
+    stop("Pathogen, file_type, and extension must all be provided")
+  }
+  
+  # Build filename with consistent pattern
+  filename <- paste0(pathogen, "_", file_type)
+  
+  # Add subtype if provided
+  if (!is.null(subtype)) {
+    filename <- paste0(filename, "_", subtype)
+  }
+  
+  # Add extension
+  filename <- paste0(filename, ".", extension)
+  
+  return(filename)
+}
+
+#' Clean a List String Input
+#'
+#' Processes a string input or vector containing comma-separated values
+#' and returns a clean vector of values.
+#'
+#' @param input_string A string containing comma-separated values or a vector of values.
+#' @return A character vector with cleaned values.
+#' @examples
+#' clean_list("NO,UNKNOWN,YES")
+#' clean_list(c("CIDT+", "CX+"))
+clean_list <- function(input_string) {
   if (length(input_string) > 1) {
     # If input is a vector, collapse into a single string
     input_string <- paste(input_string, collapse = ",")
   }
+  # Remove brackets and quotes, then split by comma
   cleanedString <- gsub('[\\[\\]\"]', '', input_string)
   strsplit(cleanedString, ",")[[1]]
 }
 
-# Helper: Write data to a file safely
-SAFE_WRITE <- function(data, file_path) {
+#' Write Data to a File Safely
+#'
+#' Writes a data frame to a file, ensuring the target directory exists and handling errors.
+#'
+#' @param data Data frame to write
+#' @param file_path Full path to the output file (.csv or .Rds)
+#' @return None
+safe_write <- function(data, file_path) {
   tryCatch({
+    # Create directory if it doesn't exist
     dir_path <- dirname(file_path)
     if (!dir.exists(dir_path)) {
       dir.create(dir_path, recursive = TRUE, showWarnings = FALSE)
     }
     
+    # Write data based on file extension
     if (endsWith(file_path, ".csv")) {
       if (file.exists(file_path)) {
         write.table(data, file = file_path, append = TRUE, quote = TRUE, sep = ",",
@@ -49,25 +114,53 @@ SAFE_WRITE <- function(data, file_path) {
   })
 }
 
-# PATH_ANALYSIS function - Updated to remove hardcoded state filtering
-PATH_ANALYSIS <- function(mmwrdata, census) {
-  pathogens <- c("CAMPYLOBACTER", "CYCLOSPORA", "SALMONELLA", "SHIGELLA", "STEC", "VIBRIO", "YERSINIA")
+# =========================================================================
+# Pathogen-specific data processing functions
+# =========================================================================
+# The following functions handle different pathogens separately because:
+# 1. Different pathogens require different census denominators (bacterial vs. parasitic)
+# 2. Some pathogens (like Salmonella) have special processing requirements
+# 3. Handling them separately allows for pathogen-specific customization
+#    without complicating a single generic function
+# =========================================================================
 
+#' Prepare and Aggregate Pathogen Data
+#'
+#' Filters and aggregates FoodNet data for specified pathogens and joins with census data.
+#' This function is used for most bacterial pathogens.
+#'
+#' @param mmwrdata MMWR surveillance data frame
+#' @param census Census data frame
+#' @return Aggregated data frame with counts and population by year, state, and pathogen
+path_analysis <- function(mmwrdata, census) {
+  # Define standard pathogens
+  pathogens <- c("CAMPYLOBACTER", "CYCLOSPORA", "SALMONELLA", "SHIGELLA", "STEC", "VIBRIO", "YERSINIA")
+  
+  # Create a data frame with counts per year, state, and pathogen
   selectDf <- mmwrdata %>%
     filter(pathogen %in% pathogens) %>%
     group_by(year, state, pathogen) %>%
     summarise(count = n(), .groups = "drop") %>%
+    # Ensure all year/state/pathogen combinations exist with zero counts as needed
     complete(year, state, pathogen = unique(pathogen), fill = list(count = 0)) %>%
+    # Join with census data to get population values
     left_join(census %>% filter(pathogentype == "Bacterial"), by = c("year", "state")) %>%
     mutate(year = as.numeric(as.character(year)))
-  
-  # State filtering is now handled in the main script
   
   return(selectDf)
 }
 
-# CYCLOSPORA_ANALYSIS function
-CYCLOSPORA_ANALYSIS <- function(mmwrdata, census) {
+#' Prepare and Aggregate Cyclospora Data
+#'
+#' Filters and aggregates FoodNet data specifically for Cyclospora and joins with census data.
+#' Note: Cyclospora requires parasitic census data, unlike bacterial pathogens.
+#'
+#' @param mmwrdata MMWR surveillance data frame
+#' @param census Census data frame
+#' @return Aggregated data frame with counts and population by year and state for Cyclospora
+cyclospora_analysis <- function(mmwrdata, census) {
+  # Filter for Cyclospora, aggregate by year and state, and join with census data
+  # Note: Using parasitic pathogen type for population denominator
   cyclo <- mmwrdata %>%
     filter(pathogen == "CYCLOSPORA") %>%
     group_by(year, state) %>%
@@ -78,8 +171,17 @@ CYCLOSPORA_ANALYSIS <- function(mmwrdata, census) {
   return(cyclo)
 }
 
-# SALMONELLA_ANALYSIS function
-SALMONELLA_ANALYSIS <- function(mmwrdata, census) {
+#' Prepare and Aggregate Salmonella Data
+#'
+#' Filters and aggregates FoodNet data specifically for Salmonella and joins with census data.
+#' Salmonella gets special handling due to its public health importance and serotype considerations.
+#'
+#' @param mmwrdata MMWR surveillance data frame
+#' @param census Census data frame
+#' @return Aggregated data frame with counts and population by year and state for Salmonella
+salmonella_analysis <- function(mmwrdata, census) {
+  # Filter for Salmonella, aggregate by year and state, and join with census data
+  # Note: Using bacterial pathogen type for population denominator
   sal <- mmwrdata %>%
     filter(pathogen == "SALMONELLA") %>%
     group_by(year, state) %>%
@@ -90,8 +192,20 @@ SALMONELLA_ANALYSIS <- function(mmwrdata, census) {
   return(sal)
 }
 
-# PROPOSED_BM function - Updated to handle zero-count data
-PROPOSED_BM <- function(data, cores = 16, chains = 2, iterations = 500,
+#' Fit Bayesian Model for Pathogen Trends
+#'
+#' Fits a Bayesian hierarchical model with splines to estimate incidence rates.
+#' Includes robust error handling and fallback mechanisms for zero-count data.
+#'
+#' @param data Data frame containing count, year, state, and population
+#' @param cores Number of cores to use for model fitting
+#' @param chains Number of MCMC chains
+#' @param iterations Number of MCMC iterations
+#' @param adapt_delta Adaptation parameter for HMC
+#' @param max_treedepth Maximum tree depth for HMC
+#' @param seed Random seed for reproducibility
+#' @return A brms model object, or dummy model if fitting fails
+proposed_bm <- function(data, cores = 16, chains = 2, iterations = 500,
                         adapt_delta = 0.95, max_treedepth = 10, seed = 123) {
   # Ensure data is properly formatted
   data <- as.data.frame(data)
@@ -109,11 +223,11 @@ PROPOSED_BM <- function(data, cores = 16, chains = 2, iterations = 500,
   # Ensure count is integer
   data$count <- as.integer(as.numeric(data$count))
   
-  # Check if all counts are zero - this will cause model fitting issues
+  # Handle zero-count data
   if (all(data$count == 0) || sum(data$count) == 0) {
     message("All counts are zero. Creating a dummy model with synthetic data.")
     
-    # Create a dummy data frame with synthetic data
+    # Create dummy data with synthetic counts
     states <- unique(data$state)
     n_states <- length(states)
     
@@ -131,18 +245,18 @@ PROPOSED_BM <- function(data, cores = 16, chains = 2, iterations = 500,
         count ~ 1 + (1|state) + offset(log(population)),
         data = synthetic_data,
         family = negbinomial(),
-        chains = 1,  # Use minimal chains
-        iter = 10,   # Use minimal iterations
-        cores = 1,   # Use minimal cores
+        chains = 1,
+        iter = 10,
+        cores = 1,
         seed = seed,
         control = list(adapt_delta = 0.8, max_treedepth = 5),
-        backend = "rstan"  # Explicitly use rstan backend for stability
+        backend = "rstan"
       )
     }, error = function(e) {
-      # If even that fails, try an even simpler model
+      # If that fails, try an even simpler model
       message("First dummy model failed. Trying simpler model. Error was: ", e$message)
       
-      # Create an extremely simple model with just one state
+      # Create very simple data with just one state
       very_simple_data <- data.frame(
         count = c(1L, 2L, 3L),
         year = c(2000, 2010, 2020),
@@ -175,7 +289,7 @@ PROPOSED_BM <- function(data, cores = 16, chains = 2, iterations = 500,
         # Add attributes to indicate this is a fully synthetic model
         attr(dummy_model, "is_manual_dummy") <- TRUE
         attr(dummy_model, "reason") <- paste("Could not fit any model. Errors:", 
-                                          e$message, e2$message)
+                                             e$message, e2$message)
         
         return(dummy_model)
       })
@@ -198,10 +312,10 @@ PROPOSED_BM <- function(data, cores = 16, chains = 2, iterations = 500,
     data$state <- as.factor(data$state)
   }
   
-  # Set a reasonable seed for reproducibility
+  # Set seed for reproducibility
   set.seed(seed)
   
-  # Fit the model with more robust settings
+  # Fit the model with robust settings
   model <- tryCatch({
     brm(
       count ~ s(year, by = state) + state + offset(log(population)),
@@ -212,14 +326,14 @@ PROPOSED_BM <- function(data, cores = 16, chains = 2, iterations = 500,
       cores = cores,
       seed = seed,
       control = list(adapt_delta = adapt_delta, max_treedepth = max_treedepth),
-      backend = "rstan"  # Explicitly use rstan backend for stability
+      backend = "rstan"
     )
   }, error = function(e) {
     # If spline model fails, try a simpler model
     message("Spline model failed. Trying simpler model. Error was: ", e$message)
     
-    # Try a simpler model without splines
     tryCatch({
+      # Try a simpler model without splines
       simpler_model <- brm(
         count ~ year + state + offset(log(population)),
         data = data,
@@ -240,7 +354,7 @@ PROPOSED_BM <- function(data, cores = 16, chains = 2, iterations = 500,
       # If even the simpler model fails, create a dummy model with synthetic data
       message("Even simpler model failed. Creating dummy model. Error was: ", e2$message)
       
-      # Create a very simple model with synthetic data
+      # Create simple data
       synthetic_data <- data.frame(
         count = c(1L, 2L, 3L),
         year = c(2000, 2010, 2020),
@@ -262,7 +376,7 @@ PROPOSED_BM <- function(data, cores = 16, chains = 2, iterations = 500,
         
         attr(minimal_model, "is_dummy") <- TRUE
         attr(minimal_model, "reason") <- paste("Both models failed. Original error:", e$message, 
-                                            "Secondary error:", e2$message)
+                                               "Secondary error:", e2$message)
         
         return(minimal_model)
       }, error = function(e3) {
@@ -279,7 +393,7 @@ PROPOSED_BM <- function(data, cores = 16, chains = 2, iterations = 500,
         # Add attributes to indicate this is a fully synthetic model
         attr(dummy_model, "is_manual_dummy") <- TRUE
         attr(dummy_model, "reason") <- paste("Could not fit any model. Errors:", 
-                                          e$message, e2$message, e3$message)
+                                             e$message, e2$message, e3$message)
         
         return(dummy_model)
       })
@@ -289,16 +403,23 @@ PROPOSED_BM <- function(data, cores = 16, chains = 2, iterations = 500,
   return(model)
 }
 
-# LINPREAD_DRAW_FN function
-LINPREAD_DRAW_FN <- function(data, model) {
-  # Check if this is a manual dummy model
+#' Generate Predicted Values from a Bayesian Model
+#'
+#' Generates posterior predictions from a fitted Bayesian model,
+#' with special handling for dummy models and error cases.
+#'
+#' @param data Data frame to generate predictions for
+#' @param model A brms model object from proposed_bm()
+#' @return A tibble with posterior predictions
+linpred_draw <- function(data, model) {
+  # Handle manually created dummy model
   if (!is.null(attr(model, "is_manual_dummy")) && attr(model, "is_manual_dummy")) {
     message("Using fully synthetic model to generate synthetic predictions.")
     
     # Convert data to tibble, ungroup
     data <- as_tibble(data) %>% ungroup()
     
-    # Create synthetic draws - 100 samples of very low numbers
+    # Create synthetic draws
     draw_count <- 100  # Number of posterior draws to simulate
     
     # Create a dataframe with multiple draws
@@ -322,15 +443,14 @@ LINPREAD_DRAW_FN <- function(data, model) {
     return(synthetic_draws)
   }
   
-  # Check if this is a dummy model
+  # Handle dummy model created by proposed_bm
   if (!is.null(attr(model, "is_dummy")) && attr(model, "is_dummy")) {
-    # For dummy models, create synthetic predictions instead
     message("Using dummy model to generate synthetic predictions.")
     
     # Convert data to tibble, ungroup
     data <- as_tibble(data) %>% ungroup()
     
-    # Create synthetic draws - 100 samples of very low numbers
+    # Create synthetic draws
     draw_count <- 100  # Number of posterior draws to simulate
     
     # Create a dataframe with multiple draws
@@ -355,8 +475,7 @@ LINPREAD_DRAW_FN <- function(data, model) {
   }
 
   # Regular processing for normal models
-  # Prepare newdata: convert to tibble, ungroup, add a row identifier,
-  # and force the Population column to be numeric.
+  # Prepare data for prediction
   data <- as_tibble(data) %>%
     ungroup() %>%
     mutate(
@@ -370,29 +489,30 @@ LINPREAD_DRAW_FN <- function(data, model) {
         }
     )
 
-  # Ensure that Population is numeric and no NA values were introduced.
+  # Ensure population is numeric
   if (!is.numeric(data$Population) || any(is.na(data$Population))) {
     stop("Population column is not numeric after conversion")
   }
 
-  # Handle the case where a fallback model was used
+  # Handle fallback model (without splines)
   if (!is.null(attr(model, "used_fallback")) && attr(model, "used_fallback")) {
     message("Using fallback model to generate predictions.")
     
-    # For the simpler model without splines, we need to make sure data is formatted properly
+    # For the simpler model without splines, ensure year is numeric
     if (is.factor(data$year)) {
       data$year <- as.numeric(as.character(data$year))
     }
   }
 
-  # Get posterior predictive draws (using tidybayes's epred_draws).
+  # Generate posterior predictions
   tryCatch({
+    # Get posterior predictive draws
     epred <- epred_draws(model, newdata = data) %>% ungroup()
     
-    # Remove any Population column in the posterior draws to avoid conflict.
+    # Remove any Population column in the posterior draws to avoid conflict
     epred <- epred %>% select(-one_of("Population"))
     
-    # Join the Population values back by the unique row identifier.
+    # Join the Population values back by the unique row identifier
     pop_df <- data %>% select(.row, Population) %>% ungroup()
     draws <- left_join(epred, pop_df, by = ".row") %>% ungroup()
     
@@ -400,7 +520,7 @@ LINPREAD_DRAW_FN <- function(data, model) {
       stop("Population column is not numeric in the joined data")
     }
     
-    # Now compute predicted incidence (per 100,000)
+    # Compute predicted incidence (per 100,000)
     draws <- draws %>% mutate(pred_incidence = .epred / (Population / 100000))
     
     return(draws)
@@ -423,8 +543,13 @@ LINPREAD_DRAW_FN <- function(data, model) {
   })
 }
 
-# Implementation of CATCHMENT function
-CATCHMENT <- function(draws) {
+#' Generate Catchment-Level Summary from Posterior Draws
+#'
+#' Summarizes posterior draws by year and state to produce catchment-level estimates.
+#'
+#' @param draws Tibble with posterior draws from linpred_draw()
+#' @return A tibble with summarized incidence estimates by year and state
+catchment <- function(draws) {
   # Group by relevant variables and calculate summary statistics
   catchment_data <- draws %>%
     group_by(year, state, .draw) %>%
@@ -445,8 +570,13 @@ CATCHMENT <- function(draws) {
   return(catchment_data)
 }
 
-# Implementation of LINPRED_TO_CATCHIR function
-LINPRED_TO_CATCHIR <- function(catchment_data) {
+#' Format Catchment-Level Data for Output
+#'
+#' Formats the catchment data for output, rounding values and arranging by year and state.
+#'
+#' @param catchment_data Tibble from catchment()
+#' @return A formatted tibble with incidence estimates by year and state
+linpred_to_catchir <- function(catchment_data) {
   # Format the data for output
   ir_data <- catchment_data %>%
     mutate(
@@ -463,8 +593,13 @@ LINPRED_TO_CATCHIR <- function(catchment_data) {
   return(ir_data)
 }
 
-# Implementation of LINPRED_TO_SITEIR function
-LINPRED_TO_SITEIR <- function(draws) {
+#' Format Site-Level Data for Output
+#'
+#' Formats the site-specific draws for output, rounding values and arranging by state and year.
+#'
+#' @param draws Tibble with posterior draws from linpred_draw()
+#' @return A formatted tibble with incidence estimates by state and year
+linpred_to_siteir <- function(draws) {
   # Format the data for site-specific outputs
   ir_data <- draws %>%
     group_by(year, state) %>%
@@ -489,8 +624,15 @@ LINPRED_TO_SITEIR <- function(draws) {
   return(ir_data)
 }
 
-# New function: Plot site-specific trends
-PLOT_SITE_TRENDS <- function(catchir_data, pathogen, outDir) {
+#' Plot Site-Specific Trends
+#'
+#' Creates a faceted plot showing trends for each state over time.
+#'
+#' @param catchir_data Tibble from linpred_to_catchir()
+#' @param pathogen Name of pathogen for plot title
+#' @param outDir Directory to save the plot
+#' @return A ggplot object with the plot
+plot_site_trends <- function(catchir_data, pathogen, outDir) {
   # Create a plot for each state showing trends over time
   p <- ggplot(catchir_data, aes(x = year, y = median_incidence)) +
     geom_line(linewidth = 1) +
@@ -510,14 +652,21 @@ PLOT_SITE_TRENDS <- function(catchir_data, pathogen, outDir) {
     )
 
   # Save the plot
-  plot_file <- file.path(outDir, paste0(pathogen, "_site_trends.png"))
+  plot_file <- file.path(outDir, get_output_filename(pathogen, "site_trends", "png"))
   ggsave(plot_file, p, width = 12, height = 8, dpi = 300)
 
   return(p)
 }
 
-# New function: Plot overall trend
-PLOT_OVERALL_TREND <- function(catchir_data, pathogen, outDir) {
+#' Plot Overall Trend
+#'
+#' Creates a plot showing the overall trend across all sites.
+#'
+#' @param catchir_data Tibble from linpred_to_catchir()
+#' @param pathogen Name of pathogen for plot title
+#' @param outDir Directory to save the plot
+#' @return A ggplot object with the plot
+plot_overall_trend <- function(catchir_data, pathogen, outDir) {
   # Calculate overall incidence by year (weighted by population)
   overall_data <- catchir_data %>%
     group_by(year) %>%
@@ -545,32 +694,48 @@ PLOT_OVERALL_TREND <- function(catchir_data, pathogen, outDir) {
     )
 
   # Save the plot
-  plot_file <- file.path(outDir, paste0(pathogen, "_overall_trend.png"))
+  plot_file <- file.path(outDir, get_output_filename(pathogen, "overall_trend", "png"))
   ggsave(plot_file, p, width = 10, height = 6, dpi = 300)
 
   return(p)
 }
 
-# New function: Create a combined visualization
-PLOT_COMBINED <- function(site_plot, overall_plot, pathogen, outDir) {
+#' Create Combined Visualization
+#'
+#' Combines site-specific and overall trend plots into a single figure.
+#'
+#' @param site_plot Site-specific plot from plot_site_trends()
+#' @param overall_plot Overall trend plot from plot_overall_trend()
+#' @param pathogen Name of pathogen for file naming
+#' @param outDir Directory to save the plot
+#' @return A grid object with the combined plot
+plot_combined <- function(site_plot, overall_plot, pathogen, outDir) {
   # Combine the plots
   combined_plot <- gridExtra::grid.arrange(overall_plot, site_plot,
-                                           ncol = 1, heights = c(1, 2))
+                                         ncol = 1, heights = c(1, 2))
 
   # Save the combined plot
-  plot_file <- file.path(outDir, paste0(pathogen, "_combined.png"))
+  plot_file <- file.path(outDir, get_output_filename(pathogen, "combined", "png"))
   ggsave(plot_file, combined_plot, width = 12, height = 14, dpi = 300)
 
   return(combined_plot)
 }
 
-# Implementation of IR_COMP function for calculating relative risks
-IR_COMP <- function(catchir_data, start_year, end_year, output_file = NULL) {
+#' Calculate Relative Risks Compared to Historical Period
+#'
+#' Calculates relative risks and percent changes compared to a historical period.
+#'
+#' @param catchir_data Tibble from linpred_to_catchir()
+#' @param start_year Start year of comparison period
+#' @param end_year End year of comparison period
+#' @param output_file Optional file path to save results
+#' @return A data frame with relative risks and percent changes
+ir_comp <- function(catchir_data, start_year, end_year, output_file = NULL) {
   # Filter data for the comparison period
   period_data <- catchir_data %>%
     filter(year >= start_year & year <= end_year)
 
-  # Check if we have data for the requested period
+  # Handle no data for requested period
   if (nrow(period_data) == 0) {
     warning(paste("No data available for period", start_year, "to", end_year))
     # Create minimal output to avoid errors
@@ -585,13 +750,8 @@ IR_COMP <- function(catchir_data, start_year, end_year, output_file = NULL) {
         percent_change = 0.00
       )
       
-      # Create directory if it doesn't exist
-      dir_path <- dirname(output_file)
-      if (!dir.exists(dir_path)) {
-        dir.create(dir_path, recursive = TRUE, showWarnings = FALSE)
-      }
-      
-      write.csv(minimal_result, output_file, row.names = FALSE)
+      # Use safe_write to save the minimal result
+      safe_write(minimal_result, output_file)
     }
     return(NULL)
   }
@@ -606,10 +766,8 @@ IR_COMP <- function(catchir_data, start_year, end_year, output_file = NULL) {
       .groups = "drop"
     )
 
-  # Calculate relative risks compared to the most recent year
-  latest_year <- max(catchir_data$year)
-
   # Get the most recent year's data
+  latest_year <- max(catchir_data$year)
   latest_data <- catchir_data %>%
     filter(year == latest_year)
 
@@ -636,98 +794,25 @@ IR_COMP <- function(catchir_data, start_year, end_year, output_file = NULL) {
 
   # Write to file if specified
   if (!is.null(output_file)) {
-    # Create directory if it doesn't exist
-    dir_path <- dirname(output_file)
-    if (!dir.exists(dir_path)) {
-      dir.create(dir_path, recursive = TRUE, showWarnings = FALSE)
-    }
-    
-    write.csv(result, output_file, row.names = FALSE)
+    # Use safe_write to save the result
+    safe_write(result, output_file)
   }
 
   return(result)
 }
 
-# Implementation of IR_COMP_CATCH function for calculating relative risks
-IR_COMP_CATCH <- function(catch, catchir_data, start_year, end_year, output_file = NULL) {
-  # Filter data for the comparison period
-  period_data <- catchir_data %>%
-    filter(year >= start_year & year <= end_year)
-
-  # Check if we have data for the requested period
-  if (nrow(period_data) == 0) {
-    warning(paste("No data available for period", start_year, "to", end_year))
-    # Create minimal output to avoid errors
-    if (!is.null(output_file)) {
-      minimal_result <- data.frame(
-        state = unique(catchir_data$state),
-        year = max(catchir_data$year),
-        comparison_period = paste0(start_year, "-", end_year),
-        current_incidence = 0.01,
-        period_incidence = 0.01,
-        relative_risk = 1.00,
-        percent_change = 0.00
-      )
-      
-      # Create directory if it doesn't exist
-      dir_path <- dirname(output_file)
-      if (!dir.exists(dir_path)) {
-        dir.create(dir_path, recursive = TRUE, showWarnings = FALSE)
-      }
-      
-      write.csv(minimal_result, output_file, row.names = FALSE)
-    }
-    return(NULL)
-  }
-
-  # Calculate average incidence for the period by state
-  period_avg <- period_data %>%
-    group_by(state) %>%
-    summarise(
-      period_incidence = mean(median_incidence),
-      period_lower = mean(lower_hdi),
-      period_upper = mean(upper_hdi),
-      .groups = "drop"
-    )
-
-  # Calculate relative risks compared to the most recent year
-  latest_year <- max(catchir_data$year)
-
-  # Get the most recent year's data
-  latest_data <- catchir_data %>%
-    filter(year == latest_year)
-
-  # Join and calculate relative risks
-  result <- latest_data %>%
-    left_join(period_avg, by = "state") %>%
-    mutate(
-      relative_risk = median_incidence / period_incidence,
-      percent_change = ((median_incidence / period_incidence) - 1) * 100,
-      comparison_period = paste0(start_year, "-", end_year)
-    ) %>%
-    select(
-      state, year, comparison_period,
-      current_incidence = median_incidence,
-      period_incidence,
-      relative_risk,
-      percent_change
-    ) %>%
-    arrange(state)
-
-  # Round numeric columns for readability
-  result <- result %>%
-    mutate(across(where(is.numeric), ~round(., 4)))
-
-  # Write to file if specified
-  if (!is.null(output_file)) {
-    # Create directory if it doesn't exist
-    dir_path <- dirname(output_file)
-    if (!dir.exists(dir_path)) {
-      dir.create(dir_path, recursive = TRUE, showWarnings = FALSE)
-    }
-    
-    write.csv(result, output_file, row.names = FALSE)
-  }
-
-  return(result)
+#' Calculate Catchment-Level Relative Risks
+#'
+#' Wrapper function for ir_comp that accepts a catchment object.
+#' This function exists for backward compatibility.
+#'
+#' @param catch Catchment object (not used but kept for API compatibility)
+#' @param catchir_data Tibble from linpred_to_catchir()
+#' @param start_year Start year of comparison period
+#' @param end_year End year of comparison period
+#' @param output_file Optional file path to save results
+#' @return A data frame with relative risks and percent changes
+ir_comp_catch <- function(catch, catchir_data, start_year, end_year, output_file = NULL) {
+  # This is a wrapper around ir_comp for backward compatibility
+  return(ir_comp(catchir_data, start_year, end_year, output_file))
 }

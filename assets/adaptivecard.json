@@ -1,67 +1,60 @@
 {
-    "type": "message",
-    "attachments": [
+    "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+    "type": "AdaptiveCard",
+    "version": "1.0",
+    "body": [
         {
-            "contentType": "application/vnd.microsoft.card.adaptive",
-            "contentUrl": null,
-            "content": {
-                "\$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
-                "msteams": {
-                    "width": "Full"
+            "type": "Image",
+            "url": "https://raw.githubusercontent.com/nf-core/logos/master/nf-core-logo.png"
+        },
+        {
+            "type": "TextBlock",
+            "text": "CDCgov/FoodNetTrends v${version} - ${runName}",
+            "weight": "bolder",
+            "size": "large",
+            "wrap": true
+        },
+        {
+            "type": "TextBlock",
+            "text": "Completed at ${dateComplete} (duration: ${duration})",
+            "weight": "bolder",
+            "wrap": true
+        },
+        {
+            "type": "TextBlock",
+            "text": "The workflow was run on `${profile}` with work directory: `${workDir}`.",
+            "wrap": true
+        },
+        {
+            "type": "Container",
+            "items": [
+                {
+                    "type": "TextBlock",
+                    "text": "Execution summary",
+                    "weight": "bolder"
+                }
+            ],
+            "style": "emphasis"
+        },
+        {
+            "type": "FactSet",
+            "facts": [
+                {
+                    "title": "Exit status",
+                    "value": "${exitStatus}"
                 },
-                "type": "AdaptiveCard",
-                "version": "1.2",
-                "body": [
-                    {
-                        "type": "TextBlock",
-                        "size": "Large",
-                        "weight": "Bolder",
-                        "color": "<% if (success) { %>Good<% } else { %>Attention<%} %>",
-                        "text": "cdc/spline v${version} - ${runName}",
-                        "wrap": true
-                    },
-                    {
-                        "type": "TextBlock",
-                        "spacing": "None",
-                        "text": "Completed at ${dateComplete} (duration: ${duration})",
-                        "isSubtle": true,
-                        "wrap": true
-                    },
-                    {
-                        "type": "TextBlock",
-                        "text": "<% if (success) { %>Pipeline completed successfully!<% } else { %>Pipeline completed with errors. The full error message was: ${errorReport}.<% } %>",
-                        "wrap": true
-                    },
-                    {
-                        "type": "TextBlock",
-                        "text": "The command used to launch the workflow was as follows:",
-                        "wrap": true
-                    },
-                    {
-                        "type": "TextBlock",
-                        "text": "${commandLine}",
-                        "isSubtle": true,
-                        "wrap": true
-                    }
-                ],
-                "actions": [
-                    {
-                        "type": "Action.ShowCard",
-                        "title": "Pipeline Configuration",
-                        "card": {
-                            "type": "AdaptiveCard",
-                            "\$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
-                            "body": [
-                                {
-                                    "type": "FactSet",
-                                    "facts": [<% out << summary.collect{ k,v -> "{\"title\": \"$k\", \"value\" : \"$v\"}"}.join(",\n") %>
-                                    ]
-                                }
-                            ]
-                        }
-                    }
-                ]
-            }
+                {
+                    "title": "Launch directory",
+                    "value": "${launchDir}"
+                },
+                {
+                    "title": "Results directory",
+                    "value": "${outDir}"
+                }
+            ]
         }
-    ]
+    ],
+    "msteams": {
+        "width": "Full"
+    }
 }

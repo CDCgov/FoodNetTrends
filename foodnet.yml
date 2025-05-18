@@ -1,4 +1,4 @@
-name: FootNetTreands_R
+name: FoodNetTrends_Renv
 channels:
   - conda-forge
   - bioconda

@@ -12,8 +12,8 @@ if (params.help) {
     Options:
         --help                  Show this help message
         --mmwrFile              Path to the MMWR data file (raw SAS or preprocessed CSV)
-        --censusFile_B          Path to the bacterial census data file
-        --censusFile_P          Path to the parasitic census data file
+        --censusFileB          Path to the bacterial census data file
+        --censusFileP          Path to the parasitic census data file
         --travel                Travel types (e.g., NO,UNKNOWN)
         --cidt                  CIDT types (e.g., CIDT+,CX+,PARASITIC)
         --projID                Project ID (e.g., 20240705)

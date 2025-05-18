@@ -1,25 +1,107 @@
-Bootstrap: docker
-From: continuumio/miniconda3
+Bootstrap: library
+From: ubuntu:22.04
 
 %labels
-    author Ethan H
-    date 2025-1-14
-    version 1.0.0
-    description FoodNet container with Rscript support
-
-%files
-    foodnet.yml
+    author Josh Forstedt
+    date 2025-5-18
+        description FoodNet container with Rscript support
+    version v1.0
 
 %post
-    # Create the Conda environment from the YAML file
-    conda env create -f foodnet.yml
-    conda clean --all --yes
+    # Install system dependencies
+    apt-get update && apt-get install -y --no-install-recommends \
+        software-properties-common \
+        dirmngr \
+        gpg-agent \
+        wget \
+        ca-certificates \
+        && apt-get clean && rm -rf /var/lib/apt/lists/*
+        
+    # Add R 4.4 repository
+    wget -qO- https://cloud.r-project.org/bin/linux/ubuntu/marutter_pubkey.asc | tee -a /etc/apt/trusted.gpg.d/cran_ubuntu_key.asc
+    add-apt-repository "deb https://cloud.r-project.org/bin/linux/ubuntu $(lsb_release -cs)-cran40/"
+    
+    # Install R 4.4 and dependencies
+    apt-get update && apt-get install -y --no-install-recommends \
+        r-base=4.4.* \
+        r-base-dev \
+        libcurl4-openssl-dev \
+        libssl-dev \
+        libxml2-dev \
+        libhdf5-dev \
+        libfontconfig1-dev \
+        libharfbuzz-dev \
+        libfribidi-dev \
+        libfreetype6-dev \
+        libpng-dev \
+        libtiff5-dev \
+        libjpeg-dev \
+        build-essential \
+        && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-    apt-get update
-    apt-get install -y build-essential
+    # Install required R packages with pinned versions matching foodnet.yml
+    # Statistical modeling
+    R -e "install.packages('brms', repos='https://cloud.r-project.org/', version='2.22.0')"
+    R -e "install.packages('rstan', repos='https://cloud.r-project.org/', version='2.32.6')"
+    R -e "install.packages('tidybayes', repos='https://cloud.r-project.org/', version='3.0.7')"
+    R -e "install.packages('HDInterval', repos='https://cloud.r-project.org/', version='0.2.4')"
+    
+    # Data manipulation
+    R -e "install.packages('tidyverse', repos='https://cloud.r-project.org/', version='2.0.0')"
+    R -e "install.packages('dplyr', repos='https://cloud.r-project.org/', version='1.1.4')"
+    R -e "install.packages('tidyr', repos='https://cloud.r-project.org/')"
+    R -e "install.packages('readr', repos='https://cloud.r-project.org/')"
+    R -e "install.packages('haven', repos='https://cloud.r-project.org/', version='2.5.4')"
+    R -e "install.packages('tibble', repos='https://cloud.r-project.org/')"
+    R -e "install.packages('jsonlite', repos='https://cloud.r-project.org/')"
+    R -e "install.packages('gtools', repos='https://cloud.r-project.org/', version='3.9.5')"
+    R -e "install.packages('reshape2', repos='https://cloud.r-project.org/', version='1.4.4')"
+    
+    # Argument parsing
+    R -e "install.packages('argparse', repos='https://cloud.r-project.org/', version='2.2.5')"
+    
+    # Visualization 
+    R -e "install.packages('ggplot2', repos='https://cloud.r-project.org/', version='3.5.1')"
+    R -e "install.packages('gridExtra', repos='https://cloud.r-project.org/', version='2.3')"
+    R -e "install.packages('htmlwidgets', repos='https://cloud.r-project.org/')"
+    R -e "install.packages('plotly', repos='https://cloud.r-project.org/')"
+    R -e "install.packages('DT', repos='https://cloud.r-project.org/')"
+    R -e "install.packages('htmltools', repos='https://cloud.r-project.org/')"
+    R -e "install.packages('base64enc', repos='https://cloud.r-project.org/')"
+
+    # Create directory for pipeline-specific files
+    mkdir -p /opt/foodnet
+    chmod -R 777 /opt/foodnet
 
 %environment
-    export PATH="/opt/conda/envs/FootNetTreands_R/bin:$PATH"
+    export LC_ALL=C
+    export LANG=C
+    export R_HOME=/usr/lib/R
+    export PATH=/usr/bin:$PATH
 
 %runscript
-    exec "$@"
+    echo "FoodNet Trends Analysis Pipeline v1.0"
+    echo "This container provides the environment for running the FoodNet Trends pipeline."
+    echo "For usage, see the README.md file at https://github.com/CDC-DIDRI/FoodNetTrends"
+    echo ""
+    echo "Available commands:"
+    echo "  R            - Start R environment"
+    echo "  Rscript      - Run R scripts"
+    echo ""
+
+%help
+    FoodNet Trends Analysis Pipeline v1.0
+    
+    This Singularity container provides all required dependencies for running
+    the FoodNet Trends pipeline, which performs Bayesian modeling of foodborne
+    disease surveillance data.
+    
+    Main dependencies:
+    - R 4.4 with packages:
+      - brms 2.22.0
+      - dplyr 1.1.4
+      - ggplot2 3.5.1
+      - And other required packages with pinned versions
+    
+    Usage with Nextflow:
+      nextflow run main.nf -profile singularity

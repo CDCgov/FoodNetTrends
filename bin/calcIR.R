@@ -1,132 +1,211 @@
 #!/usr/bin/env Rscript
-################################################################################
-# calcIR.R
+# =========================================================================
+# FoodNet Trends - Data Preprocessing and Cleaning
+# =========================================================================
 #
 # Purpose:
-#   This script cleans and aggregates raw MMWR SAS data and writes out a CSV file
-#   with standardized column names required for downstream analysis.
+#   Clean and standardize raw MMWR data for analysis by the trendy.R script.
+#   Generate metadata for downstream discovery and filtering.
 #
-#   The cleaning includes:
-#     - Reading the raw SAS file.
-#     - Converting all column names to lowercase.
-#     - Recoding SERO values: creating a new column 'sero2' (and copying it into
-#       'serotypesummary') so that values like "NOT SPECIATED", "UNKNOWN", etc.
-#       are recoded to "Missing".
-#     - Standardizing county names.
-#     - (Any other cleaning steps can be added here as needed.)
-#
-#   Finally, key columns are renamed so that:
-#     - 'pathogen' becomes 'Pathogen'
-#     - 'state' becomes 'State'
-#     - 'year' becomes 'Year'
-#     - A derived 'pathogentype' column is created (if not already present) to 
-#       distinguish between "Parasitic" and "Bacterial" pathogens.
-#
-#   NEW: Optionally generates a metadata JSON file with information about the 
-#   data contents (pathogens, states, serotypes, etc.).
+# The script performs the following operations:
+#   1. Read raw SAS data file
+#   2. Standardize column names and formats
+#   3. Clean and recode serotype values
+#   4. Standardize county names
+#   5. Generate optional metadata JSON about the dataset contents
+#   6. Write processed data to CSV
 #
 # Usage:
 #   Rscript calcIR.R --mmwrFile <path_to_raw_SAS_file> --outputFile <path_to_output_csv> [--generate_metadata true/false]
 #
-# Example:
-#   Rscript calcIR.R --mmwrFile "/path/to/mmwr9623_Jan2024.sas7bdat" --outputFile "clean_mmwr.csv"
+# Output:
+#   - Cleaned CSV file with standardized format
+#   - Optional JSON metadata file with dataset summary
 #
-################################################################################
+# Last updated: 2025-05-18
+# =========================================================================
 
-suppressPackageStartupMessages(library("argparse"))
-suppressPackageStartupMessages(library("dplyr"))
-suppressPackageStartupMessages(library("haven"))
-# Add jsonlite for metadata generation
-suppressPackageStartupMessages(library("jsonlite"))
+# Attempt to load functions from library
+tryCatch({
+  source("functions.R")
+  cat("Successfully sourced functions.R\n")
+}, error = function(e) {
+  # If functions.R isn't available, try to find it in the script directory
+  script_path <- commandArgs(trailingOnly = FALSE)
+  script_path <- script_path[grep("--file=", script_path)]
+  
+  if (length(script_path) > 0) {
+    script_path <- substring(script_path, 8)
+    script_dir <- dirname(script_path)
+    
+    tryCatch({
+      source(file.path(script_dir, "functions.R"))
+      cat("Successfully sourced functions.R from script directory\n")
+    }, error = function(e) {
+      cat("Warning: Could not load functions.R from either location\n")
+      cat("Script directory:", script_dir, "\n")
+      cat("Current directory:", getwd(), "\n")
+      cat("Directory contents:", paste(list.files("."), collapse=", "), "\n")
+      
+      # Continue without functions.R as it's not strictly required for this script
+      cat("Continuing without functions.R - safe_write function will not be available\n")
+    })
+  }
+})
+
+# Load required packages
+suppressPackageStartupMessages({
+  library("argparse")
+  library("dplyr")
+  library("haven")
+  library("jsonlite")
+})
 
 # Setup argument parser
-parser <- ArgumentParser()
+parser <- ArgumentParser(description="Clean and standardize FoodNet MMWR data")
 parser$add_argument("--mmwrFile", type = "character", help = "Path to the raw MMWR SAS file", required = TRUE)
 parser$add_argument("--outputFile", type = "character", help = "Path to save the cleaned CSV file", required = TRUE)
-# Add new parameter for metadata generation
 parser$add_argument("--generate_metadata", type = "logical", default = FALSE, 
                    help = "Whether to generate a metadata JSON file (default: FALSE)")
 args <- parser$parse_args()
 
-# --- Data Loading ---
-cat("Loading raw MMWR data from:", args$mmwrFile, "\n")
-mmwrdata <- haven::read_sas(args$mmwrFile) %>% as.data.frame()
-
-# --- Standardize Column Names ---
-# Convert all column names to lowercase for consistency.
-mmwrdata <- mmwrdata %>% rename_all(tolower)
-
-# --- Data Cleaning: Recoding SERO Variables ---
-# Define a list of SERO values to be considered non-informative.
-seroList <- c("NOT SPECIATED", "UNKNOWN", "PARTIAL SERO", "NOT SERO", "")
-# Create a new column 'sero2': recode values in SERO1 that are in seroList as "Missing"
-mmwrdata$sero2 <- ifelse(mmwrdata$sero1 %in% seroList, "Missing", mmwrdata$sero1)
-# Further, if 'sero2' contains the string "UNDET", recode it to "Missing"
-mmwrdata$sero2 <- ifelse(grepl("UNDET", mmwrdata$sero2), "Missing", mmwrdata$sero2)
-# Copy sero2 to serotypesummary (the column we want to preserve downstream)
-mmwrdata$serotypesummary <- mmwrdata$sero2
-
-# --- Data Cleaning: Standardize County Names ---
-# Correct common issues in county names.
-mmwrdata <- mmwrdata %>%
-  mutate(
-    county = if_else(county %in% c("ST. MARYS'S", "ST. MARYS"), "ST. MARY'S", county),
-    county = if_else(county == "PRINCE GEORGES", "PRINCE GEORGE'S", county),
-    county = if_else(county == "QUEEN ANNES", "QUEEN ANNE'S", county),
-    county = if_else(county == "DE BACA", "DEBACA", county)
-  )
-
-# --- (Optional) Additional Cleaning Steps ---
-# Ensure pathogen column is uppercase for consistency
-mmwrdata$pathogen <- toupper(mmwrdata$pathogen)
-
-# --- Standardize and Rename Key Columns ---
-# Ensure the raw data has the necessary columns and then rename them:
-# If the cleaned file still has lowercase names (e.g., 'pathogen', 'state', 'year'),
-# we explicitly rename them to the expected format.
-#mmwrdata <- mmwrdata %>%
-#  rename(
-#    Pathogen = pathogen,
-#    State    = state,
-#    Year     = year
-#  )
-
-# --- Create or Verify Derived Columns ---
-# Create a derived column 'pathogentype' if not already present.
-# We assume that if Pathogen is one of "CRYPTOSPORIDIUM" or "CYCLOSPORA", it is "Parasitic"; otherwise "Bacterial".
-if(!"pathogentype" %in% names(mmwrdata)) {
-  mmwrdata <- mmwrdata %>%
-    mutate(pathogentype = ifelse(pathogen %in% c("CRYPTOSPORIDIUM", "CYCLOSPORA"), "Parasitic", "Bacterial"))
+#' Define helper functions if not available from functions.R
+if(!exists("get_output_filename")) {
+  #' Generate Standardized Filename
+  #'
+  #' @param base_name Base name for the file (e.g., dataset name)
+  #' @param file_type Type of file (e.g., "metadata")
+  #' @param extension File extension without dot (e.g., "json")
+  #' @return A standardized filename string
+  get_output_filename <- function(base_name, file_type, extension) {
+    # Build filename with consistent pattern
+    filename <- paste0(base_name, "_", file_type, ".", extension)
+    return(filename)
+  }
 }
 
-# --- Generate Metadata if Requested ---
-if(args$generate_metadata) {
-  cat("Generating metadata from cleaned data...\n")
+#' Define a safe_write function if it's not available from functions.R
+#' 
+#' @param data Data frame to write
+#' @param file_path Full path to the output file (.csv or .Rds)
+#' @return None
+if(!exists("safe_write")) {
+  safe_write <- function(data, file_path) {
+    tryCatch({
+      # Create directory if it doesn't exist
+      dir_path <- dirname(file_path)
+      if (!dir.exists(dir_path)) {
+        dir.create(dir_path, recursive = TRUE, showWarnings = FALSE)
+      }
+      
+      # Write data based on file extension
+      if (endsWith(file_path, ".csv")) {
+        if (file.exists(file_path)) {
+          write.table(data, file = file_path, append = TRUE, quote = TRUE, sep = ",",
+                      col.names = FALSE, row.names = FALSE)
+        } else {
+          write.table(data, file = file_path, append = FALSE, quote = TRUE, sep = ",",
+                      col.names = TRUE, row.names = FALSE)
+        }
+      } else if (endsWith(file_path, ".Rds")) {
+        saveRDS(data, file = file_path)
+      }
+    }, error = function(e) {
+      message("Error writing file: ", e$message)
+    })
+  }
+}
+
+#' Load and validate raw MMWR data
+#' 
+#' @param file_path Path to the SAS file
+#' @return Data frame with raw MMWR data
+#' @throws Error if file cannot be read
+load_mmwr_data <- function(file_path) {
+  if (!file.exists(file_path)) {
+    stop("MMWR file does not exist: ", file_path)
+  }
   
-  # Determine output path for metadata JSON (same base name as CSV but with _metadata.json extension)
-  metadata_file <- sub("\\.csv$", "_metadata.json", args$outputFile)
+  tryCatch({
+    cat("Loading raw MMWR data from:", file_path, "\n")
+    data <- haven::read_sas(file_path) %>% as.data.frame()
+    cat("Successfully loaded data with", nrow(data), "records and", ncol(data), "columns\n")
+    return(data)
+  }, error = function(e) {
+    stop("Failed to read MMWR file: ", e$message)
+  })
+}
+
+#' Clean and standardize MMWR data
+#' 
+#' @param raw_data Data frame with raw MMWR data
+#' @return Cleaned data frame
+clean_mmwr_data <- function(raw_data) {
+  # Convert all column names to lowercase for consistency
+  cat("Standardizing column names to lowercase...\n")
+  data <- raw_data %>% rename_all(tolower)
+  
+  # Recode serotype values
+  cat("Recoding serotype values...\n")
+  seroList <- c("NOT SPECIATED", "UNKNOWN", "PARTIAL SERO", "NOT SERO", "")
+  data$sero2 <- ifelse(data$sero1 %in% seroList, "Missing", data$sero1)
+  data$sero2 <- ifelse(grepl("UNDET", data$sero2), "Missing", data$sero2)
+  data$serotypesummary <- data$sero2
+  
+  # Standardize county names
+  cat("Standardizing county names...\n")
+  data <- data %>%
+    mutate(
+      county = if_else(county %in% c("ST. MARYS'S", "ST. MARYS"), "ST. MARY'S", county),
+      county = if_else(county == "PRINCE GEORGES", "PRINCE GEORGE'S", county),
+      county = if_else(county == "QUEEN ANNES", "QUEEN ANNE'S", county),
+      county = if_else(county == "DE BACA", "DEBACA", county)
+    )
+  
+  # Ensure pathogen column is uppercase for consistency
+  data$pathogen <- toupper(data$pathogen)
+  
+  # Create pathogentype column if not present
+  if(!"pathogentype" %in% names(data)) {
+    cat("Creating derived pathogentype column...\n")
+    data <- data %>%
+      mutate(pathogentype = ifelse(pathogen %in% c("CRYPTOSPORIDIUM", "CYCLOSPORA"), 
+                                  "Parasitic", "Bacterial"))
+  }
+  
+  return(data)
+}
+
+#' Generate metadata from cleaned data
+#' 
+#' @param data Cleaned MMWR data
+#' @param source_file Original source file path
+#' @return List with metadata information
+generate_metadata <- function(data, source_file) {
+  cat("Generating metadata from cleaned data...\n")
   
   # Extract key information for metadata
   metadata <- list(
-    pathogens = sort(unique(mmwrdata$pathogen)),
-    states = sort(unique(mmwrdata$state)),
-    years = sort(unique(as.numeric(as.character(mmwrdata$year)))),
-    counties = sort(unique(mmwrdata$county)),
+    pathogens = sort(unique(data$pathogen)),
+    states = sort(unique(data$state)),
+    years = sort(unique(as.numeric(as.character(data$year)))),
+    counties = sort(unique(data$county)),
     generated_timestamp = as.character(Sys.time()),
-    source_file = args$mmwrFile,
-    record_count = nrow(mmwrdata)
+    source_file = source_file,
+    record_count = nrow(data)
   )
   
   # Add counts for basic statistics
   metadata$counts <- list(
-    total_records = nrow(mmwrdata),
-    pathogen_counts = as.list(table(mmwrdata$pathogen)),
-    state_counts = as.list(table(mmwrdata$state))
+    total_records = nrow(data),
+    pathogen_counts = as.list(table(data$pathogen)),
+    state_counts = as.list(table(data$state))
   )
   
   # Process Salmonella serotypes if available
-  if (any(mmwrdata$pathogen == "SALMONELLA") && "serotypesummary" %in% names(mmwrdata)) {
-    sal_data <- mmwrdata[mmwrdata$pathogen == "SALMONELLA", ]
+  if (any(data$pathogen == "SALMONELLA") && "serotypesummary" %in% names(data)) {
+    cat("Processing Salmonella serotype information...\n")
+    sal_data <- data[data$pathogen == "SALMONELLA", ]
     serotype_counts <- as.data.frame(table(sal_data$serotypesummary))
     serotype_counts <- serotype_counts[order(serotype_counts$Freq, decreasing=TRUE),]
     
@@ -138,19 +217,50 @@ if(args$generate_metadata) {
     metadata$salmonella_serotype_names <- as.character(serotype_counts$Var1)
     
     cat("Found", length(metadata$salmonella_serotype_names), "Salmonella serotypes\n")
+  } else {
+    cat("No Salmonella serotype information available\n")
   }
   
-  # Write metadata JSON
-  cat("Writing metadata to:", metadata_file, "\n")
-  write_json(metadata, metadata_file, pretty = TRUE)
+  return(metadata)
 }
 
-# --- Write Cleaned Data to CSV ---
-cat("Writing cleaned data to:", args$outputFile, "\n")
-write.csv(mmwrdata, file = args$outputFile, row.names = FALSE)
-cat("Data cleaning complete. Cleaned data saved to:", args$outputFile, "\n")
-
-if(args$generate_metadata) {
-  metadata_file <- sub("\\.csv$", "_metadata.json", args$outputFile)
-  cat("Metadata saved to:", metadata_file, "\n")
+# Main execution
+main <- function() {
+  # Load data
+  mmwrdata <- load_mmwr_data(args$mmwrFile)
+  
+  # Clean data
+  cleaned_data <- clean_mmwr_data(mmwrdata)
+  
+  # Extract base name without extension for consistent naming
+  output_base <- tools::file_path_sans_ext(basename(args$outputFile))
+  output_dir <- dirname(args$outputFile)
+  
+  # Generate metadata if requested
+  if(args$generate_metadata) {
+    # Create standardized metadata filename
+    metadata_filename <- get_output_filename(output_base, "metadata", "json")
+    metadata_file <- file.path(output_dir, metadata_filename)
+    
+    # Generate metadata
+    metadata <- generate_metadata(cleaned_data, args$mmwrFile)
+    
+    # Write metadata JSON
+    cat("Writing metadata to:", metadata_file, "\n")
+    write_json(metadata, metadata_file, pretty = TRUE)
+  }
+  
+  # Write cleaned data to CSV using safe_write
+  cat("Writing cleaned data to:", args$outputFile, "\n")
+  safe_write(cleaned_data, args$outputFile)
+  
+  cat("Data cleaning complete. Cleaned data saved to:", args$outputFile, "\n")
+  if(args$generate_metadata) {
+    if(exists("metadata_file")) {
+      cat("Metadata saved to:", metadata_file, "\n")
+    }
+  }
 }
+
+# Run the main function
+main()
