@@ -8,6 +8,10 @@ From: ubuntu:22.04
     version v1.0
 
 %post
+    # Set non-interactive environment
+    export DEBIAN_FRONTEND=noninteractive
+    export TZ=America/New_York
+    
     # Install system dependencies
     apt-get update && apt-get install -y --no-install-recommends \
         software-properties-common \
@@ -42,35 +46,38 @@ From: ubuntu:22.04
     # Verify R installation before proceeding
     R --version
     
-    # Install required R packages with pinned versions matching foodnet.yml
+    # Make R package installation non-interactive
+    echo "options(repos = c(CRAN = 'https://cloud.r-project.org/'), download.file.method = 'libcurl')" >> /usr/lib/R/etc/Rprofile.site
+    
+    # Install required R packages non-interactively
     # Statistical modeling
-    R -e "install.packages('brms', repos='https://cloud.r-project.org/')"
-    R -e "install.packages('rstan', repos='https://cloud.r-project.org/')"
-    R -e "install.packages('tidybayes', repos='https://cloud.r-project.org/')"
-    R -e "install.packages('HDInterval', repos='https://cloud.r-project.org/')"
+    R -e "options(Ncpus = 4); install.packages('brms', dependencies=TRUE, repos='https://cloud.r-project.org/')"
+    R -e "options(Ncpus = 4); install.packages('rstan', dependencies=TRUE, repos='https://cloud.r-project.org/')"
+    R -e "options(Ncpus = 4); install.packages('tidybayes', dependencies=TRUE, repos='https://cloud.r-project.org/')"
+    R -e "options(Ncpus = 4); install.packages('HDInterval', dependencies=TRUE, repos='https://cloud.r-project.org/')"
     
     # Data manipulation
-    R -e "install.packages('tidyverse', repos='https://cloud.r-project.org/')"
-    R -e "install.packages('dplyr', repos='https://cloud.r-project.org/')"
-    R -e "install.packages('tidyr', repos='https://cloud.r-project.org/')"
-    R -e "install.packages('readr', repos='https://cloud.r-project.org/')"
-    R -e "install.packages('haven', repos='https://cloud.r-project.org/')"
-    R -e "install.packages('tibble', repos='https://cloud.r-project.org/')"
-    R -e "install.packages('jsonlite', repos='https://cloud.r-project.org/')"
-    R -e "install.packages('gtools', repos='https://cloud.r-project.org/')"
-    R -e "install.packages('reshape2', repos='https://cloud.r-project.org/')"
+    R -e "options(Ncpus = 4); install.packages('tidyverse', dependencies=TRUE, repos='https://cloud.r-project.org/')"
+    R -e "options(Ncpus = 4); install.packages('dplyr', dependencies=TRUE, repos='https://cloud.r-project.org/')"
+    R -e "options(Ncpus = 4); install.packages('tidyr', dependencies=TRUE, repos='https://cloud.r-project.org/')"
+    R -e "options(Ncpus = 4); install.packages('readr', dependencies=TRUE, repos='https://cloud.r-project.org/')"
+    R -e "options(Ncpus = 4); install.packages('haven', dependencies=TRUE, repos='https://cloud.r-project.org/')"
+    R -e "options(Ncpus = 4); install.packages('tibble', dependencies=TRUE, repos='https://cloud.r-project.org/')"
+    R -e "options(Ncpus = 4); install.packages('jsonlite', dependencies=TRUE, repos='https://cloud.r-project.org/')"
+    R -e "options(Ncpus = 4); install.packages('gtools', dependencies=TRUE, repos='https://cloud.r-project.org/')"
+    R -e "options(Ncpus = 4); install.packages('reshape2', dependencies=TRUE, repos='https://cloud.r-project.org/')"
     
     # Argument parsing
-    R -e "install.packages('argparse', repos='https://cloud.r-project.org/')"
+    R -e "options(Ncpus = 4); install.packages('argparse', dependencies=TRUE, repos='https://cloud.r-project.org/')"
     
     # Visualization 
-    R -e "install.packages('ggplot2', repos='https://cloud.r-project.org/')"
-    R -e "install.packages('gridExtra', repos='https://cloud.r-project.org/')"
-    R -e "install.packages('htmlwidgets', repos='https://cloud.r-project.org/')"
-    R -e "install.packages('plotly', repos='https://cloud.r-project.org/')"
-    R -e "install.packages('DT', repos='https://cloud.r-project.org/')"
-    R -e "install.packages('htmltools', repos='https://cloud.r-project.org/')"
-    R -e "install.packages('base64enc', repos='https://cloud.r-project.org/')"
+    R -e "options(Ncpus = 4); install.packages('ggplot2', dependencies=TRUE, repos='https://cloud.r-project.org/')"
+    R -e "options(Ncpus = 4); install.packages('gridExtra', dependencies=TRUE, repos='https://cloud.r-project.org/')"
+    R -e "options(Ncpus = 4); install.packages('htmlwidgets', dependencies=TRUE, repos='https://cloud.r-project.org/')"
+    R -e "options(Ncpus = 4); install.packages('plotly', dependencies=TRUE, repos='https://cloud.r-project.org/')"
+    R -e "options(Ncpus = 4); install.packages('DT', dependencies=TRUE, repos='https://cloud.r-project.org/')"
+    R -e "options(Ncpus = 4); install.packages('htmltools', dependencies=TRUE, repos='https://cloud.r-project.org/')"
+    R -e "options(Ncpus = 4); install.packages('base64enc', dependencies=TRUE, repos='https://cloud.r-project.org/')"
 
     # Create directory for pipeline-specific files
     mkdir -p /opt/foodnet
