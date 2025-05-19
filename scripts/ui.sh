@@ -4,12 +4,12 @@
 # This includes functions for user interaction and display
 # Version: 1.0 (2025-05)
 
-# Define color codes for better user experience
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-RED='\033[0;31m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+# Define variables but don't use color codes
+GREEN=""
+YELLOW=""
+RED=""
+BLUE=""
+NC="" # No Color
 
 # Function to display the welcome banner
 display_welcome() {
@@ -59,7 +59,7 @@ get_workflow_mode() {
 # Function to get run mode (test/full/resume)
 get_run_mode() {
   echo ""
-  echo -e "Select run mode:"
+  echo "Select run mode:"
   echo "1) Test run (minimal settings - automatically sets: chains=1, iterations=100)"
   echo "2) Full analysis (custom settings - you'll specify parameters)"
   echo "3) Resume previous run (continues from last execution)"
@@ -68,7 +68,7 @@ get_run_mode() {
   
   # Validate run mode
   if [[ ! "$run_mode" =~ ^[1-3]$ ]]; then
-    echo -e "${RED}Error: Invalid selection. Using default (Test run).${NC}"
+    echo "Error: Invalid selection. Using default (Test run)."
     echo "$(date): Invalid run_mode selection: ${run_mode}" >> "$error_log"
     run_mode=1
   fi
@@ -104,7 +104,7 @@ get_output_directory() {
 # Function to get travel status selection
 get_travel_status() {
   echo ""
-  echo -e "${BLUE}======== Travel Status Filter ========${NC}"
+  echo "======== Travel Status Filter ========"
   echo "Select travel status to include:"
   echo "1) All travel statuses (NO, UNKNOWN, YES)"
   echo "2) Only non-travel related (NO only)"
@@ -126,7 +126,7 @@ get_travel_status() {
       echo "${travel:-NO,UNKNOWN,YES}"
       ;;
     *)
-      echo -e "${RED}Error: Invalid selection. Using default (All travel statuses).${NC}"
+      echo "Error: Invalid selection. Using default (All travel statuses)."
       echo "$(date): Invalid travel_choice: ${travel_choice}" >> "$error_log"
       echo "NO,UNKNOWN,YES"
       ;;
@@ -136,7 +136,7 @@ get_travel_status() {
 # Function to get CIDT/culture method selection
 get_cidt_method() {
   echo ""
-  echo -e "${BLUE}======== CIDT/Culture Method Filter ========${NC}"
+  echo "======== CIDT/Culture Method Filter ========"
   echo "Select CIDT/culture methods to include:"
   echo "1) All methods (CIDT+, CX+, PARASITIC)"
   echo "2) Culture positive only (CX+)"
@@ -156,7 +156,7 @@ get_cidt_method() {
       echo "${cidt:-CIDT+,CX+,PARASITIC}"
       ;;
     *)
-      echo -e "${RED}Error: Invalid selection. Using default (All methods).${NC}"
+      echo "Error: Invalid selection. Using default (All methods)."
       echo "$(date): Invalid cidt_choice: ${cidt_choice}" >> "$error_log"
       echo "CIDT+,CX+,PARASITIC"
       ;;
@@ -186,44 +186,44 @@ display_summary() {
   local final_cmd=${19}
   
   echo ""
-  echo -e "${BLUE}========= Analysis Summary ===========${NC}"
-  echo -e "Mode: ${GREEN}${mode_string}${NC}"
+  echo "========= Analysis Summary ==========="
+  echo "Mode: ${mode_string}"
   
   # Fixed conditional for preprocessed data:
   if [ "$workflow_mode" == "1" ] || [ "$workflow_mode" == "3" ]; then
-    echo -e "Using preprocessed data: ${GREEN}Yes${NC}"
+    echo "Using preprocessed data: Yes"
   else
-    echo -e "Using preprocessed data: ${GREEN}No${NC}"
+    echo "Using preprocessed data: No"
   fi
   
-  echo -e "Pathogens: ${GREEN}$pathogens${NC}"
-  echo -e "States: ${GREEN}$states${NC}"
-  echo -e "Travel status: ${GREEN}$travel${NC}"
-  echo -e "CIDT/culture methods: ${GREEN}$cidt${NC}"
+  echo "Pathogens: $pathogens"
+  echo "States: $states"
+  echo "Travel status: $travel"
+  echo "CIDT/culture methods: $cidt"
   if [[ -n "$serotype_param" ]]; then
     # Extract just the serotype names from the parameter
     serotypes=$(echo $serotype_param | sed 's/--salmonella_serotypes //; s/"//g')
-    echo -e "Salmonella serotypes: ${GREEN}$serotypes${NC}"
+    echo "Salmonella serotypes: $serotypes"
   fi
-  echo -e "Input files:"
-  echo -e "  Data file: ${GREEN}$mmwrFile${NC}"
-  echo -e "  Census file (bacterial): ${GREEN}$censusFileB${NC}" 
-  echo -e "  Census file (parasitic): ${GREEN}$censusFileP${NC}"
+  echo "Input files:"
+  echo "  Data file: $mmwrFile"
+  echo "  Census file (bacterial): $censusFileB" 
+  echo "  Census file (parasitic): $censusFileP"
   if [[ -n "$preprocessed_metadata" ]]; then
-    echo -e "  Metadata: ${GREEN}$preprocessed_metadata${NC}"
+    echo "  Metadata: $preprocessed_metadata"
   fi
   
   if [[ "$flag" != "resume" ]]; then
-    echo -e "Chains: ${GREEN}$chains${NC}"
-    echo -e "Iterations: ${GREEN}$iterations${NC}"
-    echo -e "Adapt delta: ${GREEN}$adapt_delta${NC}"
-    echo -e "Max treedepth: ${GREEN}$max_treedepth${NC}"
+    echo "Chains: $chains"
+    echo "Iterations: $iterations"
+    echo "Adapt delta: $adapt_delta"
+    echo "Max treedepth: $max_treedepth"
   fi
   
-  echo -e "Output directory: ${GREEN}$outDir${NC}"
-  echo -e "Run in background: ${GREEN}$([ "$background" == true ] && echo "Yes" || echo "No")${NC}"
+  echo "Output directory: $outDir"
+  echo "Run in background: $([ "$background" == true ] && echo "Yes" || echo "No")"
   echo ""
-  echo -e "Command to run:"
-  echo -e "${YELLOW}$final_cmd${NC}"
+  echo "Command to run:"
+  echo "$final_cmd"
   echo ""
 } 
