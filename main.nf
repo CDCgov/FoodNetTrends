@@ -49,22 +49,34 @@ def validateFilePaths() {
     }
     
     // Census files are now optional with warnings
-    if (params.censusFileB && params.censusFileB != "") {
-        try {
-            def censusPath = params.censusFileB.toString()
-            log.info "Census bacterial file path appears valid: ${censusPath}"
-        } catch (Exception e) {
-            log.warn "Invalid census bacterial file path format: ${params.censusFileB}"
+    if (params.containsKey('censusFileB')) {
+        if (params.censusFileB == null || params.censusFileB == "") {
+            log.warn "Census bacterial file parameter is empty, will use placeholder"
+        } else {
+            try {
+                def censusPath = params.censusFileB.toString()
+                log.info "Census bacterial file path: ${censusPath}"
+            } catch (Exception e) {
+                log.warn "Invalid census bacterial file path format: ${params.censusFileB}"
+            }
         }
+    } else {
+        log.warn "Census bacterial file parameter not provided, will use placeholder"
     }
     
-    if (params.censusFileP && params.censusFileP != "") {
-        try {
-            def censusPath = params.censusFileP.toString()
-            log.info "Census parasitic file path appears valid: ${censusPath}"
-        } catch (Exception e) {
-            log.warn "Invalid census parasitic file path format: ${params.censusFileP}"
+    if (params.containsKey('censusFileP')) {
+        if (params.censusFileP == null || params.censusFileP == "") {
+            log.warn "Census parasitic file parameter is empty, will use placeholder"
+        } else {
+            try {
+                def censusPath = params.censusFileP.toString()
+                log.info "Census parasitic file path: ${censusPath}"
+            } catch (Exception e) {
+                log.warn "Invalid census parasitic file path format: ${params.censusFileP}"
+            }
         }
+    } else {
+        log.warn "Census parasitic file parameter not provided, will use placeholder"
     }
 }
 

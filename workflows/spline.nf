@@ -30,16 +30,23 @@ workflow SPLINE {
     if (params.pathogen) {
         // Convert comma-separated string to a channel of pathogens
         def pathogenList = params.pathogen.tokenize(',')
-        pathogens = Channel.fromList(pathogenList).map { pathogen -> [pathogen, mmwrFile] }
-        
-        // Log the pathogens being analyzed
         log.info "Analyzing ${pathogenList.size()} pathogens: ${pathogenList.join(', ')}"
+        
+        // First define mmwrFile to avoid getFileSystem errors
+        def mmwrFilePath = params.mmwrFile
+        mmwrFile = file(mmwrFilePath, checkIfExists: false)
+        
+        // Then create pathogens channel 
+        pathogens = Channel.fromList(pathogenList.collect { pathogen -> [pathogen, mmwrFile] })
     } else {
         // Default to CAMPYLOBACTER and CYCLOSPORA for testing
-        pathogens = Channel.of(
+        def mmwrFilePath = params.mmwrFile
+        mmwrFile = file(mmwrFilePath, checkIfExists: false)
+        
+        pathogens = Channel.fromList([
             ['CAMPYLOBACTER', mmwrFile], 
             ['CYCLOSPORA', mmwrFile]
-        )
+        ])
         log.info "No pathogens specified, using defaults: CAMPYLOBACTER, CYCLOSPORA"
     }
 
@@ -53,37 +60,67 @@ workflow SPLINE {
     }
 
     // Input files - handle carefully to avoid getFileSystem errors
-    def mmwrFilePath = params.mmwrFile
-    mmwrFile = file(mmwrFilePath, checkIfExists: false)
     if (!mmwrFile.exists()) {
-        error "MMWR file does not exist: ${mmwrFilePath}"
+        error "MMWR file does not exist: ${params.mmwrFile}"
     }
 
     // Handle empty census file parameters
-    def censusFileB = ""
-    def censusFileP = ""
-
-    // Check if census file parameters are not empty strings
-    if (params.censusFileB && params.censusFileB != "") {
+    def censusFileB
+    def censusFileP
+    
+    // Create placeholder files for empty census parameters
+    if (!params.censusFileB || params.censusFileB == "") {
+        log.warn "WARNING: Census bacterial file parameter is empty"
+        log.warn "Will proceed with empty census bacterial file"
+        
+        // Create empty placeholder file in workDir
+        def placeholderB = "${workflow.workDir}/empty_census_bacterial.csv"
+        def placeholderBFile = new File(placeholderB)
+        if (!placeholderBFile.exists()) {
+            placeholderBFile.text = "state,population\n"
+        }
+        censusFileB = file(placeholderB)
+    } else {
         censusFileB = file(params.censusFileB, checkIfExists: false)
         if (!censusFileB.exists()) {
             log.warn "WARNING: Census bacterial file does not exist: ${params.censusFileB}"
-            log.warn "Will proceed without census bacterial file"
+            log.warn "Will proceed with empty census bacterial file"
+            
+            // Create empty placeholder file in workDir
+            def placeholderB = "${workflow.workDir}/empty_census_bacterial.csv"
+            def placeholderBFile = new File(placeholderB)
+            if (!placeholderBFile.exists()) {
+                placeholderBFile.text = "state,population\n"
+            }
+            censusFileB = file(placeholderB)
         }
-    } else {
-        log.warn "WARNING: Census bacterial file parameter is empty"
-        log.warn "Will proceed without census bacterial file"
     }
 
-    if (params.censusFileP && params.censusFileP != "") {
+    if (!params.censusFileP || params.censusFileP == "") {
+        log.warn "WARNING: Census parasitic file parameter is empty"
+        log.warn "Will proceed with empty census parasitic file"
+        
+        // Create empty placeholder file in workDir
+        def placeholderP = "${workflow.workDir}/empty_census_parasitic.csv"
+        def placeholderPFile = new File(placeholderP)
+        if (!placeholderPFile.exists()) {
+            placeholderPFile.text = "state,population\n"
+        }
+        censusFileP = file(placeholderP)
+    } else {
         censusFileP = file(params.censusFileP, checkIfExists: false)
         if (!censusFileP.exists()) {
             log.warn "WARNING: Census parasitic file does not exist: ${params.censusFileP}"
-            log.warn "Will proceed without census parasitic file"
+            log.warn "Will proceed with empty census parasitic file"
+            
+            // Create empty placeholder file in workDir
+            def placeholderP = "${workflow.workDir}/empty_census_parasitic.csv"
+            def placeholderPFile = new File(placeholderP)
+            if (!placeholderPFile.exists()) {
+                placeholderPFile.text = "state,population\n" 
+            }
+            censusFileP = file(placeholderP)
         }
-    } else {
-        log.warn "WARNING: Census parasitic file parameter is empty"
-        log.warn "Will proceed without census parasitic file"
     }
     
     // Flag for preprocessed data
@@ -92,7 +129,7 @@ workflow SPLINE {
     // Check file size to catch obvious issues
     try {
         if (mmwrFile.size() == 0) {
-            error "MMWR file is empty: ${mmwrFilePath}"
+            error "MMWR file is empty: ${params.mmwrFile}"
         }
     } catch (Exception e) {
         log.warn "Could not check MMWR file size: ${e.message}"
