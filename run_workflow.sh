@@ -122,6 +122,32 @@ if [[ "$workflow_mode" == "1" ]]; then
         exit 1
     fi
     
+    # Census files for preprocessing
+    # Default census data files
+    defaultCensusFileB="${DEFAULT_DATA_DIR}/cen9624.sas7bdat"
+    defaultCensusFileP="${DEFAULT_DATA_DIR}/cen9624_para.sas7bdat"
+    
+    read -p "Census file (bacterial) [${defaultCensusFileB}]: " censusFileB
+    censusFileB=${censusFileB:-$defaultCensusFileB}
+    
+    read -p "Census file (parasitic) [${defaultCensusFileP}]: " censusFileP
+    censusFileP=${censusFileP:-$defaultCensusFileP}
+    
+    # Validate census files exist
+    if [ ! -f "${censusFileB}" ]; then
+        echo "Error: Census bacterial file does not exist: ${censusFileB}"
+        echo "$(date): Missing census bacterial file: ${censusFileB}" >> "$error_log"
+        echo "Exiting."
+        exit 1
+    fi
+    
+    if [ ! -f "${censusFileP}" ]; then
+        echo "Error: Census parasitic file does not exist: ${censusFileP}"
+        echo "$(date): Missing census parasitic file: ${censusFileP}" >> "$error_log"
+        echo "Exiting."
+        exit 1
+    fi
+    
     # Set output location
     echo ""
     echo "======== Output Settings ========"
@@ -152,6 +178,8 @@ if [[ "$workflow_mode" == "1" ]]; then
     # Run the preprocessing workflow
     preprocess_cmd="nextflow run main.nf -profile singularity -entry PREPROCESS_WORKFLOW \
       --mmwrFile \"${mmwrFile}\" \
+      --censusFileB \"${censusFileB}\" \
+      --censusFileP \"${censusFileP}\" \
       --outdir \"${preprocessedDir}\" \
       --outputBase \"${outputBase}\" \
       ${metadata_param}"
@@ -298,37 +326,6 @@ else
             # Clear metadata file if continuing without it
             preprocessed_metadata=""
         fi
-    fi
-fi
-
-# For all modes, we need census files
-if [[ "$workflow_mode" == "1" || "$workflow_mode" == "2" || "$workflow_mode" == "3" ]]; then
-    echo ""
-    echo "======== Census Files ========"
-    
-    # Default census data files
-    defaultCensusFileB="${DEFAULT_DATA_DIR}/cen9624.sas7bdat"
-    defaultCensusFileP="${DEFAULT_DATA_DIR}/cen9624_para.sas7bdat"
-    
-    read -p "Census file (bacterial) [${defaultCensusFileB}]: " censusFileB
-    censusFileB=${censusFileB:-$defaultCensusFileB}
-    
-    read -p "Census file (parasitic) [${defaultCensusFileP}]: " censusFileP
-    censusFileP=${censusFileP:-$defaultCensusFileP}
-    
-    # Validate census files exist
-    if [ ! -f "${censusFileB}" ]; then
-        echo "Error: Census bacterial file does not exist: ${censusFileB}"
-        echo "$(date): Missing census bacterial file: ${censusFileB}" >> "$error_log"
-        echo "Exiting."
-        exit 1
-    fi
-    
-    if [ ! -f "${censusFileP}" ]; then
-        echo "Error: Census parasitic file does not exist: ${censusFileP}"
-        echo "$(date): Missing census parasitic file: ${censusFileP}" >> "$error_log"
-        echo "Exiting."
-        exit 1
     fi
 fi
 
