@@ -138,7 +138,7 @@ workflow SPLINE {
     scripts_path = "${workflow.projectDir}/bin"
 
     // Run TRENDY with input data
-    trendy_results = TRENDY(
+    (model, summary, ir_outputs, plots, irr_outputs, dashboard_trendy, logs) = TRENDY(
         pathogens,
         censusFileB,
         censusFileP,
@@ -151,7 +151,7 @@ workflow SPLINE {
 
     // Run dashboard generation after all modeling is complete
     dashboard = GENERATE_DASHBOARD(
-        trendy_results.out.ir_outputs.collect(),
+        ir_outputs.collect(),
         params.outdir + '/' + projID,
         projID,
         dashboardTemplate,
