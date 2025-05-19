@@ -470,9 +470,6 @@
   <!-- Navbar -->
   <div class="dashboard-navbar">
     <div class="dashboard-logo">
-      {{#if logo_data_url}}
-      <img src="{{logo_data_url}}" alt="FoodNet Trends Logo">
-      {{/if}}
       <h1>FoodNet Trends</h1>
     </div>
     <div class="dashboard-actions">
@@ -734,6 +731,36 @@
         console.log(`Dashboard filter: pathogen=${pathogen}, year=${year}, comparison=${comparison}`);
         alert('Dashboard filters updated!');
       });
+
+      // Dynamically populate pathogen dropdown
+      const pathogenSelect = document.getElementById('pathogen-select');
+      if (dashboardData.pathogens && dashboardData.pathogens.length > 0) {
+        pathogenSelect.innerHTML = '<option value="all">All Pathogens</option>' +
+          dashboardData.pathogens.map(p => `<option value="${p}">${p}</option>`).join('');
+      }
+      // Dynamically populate year dropdown
+      const yearSelect = document.getElementById('year-select');
+      if (dashboardData.years && dashboardData.years.length > 0) {
+        yearSelect.innerHTML = '<option value="all">All Years</option>' +
+          dashboardData.years.map(y => `<option value="${y}">${y}</option>`).join('');
+      }
+      // Dynamically populate comparison period dropdown
+      const comparisonSelect = document.getElementById('comparison-select');
+      if (dashboardData.comparisonPeriods && dashboardData.comparisonPeriods.length > 0) {
+        comparisonSelect.innerHTML = dashboardData.comparisonPeriods.map(cp => `<option value="${cp}">${cp}</option>`).join('');
+      } else {
+        comparisonSelect.innerHTML = '<option value="">No comparison periods</option>';
+      }
+      // Placeholders for charts if no data
+      if (!dashboardData.irData || dashboardData.irData.length === 0) {
+        document.getElementById('trend-chart').innerHTML = '<div class="error-message">No incidence rate data available.</div>';
+      }
+      if (!dashboardData.rrData || dashboardData.rrData.length === 0) {
+        document.getElementById('risk-chart').innerHTML = '<div class="error-message">No relative risk data available.</div>';
+      }
+      if (!dashboardData.irData || dashboardData.irData.length === 0) {
+        document.getElementById('map-viz').innerHTML = '<div class="error-message">No geographic data available.</div>';
+      }
     });
   </script>
 </body>
