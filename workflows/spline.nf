@@ -60,7 +60,7 @@ workflow SPLINE {
     def censusFileP = ""
 
     // Check if census file parameters are not empty strings
-    if (params.censusFileB?.trim()) {
+    if (params.censusFileB && params.censusFileB != "") {
         censusFileB = file(params.censusFileB, checkIfExists: false)
         if (!censusFileB.exists()) {
             log.warn "WARNING: Census bacterial file does not exist: ${params.censusFileB}"
@@ -71,7 +71,7 @@ workflow SPLINE {
         log.warn "Will proceed without census bacterial file"
     }
 
-    if (params.censusFileP?.trim()) {
+    if (params.censusFileP && params.censusFileP != "") {
         censusFileP = file(params.censusFileP, checkIfExists: false)
         if (!censusFileP.exists()) {
             log.warn "WARNING: Census parasitic file does not exist: ${params.censusFileP}"
