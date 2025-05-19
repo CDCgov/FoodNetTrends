@@ -460,11 +460,56 @@ fi
 
 # After pathogen selection, add STEC serotype selection
 
-echo ""
-echo "======== STEC Serotype Selection (optional) ========"
-echo "If you want to filter by specific STEC serotypes, enter a comma-separated list (e.g., O157,O26,O45)."
-echo "Leave blank to include all STEC serotypes."
-read -p "STEC serotypes to include: " stec_serotypes
+# Only prompt for STEC serotypes if STEC is among selected pathogens
+if [[ "$pathogens" == *"STEC"* ]]; then
+    echo ""
+    echo "======== STEC Serotype Selection ========"
+    stec_serotype_list=""
+    # Try to get STEC serotypes from metadata if available and jq is present
+    if [[ "$have_jq" == true && -n "$preprocessed_metadata" && -f "$preprocessed_metadata" ]]; then
+        stec_serotype_list=$(jq -r '.stec_serotypes | join(",")' "$preprocessed_metadata" 2>/dev/null)
+    fi
+    # If not found in metadata, scan the preprocessed CSV for unique STEC serotypes
+    if [[ -z "$stec_serotype_list" && -n "$mmwrFile" && -f "$mmwrFile" ]]; then
+        # Try to find the serotype column (serotypesummary, sero2, or sero1)
+        serotype_col=$(head -1 "$mmwrFile" | tr ',' '\n' | grep -i -m1 -E 'serotypesummary|sero2|sero1')
+        if [[ -n "$serotype_col" ]]; then
+            stec_serotype_list=$(awk -F',' -v col="$serotype_col" 'NR==1{for(i=1;i<=NF;i++)if(tolower($i)==tolower(col))c=i} NR>1 && toupper($1)=="STEC" && c{a[$c]++} END{for(k in a) printf "%s,", k}' "$mmwrFile" | sed 's/,
+*$//')
+        fi
+    fi
+    if [[ -n "$stec_serotype_list" ]]; then
+        IFS=',' read -ra STEC_SEROTYPES_ARRAY <<< "$stec_serotype_list"
+        echo "Detected STEC serotypes in data:"
+        for i in "${!STEC_SEROTYPES_ARRAY[@]}"; do
+            printf "%2d) %s\n" $((i+1)) "${STEC_SEROTYPES_ARRAY[$i]}"
+        done
+        echo "$(( ${#STEC_SEROTYPES_ARRAY[@]} + 1 ))) Enter a custom list manually"
+        read -p "Select STEC serotypes (comma-separated indices, or leave blank for all): " stec_sero_choice
+        if [[ -z "$stec_sero_choice" ]]; then
+            stec_serotypes=""
+        elif [[ "$stec_sero_choice" -eq $(( ${#STEC_SEROTYPES_ARRAY[@]} + 1 )) ]]; then
+            read -p "Enter STEC serotypes (comma-separated): " stec_serotypes
+        else
+            # Convert indices to serotype names
+            stec_serotypes=""
+            IFS=',' read -ra IDX <<< "$stec_sero_choice"
+            for idx in "${IDX[@]}"; do
+                idx=$((idx-1))
+                if [[ $idx -ge 0 && $idx -lt ${#STEC_SEROTYPES_ARRAY[@]} ]]; then
+                    stec_serotypes+="${STEC_SEROTYPES_ARRAY[$idx]},"
+                fi
+            done
+            stec_serotypes=$(echo "$stec_serotypes" | sed 's/,
+*$//')
+        fi
+    else
+        echo "No STEC serotype list detected. You may enter a custom list or leave blank for all."
+        read -p "STEC serotypes to include: " stec_serotypes
+    fi
+else
+    stec_serotypes=""
+fi
 
 # Get state selection
 echo ""

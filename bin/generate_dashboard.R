@@ -410,6 +410,12 @@ generate_dashboard <- function() {
     generation_date = format(Sys.time(), "%Y-%m-%d %H:%M:%S")
   )
   
+  # Debug output for each variable
+  cat("[DEBUG] Dashboard JSON variables to be embedded:\n")
+  for (name in names(template_vars)) {
+    cat(sprintf("  %s: %s\n", name, substr(template_vars[[name]], 1, 120)))
+  }
+  
   # Create plots
   cat("Creating visualizations...\n")
   if (!is.null(ir_data)) {
@@ -732,9 +738,18 @@ generate_dashboard <- function() {
   # Replace template variables (always, even if NULL)
   for (name in names(template_vars)) {
     placeholder <- paste0("{{", name, "}}")
-    value <- if (is.null(template_vars[[name]])) "" else template_vars[[name]]
+    value <- template_vars[[name]]
     html_template <- gsub(placeholder, value, html_template, fixed = TRUE)
   }
+
+  # Remove logo block from HTML template
+  html_template <- gsub("{{#if logo_data_url}}.*?{{/if}}", "", html_template, perl=TRUE)
+
+  cat("Pathogens:", paste(pathogens, collapse=", "), "\n")
+  cat("States:", paste(states, collapse=", "), "\n")
+  cat("Years:", paste(years, collapse=", "), "\n")
+  cat("IR data rows:", if (!is.null(ir_data)) nrow(ir_data) else 0, "\n")
+  cat("RR data rows:", if (!is.null(rr_data)) nrow(rr_data) else 0, "\n")
   
   # Create HTML widgets
   widget_html <- htmltools::renderTags(dashboard_widgets)$html
