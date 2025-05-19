@@ -707,6 +707,43 @@ tryCatch({
   stop("Error in pathogen analysis: ", e$message)
 })
 
+# --- Impute missing population values by (state, year) if possible, and report ---
+# Save original bact for reporting
+bact_original <- bact
+
+# Impute population by (state, year) if possible
+bact <- bact %>%
+  group_by(state, year) %>%
+  mutate(
+    imputed_population = ifelse(is.na(population) & any(!is.na(population)), TRUE, FALSE),
+    population = ifelse(is.na(population), unique(na.omit(population)), population)
+  ) %>%
+  ungroup()
+
+# Identify imputed and still-missing rows
+imputed_rows <- bact %>% filter(imputed_population)
+dropped_rows <- bact %>% filter(is.na(population))
+
+# Remove rows with unresolved NA population before modeling
+bact <- bact %>% filter(!is.na(population))
+
+# Write imputation report
+impute_report_file <- file.path(outDir, "population_imputation_report.txt")
+cat("Population Imputation Report\n", file=impute_report_file)
+cat("==========================\n", file=impute_report_file, append=TRUE)
+cat("Imputed population for the following (state, year, pathogen) rows:\n", file=impute_report_file, append=TRUE)
+if (nrow(imputed_rows) > 0) {
+  write.table(imputed_rows[, c("state", "year", "pathogen")], file=impute_report_file, append=TRUE, row.names=FALSE, col.names=TRUE, sep="\t", quote=FALSE)
+} else {
+  cat("(None)\n", file=impute_report_file, append=TRUE)
+}
+cat("\nDropped rows with unresolved NA population:\n", file=impute_report_file, append=TRUE)
+if (nrow(dropped_rows) > 0) {
+  write.table(dropped_rows[, c("state", "year", "pathogen")], file=impute_report_file, append=TRUE, row.names=FALSE, col.names=TRUE, sep="\t", quote=FALSE)
+} else {
+  cat("(None)\n", file=impute_report_file, append=TRUE)
+}
+
 # ==========================================================================
 # Model Fitting
 # ==========================================================================
