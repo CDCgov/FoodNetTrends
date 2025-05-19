@@ -406,7 +406,7 @@ generate_dashboard <- function() {
     ir_data = jsonlite::toJSON(ir_data, auto_unbox = TRUE),
     rr_data = jsonlite::toJSON(rr_data, auto_unbox = TRUE),
     summary_data = jsonlite::toJSON(summary_data, auto_unbox = TRUE),
-    logo_data_url = logo_data_url,
+    logo_data_url = if (is.null(logo_data_url)) "" else logo_data_url,
     generation_date = format(Sys.time(), "%Y-%m-%d %H:%M:%S")
   )
   
@@ -729,12 +729,11 @@ generate_dashboard <- function() {
     html_template <- paste(html_template, collapse = "\n")
   }
   
-  # Replace template variables
+  # Replace template variables (always, even if NULL)
   for (name in names(template_vars)) {
-    if (!is.null(template_vars[[name]])) {
-      placeholder <- paste0("{{", name, "}}")
-      html_template <- gsub(placeholder, template_vars[[name]], html_template, fixed = TRUE)
-    }
+    placeholder <- paste0("{{", name, "}}")
+    value <- if (is.null(template_vars[[name]])) "" else template_vars[[name]]
+    html_template <- gsub(placeholder, value, html_template, fixed = TRUE)
   }
   
   # Create HTML widgets
