@@ -399,13 +399,13 @@ generate_dashboard <- function() {
   # Create template variables
   template_vars <- list(
     title = args$title,
-    pathogens = jsonlite::toJSON(pathogens, auto_unbox = TRUE),
-    states = jsonlite::toJSON(states, auto_unbox = TRUE),
-    years = jsonlite::toJSON(years, auto_unbox = TRUE),
-    comparison_periods = jsonlite::toJSON(comparison_periods, auto_unbox = TRUE),
-    ir_data = jsonlite::toJSON(ir_data, auto_unbox = TRUE),
-    rr_data = jsonlite::toJSON(rr_data, auto_unbox = TRUE),
-    summary_data = jsonlite::toJSON(summary_data, auto_unbox = TRUE),
+    pathogens = if (is.null(pathogens) || length(pathogens) == 0) "[]" else jsonlite::toJSON(pathogens, auto_unbox = TRUE),
+    states = if (is.null(states) || length(states) == 0) "[]" else jsonlite::toJSON(states, auto_unbox = TRUE),
+    years = if (is.null(years) || length(years) == 0) "[]" else jsonlite::toJSON(years, auto_unbox = TRUE),
+    comparison_periods = if (is.null(comparison_periods) || length(comparison_periods) == 0) "[]" else jsonlite::toJSON(comparison_periods, auto_unbox = TRUE),
+    ir_data = if (is.null(ir_data) || nrow(ir_data) == 0) "[]" else jsonlite::toJSON(ir_data, auto_unbox = TRUE),
+    rr_data = if (is.null(rr_data) || nrow(rr_data) == 0) "[]" else jsonlite::toJSON(rr_data, auto_unbox = TRUE),
+    summary_data = if (is.null(summary_data) || length(summary_data) == 0) "[]" else jsonlite::toJSON(summary_data, auto_unbox = TRUE),
     logo_data_url = if (is.null(logo_data_url)) "" else logo_data_url,
     generation_date = format(Sys.time(), "%Y-%m-%d %H:%M:%S")
   )
