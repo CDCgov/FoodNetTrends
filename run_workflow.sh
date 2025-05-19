@@ -33,8 +33,215 @@
 # Last updated: 2025-05-18
 #==============================================================================
 
+# Cleaner variables (no color codes)
+GREEN=""
+YELLOW=""
+RED=""
+BLUE=""
+NC=""
+
+# Check for jq but make it optional
+have_jq=true
+if ! command -v jq &> /dev/null; then
+    echo "Warning: jq is not installed. Basic functionality will work, but advanced serotype filtering will be limited."
+    have_jq=false
+fi
+
+# Set up paths, files
+# Make data directory path environment-aware
+if [ -d "/scicomp/groups-pure/OID/NCEZID/DFWED/EDEB/foodnet/trends/data/" ]; then
+  DEFAULT_DATA_DIR="/scicomp/groups-pure/OID/NCEZID/DFWED/EDEB/foodnet/trends/data/"
+elif [ -d "/project/foodnet/data" ]; then
+  DEFAULT_DATA_DIR="/project/foodnet/data"
+else
+  DEFAULT_DATA_DIR="./data"
+  # Create local data directory if it doesn't exist
+  mkdir -p "$DEFAULT_DATA_DIR"
+fi
+outDir="output"  # Default to "output" directory in current location
+
+# Initialize log file for error tracking
+error_log="foodnet_errors.log"
+echo "$(date): Starting FoodNet Trends Analysis Pipeline" > "$error_log"
+
+# Define validation function to reduce code duplication
+validate_list() {
+    local input_list=$1
+    local valid_values=$2
+    local item_type=$3
+    local invalid_found=false
+    
+    IFS=',' read -ra INPUT_ARRAY <<< "$input_list"
+    IFS=',' read -ra VALID_ARRAY <<< "$valid_values"
+    
+    for item in "${INPUT_ARRAY[@]}"; do
+        valid=false
+        for valid_item in "${VALID_ARRAY[@]}"; do
+            if [[ "$item" == "$valid_item" ]]; then
+                valid=true
+                break
+            fi
+        done
+        
+        if [[ "$valid" == false ]]; then
+            # Strip any trailing periods which may be causing confusion
+            cleaned_item="${item%.}"
+            # Check again with cleaned item
+            for valid_item in "${VALID_ARRAY[@]}"; do
+                if [[ "$cleaned_item" == "$valid_item" ]]; then
+                    valid=true
+                    break
+                fi
+            done
+            
+            if [[ "$valid" == false ]]; then
+                echo "Warning: '$item' is not in the discovered $item_type list and may cause errors."
+                echo "$(date): Invalid $item_type: $item" >> "$error_log"
+                invalid_found=true
+            fi
+        fi
+    done
+    
+    if [[ "$invalid_found" == true ]]; then
+        echo ""
+        read -p "Continue anyway? (y/n) [n]: " continue_choice
+        continue_choice=${continue_choice:-n}
+        if [[ ! "$continue_choice" =~ ^[Yy]$ ]]; then
+            echo "Exiting."
+            echo "$(date): User canceled due to invalid $item_type" >> "$error_log"
+            exit 1
+        fi
+    fi
+}
+
+# Validate that input files exist
+validate_file() {
+    local file_path=$1
+    local file_type=$2
+    local required=$3
+    
+    if [ ! -f "${file_path}" ]; then
+        if [ "$required" = true ]; then
+            echo "Error: $file_type file does not exist: ${file_path}"
+            echo "$(date): Missing required $file_type file: ${file_path}" >> "$error_log"
+            echo "Exiting."
+            exit 1
+        else
+            echo "Warning: $file_type file does not exist: ${file_path}"
+            echo "$(date): Missing $file_type file: ${file_path}" >> "$error_log"
+            read -p "Continue anyway? (y/n) [n]: " continue_choice
+            continue_choice=${continue_choice:-n}
+            if [[ ! "$continue_choice" =~ ^[Yy]$ ]]; then
+                echo "Exiting."
+                exit 1
+            fi
+        fi
+    fi
+}
+
+# Function for basic JSON parsing without jq
+parse_json_value() {
+    local json_file=$1
+    local key=$2
+    
+    # Extract simple key-value pairs with grep and sed
+    grep -o "\"$key\":[^,}]*" "$json_file" | sed 's/.*://' | sed 's/^[ \t]*//;s/[ \t]*$//' | sed 's/^"//;s/"$//'
+}
+
+# Function to extract array values from JSON without jq
+parse_json_array() {
+    local json_file=$1
+    local key=$2
+    local max_items=$3
+    
+    # Find the array in the JSON
+    local array_text=$(grep -o "\"$key\":\[[^]]*\]" "$json_file")
+    
+    # Extract items from the array
+    if [[ -n "$array_text" ]]; then
+        # Remove the key and brackets
+        array_text=${array_text#*\[}
+        array_text=${array_text%\]*}
+        
+        # Split by comma and extract values
+        local items=()
+        local count=0
+        
+        # Split string by commas and extract values
+        IFS=',' read -ra raw_items <<< "$array_text"
+        for item in "${raw_items[@]}"; do
+            # Clean up quotes and whitespace
+            clean_item=$(echo "$item" | sed 's/^[ \t]*"//;s/"[ \t]*$//')
+            items+=("$clean_item")
+            ((count++))
+            
+            # Limit to max_items if specified
+            if [[ -n "$max_items" && $count -ge $max_items ]]; then
+                break
+            fi
+        done
+        
+        # Return as comma-separated list
+        local result=$(IFS=,; echo "${items[*]}")
+        echo "$result"
+    else
+        # Try alternative approach for complex nested arrays
+        grep -o "\"[^\"]*\":[0-9]*" "$json_file" | 
+            head -n ${max_items:-10} | 
+            sed 's/"//g' | 
+            cut -d':' -f1 | 
+            paste -sd,
+    fi
+}
+
+# Set up modules if we're in an HPC environment
+if command -v module &> /dev/null; then
+    module purge
+    module load nextflow/24.10.4
+    module load singularity/4.1.4
+    module load java/17.0.6
+else
+    echo "Warning: Module system not detected. Assuming dependencies are available in PATH."
+    echo "$(date): Module system not detected" >> "$error_log"
+fi
+
+# Make sure TMPDIR is set
+TMPDIR=${TMPDIR:-/scicomp/scratch/$(whoami)}
+mkdir -p "$TMPDIR/nextflow" 2>/dev/null
+
+# Create timestamp for automatic project ID
+timestamp=$(date +%Y%m%d_%H%M%S)
+
+# Display welcome banner
+echo "Your Nextflow temporary/cache files will be placed in $TMPDIR/nextflow/ by default"
+echo "========================================="
+echo "   FoodNet Trends Analysis Pipeline      "
+echo "========================================="
+echo ""
+
+# Ask for workflow mode
+echo "Select mode:"
+echo "1) Preprocess data (clean raw data files and generate metadata)"
+echo "2) Run analysis (with complete pipeline)"
+echo "3) Use existing preprocessed data"
+read -p "Enter selection [1]: " workflow_mode
+workflow_mode=${workflow_mode:-1}
+
+# Handle preprocessed data
+preprocessed_data=""
+preprocessed_metadata=""
+
+# Rest of the script follows...
+# (This is just a starter to verify the menu displays properly)
+
+# Debug output - initial script execution
+echo "DEBUG: Starting run_workflow.sh script"
+
 # Source all module scripts
 SCRIPT_DIR="$(dirname "$0")/scripts"
+
+# Debug output - script directory
+echo "DEBUG: Script directory is $SCRIPT_DIR"
 
 # Ensure scripts directory exists
 if [ ! -d "$SCRIPT_DIR" ]; then
@@ -42,16 +249,31 @@ if [ ! -d "$SCRIPT_DIR" ]; then
   exit 1
 fi
 
+# Debug output - before sourcing modules
+echo "DEBUG: About to source modules"
+
 # Source all modules (order matters for some dependencies)
 source "$SCRIPT_DIR/ui.sh"
+echo "DEBUG: Loaded ui.sh"
 source "$SCRIPT_DIR/utils.sh"
+echo "DEBUG: Loaded utils.sh"
 source "$SCRIPT_DIR/environment.sh"
+echo "DEBUG: Loaded environment.sh"
 source "$SCRIPT_DIR/config.sh"
+echo "DEBUG: Loaded config.sh"
 source "$SCRIPT_DIR/pathogen.sh"
+echo "DEBUG: Loaded pathogen.sh"
 source "$SCRIPT_DIR/preprocess_workflow.sh"
+echo "DEBUG: Loaded preprocess_workflow.sh"
 source "$SCRIPT_DIR/analysis_workflow.sh"
+echo "DEBUG: Loaded analysis_workflow.sh"
 source "$SCRIPT_DIR/preprocessed_workflow.sh"
+echo "DEBUG: Loaded preprocessed_workflow.sh"
 source "$SCRIPT_DIR/execution.sh"
+echo "DEBUG: Loaded execution.sh"
+
+# Debug output - calling main function
+echo "DEBUG: Starting main function"
 
 # Get dashboard preferences
 get_dashboard_preference() {
@@ -122,17 +344,28 @@ finalize_command() {
 
 # Main function that orchestrates the entire workflow
 main() {
+  # Debug output - inside main function
+  echo "DEBUG: Inside main function"
+
   # Initialize environment and paths
+  echo "DEBUG: About to call setup_environment"
   setup_environment
+  echo "DEBUG: Finished setup_environment"
   
   # Check for jq availability
+  echo "DEBUG: About to call check_jq"
   check_jq
+  echo "DEBUG: Finished check_jq"
   
   # Display welcome banner
+  echo "DEBUG: About to call display_welcome"
   display_welcome
+  echo "DEBUG: Finished display_welcome"
   
   # Get workflow mode from user
+  echo "DEBUG: About to call get_workflow_mode"
   workflow_mode=$(get_workflow_mode)
+  echo "DEBUG: get_workflow_mode returned: $workflow_mode"
   
   # Initialize variables
   preprocessed_data=""
@@ -142,11 +375,14 @@ main() {
   mmwrFile=""
   
   # Handle workflow mode-specific initialization
+  echo "DEBUG: Starting workflow mode-specific initialization for mode $workflow_mode"
   case "$workflow_mode" in
     1) 
       # Preprocess data
+      echo "DEBUG: About to call handle_preprocess_workflow"
       handle_preprocess_workflow
       preprocess_result=$?
+      echo "DEBUG: handle_preprocess_workflow returned: $preprocess_result"
       
       if [ $preprocess_result -eq 1 ]; then
         # Preprocessing failed
@@ -160,11 +396,15 @@ main() {
       ;;
     2) 
       # Run analysis with raw data
+      echo "DEBUG: About to call handle_analysis_workflow"
       handle_analysis_workflow
+      echo "DEBUG: Finished handle_analysis_workflow"
       ;;
     3) 
       # Use existing preprocessed data
+      echo "DEBUG: About to call handle_preprocessed_workflow"
       handle_preprocessed_workflow
+      echo "DEBUG: Finished handle_preprocessed_workflow"
       ;;
   esac
   
@@ -280,4 +520,6 @@ main() {
 }
 
 # Run the main function
-main "$@" 
+echo "DEBUG: Calling main function"
+main "$@"
+echo "DEBUG: Finished running main function" 
