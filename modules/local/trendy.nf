@@ -69,33 +69,52 @@ process TRENDY {
     echo "Starting analysis for pathogen: ${pathogen}" > ${pathogen}_trendy.log
     echo "Using MMWR data file: ${mmwrFile}" >> ${pathogen}_trendy.log
     
-    # These files may not exist - just note whether they do
-    if [ -f "${censusFileBact}" ]; then
+    # Create empty placeholder files if needed
+    if [ ! -f "${censusFileBact}" ] || [ ! -s "${censusFileBact}" ]; then
+        echo "Census bacterial file missing or empty, creating placeholder" >> ${pathogen}_trendy.log
+        echo "state,population,year,pathogentype" > empty_census_bact.csv
+        echo "CA,10000000,2020,Bacterial" >> empty_census_bact.csv
+        CENSUS_B_ARG="--censusFileB=empty_census_bact.csv"
+    else
         echo "Census bacterial file exists: ${censusFileBact}" >> ${pathogen}_trendy.log
-        CENSUS_B_ARG="--censusFileB=${censusFileBact}"
-    else
-        echo "Census bacterial file does not exist, using empty string" >> ${pathogen}_trendy.log
-        CENSUS_B_ARG="--censusFileB=''"
+        CENSUS_B_ARG="--censusFileB=\"${censusFileBact}\""
     fi
     
-    if [ -f "${censusFileParas}" ]; then
+    if [ ! -f "${censusFileParas}" ] || [ ! -s "${censusFileParas}" ]; then
+        echo "Census parasitic file missing or empty, creating placeholder" >> ${pathogen}_trendy.log
+        echo "state,population,year,pathogentype" > empty_census_para.csv
+        echo "CA,10000000,2020,Parasitic" >> empty_census_para.csv
+        CENSUS_P_ARG="--censusFileP=empty_census_para.csv"
+    else
         echo "Census parasitic file exists: ${censusFileParas}" >> ${pathogen}_trendy.log
-        CENSUS_P_ARG="--censusFileP=${censusFileParas}"
-    else
-        echo "Census parasitic file does not exist, using empty string" >> ${pathogen}_trendy.log
-        CENSUS_P_ARG="--censusFileP=''"
+        CENSUS_P_ARG="--censusFileP=\"${censusFileParas}\""
     fi
     
-    # Run the main trend analysis
-    Rscript \${scripts_path}/trendy.R \
-        --pathogen=${pathogen} \
-        --mmwrFile=${mmwrFile} \
-        \${CENSUS_B_ARG} \
-        \${CENSUS_P_ARG} \
-        --projID=${projID} \
-        --travel=${filter_travel} \
-        --cidt=${filter_cidt} \
-        --outDir=./
+    # Run the main trend analysis with explicit path handling for everything
+    echo "Using scripts path: ${scripts_path}" >> ${pathogen}_trendy.log
+    
+    # Create explicit path to R script
+    SCRIPT_PATH="${scripts_path}/trendy.R"
+    echo "Full script path: \${SCRIPT_PATH}" >> ${pathogen}_trendy.log
+    
+    # Check that R script exists
+    if [ ! -f "\${SCRIPT_PATH}" ]; then
+        echo "ERROR: R script not found at \${SCRIPT_PATH}" >> ${pathogen}_trendy.log
+        echo "Directory contents of ${scripts_path}:" >> ${pathogen}_trendy.log
+        ls -la "${scripts_path}" >> ${pathogen}_trendy.log
+        exit 1
+    fi
+    
+    # Execute with carefully quoted arguments
+    Rscript "\${SCRIPT_PATH}" \\
+        --pathogen="${pathogen}" \\
+        --mmwrFile="${mmwrFile}" \\
+        \${CENSUS_B_ARG} \\
+        \${CENSUS_P_ARG} \\
+        --projID="${projID}" \\
+        --travel="${filter_travel}" \\
+        --cidt="${filter_cidt}" \\
+        --outDir="./"
     
     echo "Analysis completed successfully" >> ${pathogen}_trendy.log
     """

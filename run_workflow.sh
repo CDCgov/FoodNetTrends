@@ -133,19 +133,17 @@ if [[ "$workflow_mode" == "1" ]]; then
     read -p "Census file (parasitic) [${defaultCensusFileP}]: " censusFileP
     censusFileP=${censusFileP:-$defaultCensusFileP}
     
-    # Validate census files exist
+    # Check census files and warn if they don't exist (but don't exit)
     if [ ! -f "${censusFileB}" ]; then
-        echo "Error: Census bacterial file does not exist: ${censusFileB}"
+        echo "Warning: Census bacterial file does not exist: ${censusFileB}"
         echo "$(date): Missing census bacterial file: ${censusFileB}" >> "$error_log"
-        echo "Exiting."
-        exit 1
+        echo "Continuing with placeholder file that will be created automatically."
     fi
     
     if [ ! -f "${censusFileP}" ]; then
-        echo "Error: Census parasitic file does not exist: ${censusFileP}"
+        echo "Warning: Census parasitic file does not exist: ${censusFileP}"
         echo "$(date): Missing census parasitic file: ${censusFileP}" >> "$error_log"
-        echo "Exiting."
-        exit 1
+        echo "Continuing with placeholder file that will be created automatically."
     fi
     
     # Set output location

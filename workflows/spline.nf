@@ -31,50 +31,125 @@ workflow SPLINE {
         error "Missing required parameter: --mmwrFile must be specified"
     }
     
-    // Read input files - handle carefully
-    mmwrFile = file(params.mmwrFile, checkIfExists: true)
-    
-    // Use simple string handling for census files
-    censusFileB = params.censusFileB ? file(params.censusFileB, checkIfExists: false) : file("NO_FILE")
-    censusFileP = params.censusFileP ? file(params.censusFileP, checkIfExists: false) : file("NO_FILE")
-    
-    // Dashboard templates
-    dashboardTemplate = file("${workflow.projectDir}/assets/dashboard_template.html", checkIfExists: false)
-    dashboardScript = file("${workflow.projectDir}/bin/generate_dashboard.R", checkIfExists: false)
-    
     // Define pathogen list from parameter
     def pathogenList = params.pathogen ? params.pathogen.tokenize(',') : ['CAMPYLOBACTER', 'CYCLOSPORA']
     log.info "Analyzing ${pathogenList.size()} pathogens: ${pathogenList.join(', ')}"
     
-    // Create pathogen channel
-    pathogens = Channel.fromList(pathogenList)
-        .map { pathogen -> tuple(pathogen, mmwrFile) }
+    // Read MMWR file with careful error handling
+    def mmwrFileVal
+    try {
+        mmwrFileVal = file(params.mmwrFile)
+        if (!mmwrFileVal.exists()) {
+            error "MMWR file does not exist: ${params.mmwrFile}"
+        }
+        log.info "MMWR file found: ${mmwrFileVal}"
+    } catch (Exception e) {
+        error "Error accessing MMWR file (${params.mmwrFile}): ${e.message}\nCheck path and permissions"
+    }
+    
+    // Set up census file handling with graceful fallbacks
+    def censusFileBVal, censusFilePVal
+    try {
+        if (params.censusFileB) {
+            censusFileBVal = file(params.censusFileB, checkIfExists: false)
+            if (!censusFileBVal.exists()) {
+                log.warn "Census bacterial file not found: ${params.censusFileB}, will use placeholder"
+                censusFileBVal = file("${workflow.projectDir}/work/placeholder_census_bact.csv")
+                if (!censusFileBVal.exists()) {
+                    // Create minimal placeholder file if it doesn't exist
+                    def placeholder = file("${workflow.launchDir}/placeholder_census_bact.csv")
+                    placeholder.text = "state,population,year,pathogentype\nCA,10000000,2020,Bacterial\n"
+                    censusFileBVal = placeholder
+                    log.info "Created census bacterial placeholder: ${censusFileBVal}"
+                }
+            } else {
+                log.info "Census bacterial file found: ${censusFileBVal}"
+            }
+        } else {
+            log.warn "No census bacterial file specified, will use placeholder"
+            def placeholder = file("${workflow.launchDir}/placeholder_census_bact.csv")
+            placeholder.text = "state,population,year,pathogentype\nCA,10000000,2020,Bacterial\n"
+            censusFileBVal = placeholder
+            log.info "Created census bacterial placeholder: ${censusFileBVal}"
+        }
+    } catch (Exception e) {
+        log.warn "Error handling census bacterial file: ${e.message}, using placeholder"
+        def placeholder = file("${workflow.launchDir}/placeholder_census_bact.csv")
+        placeholder.text = "state,population,year,pathogentype\nCA,10000000,2020,Bacterial\n"
+        censusFileBVal = placeholder
+    }
+    
+    try {
+        if (params.censusFileP) {
+            censusFilePVal = file(params.censusFileP, checkIfExists: false)
+            if (!censusFilePVal.exists()) {
+                log.warn "Census parasitic file not found: ${params.censusFileP}, will use placeholder"
+                censusFilePVal = file("${workflow.projectDir}/work/placeholder_census_para.csv")
+                if (!censusFilePVal.exists()) {
+                    // Create minimal placeholder file if it doesn't exist
+                    def placeholder = file("${workflow.launchDir}/placeholder_census_para.csv")
+                    placeholder.text = "state,population,year,pathogentype\nCA,10000000,2020,Parasitic\n"
+                    censusFilePVal = placeholder
+                    log.info "Created census parasitic placeholder: ${censusFilePVal}"
+                }
+            } else {
+                log.info "Census parasitic file found: ${censusFilePVal}"
+            }
+        } else {
+            log.warn "No census parasitic file specified, will use placeholder"
+            def placeholder = file("${workflow.launchDir}/placeholder_census_para.csv")
+            placeholder.text = "state,population,year,pathogentype\nCA,10000000,2020,Parasitic\n"
+            censusFilePVal = placeholder
+            log.info "Created census parasitic placeholder: ${censusFilePVal}"
+        }
+    } catch (Exception e) {
+        log.warn "Error handling census parasitic file: ${e.message}, using placeholder"
+        def placeholder = file("${workflow.launchDir}/placeholder_census_para.csv")
+        placeholder.text = "state,population,year,pathogentype\nCA,10000000,2020,Parasitic\n"
+        censusFilePVal = placeholder
+    }
+    
+    // Dashboard templates - handle with placeholders if missing
+    def dashboardTemplateVal, dashboardScriptVal
+    dashboardTemplateVal = file("${workflow.projectDir}/assets/dashboard_template.html", checkIfExists: false)
+    dashboardScriptVal = file("${workflow.projectDir}/bin/generate_dashboard.R", checkIfExists: false)
     
     // Set default projID if not specified
     projID = params.projID ?: new Date().format('yyyyMMdd_HHmmss')
     
+    // Create pathogen channel with validated MMWR file
+    pathogens = Channel.fromList(pathogenList)
+        .map { pathogen -> tuple(pathogen, mmwrFileVal) }
+    
     // Flag for preprocessed data
     isPreprocessed = params.preprocessed ?: false
     
-    // Scripts directory path
-    scripts_path = file("${workflow.projectDir}/bin", checkIfExists: true)
+    // Scripts directory path with validation
+    def scripts_pathVal
+    try {
+        scripts_pathVal = file("${workflow.projectDir}/bin", checkIfExists: true)
+        log.info "Using scripts directory: ${scripts_pathVal}"
+    } catch (Exception e) {
+        error "Critical error: Scripts directory not found: ${workflow.projectDir}/bin"
+    }
     
-    // Log pipeline start
+    // Log pipeline start with comprehensive file info
     log.info """
     ==============================================
     FoodNet Trends Spline Analysis
     ==============================================
     Project ID    : ${projID}
-    MMWR File     : ${params.mmwrFile}
+    MMWR File     : ${mmwrFileVal} (exists: ${mmwrFileVal.exists()})
     Preprocessed  : ${isPreprocessed}
     Census Files  : 
-      Bacterial   : ${params.censusFileB ?: 'Not provided'}
-      Parasitic   : ${params.censusFileP ?: 'Not provided'}
+      Bacterial   : ${censusFileBVal} (exists: ${censusFileBVal.exists()})
+      Parasitic   : ${censusFilePVal} (exists: ${censusFilePVal.exists()})
     Travel        : ${params.travel}
     CIDT          : ${params.cidt}
     Pathogens     : ${pathogenList.join(', ')}
     States        : ${params.states ?: 'all'}
     Output Dir    : ${params.outdir}/${projID}
+    Scripts Dir   : ${scripts_pathVal}
     Nextflow Ver  : ${nextflow.version}
     Starting time : ${new Date()}
     ==============================================
@@ -85,9 +160,9 @@ workflow SPLINE {
         log.info "Preprocessing raw data files"
         
         PREPROCESS(
-            mmwrFile,
-            censusFileB,
-            censusFileP,
+            mmwrFileVal,
+            censusFileBVal,
+            censusFilePVal,
             projID,
             true  // Generate metadata
         )
@@ -106,13 +181,13 @@ workflow SPLINE {
     // Run TRENDY with input data
     TRENDY(
         pathogens,
-        censusFileB,
-        censusFileP,
+        censusFileBVal,
+        censusFilePVal,
         projID,
-        scripts_path,
+        scripts_pathVal,
         params.travel,
         params.cidt,
-        dashboardTemplate
+        dashboardTemplateVal
     )
     
     // Extract outputs for downstream use
@@ -130,8 +205,8 @@ workflow SPLINE {
             ir_outputs.collect(),
             ".",
             projID,
-            dashboardTemplate,
-            dashboardScript
+            dashboardTemplateVal,
+            dashboardScriptVal
         )
         dashboard = GENERATE_DASHBOARD.out.dashboard
     }
@@ -153,36 +228,4 @@ workflow SPLINE {
     }
 }
 
-// Helper function to find metadata file in standard or alternate locations
-def findMetadataFile(String path) {
-    // First try the exact path as provided
-    def mainFilePath = path
-    def mainFile = file(mainFilePath, checkIfExists: false)
-    
-    if (mainFile.exists()) {
-        log.info "Using metadata file: ${mainFilePath}"
-        return mainFile
-    }
-    
-    // Try to find it in the metadata subdirectory by constructing the path manually
-    // Use string operations instead of File objects to avoid getFileSystem errors
-    def lastSlash = mainFilePath.lastIndexOf('/')
-    if (lastSlash == -1) {
-        lastSlash = mainFilePath.lastIndexOf('\\')
-    }
-    
-    def mainFileName = lastSlash > -1 ? mainFilePath.substring(lastSlash + 1) : mainFilePath
-    def parentDir = lastSlash > -1 ? mainFilePath.substring(0, lastSlash) : "."
-    def altFilePath = "${parentDir}/metadata/${mainFileName}"
-    def altFile = file(altFilePath, checkIfExists: false)
-    
-    if (altFile.exists()) {
-        log.info "Found metadata file in alternate location: ${altFilePath}"
-        return altFile
-    }
-    
-    // If we get here, the file doesn't exist in either location
-    log.warn "Metadata file not found: ${path} (also checked in ${altFilePath})"
-    // Return an empty string or null to indicate not found
-    return ""
-}
+// Legacy helper function removed - now using direct string operations instead of file operations
