@@ -20,6 +20,7 @@
 // Import modules
 include { TRENDY } from '../modules/local/trendy'
 include { PREPROCESS } from '../modules/local/preprocess'
+include { GENERATE_DASHBOARD } from '../modules/local/generate_dashboard'
 
 workflow SPLINE {
     // Log workflow version at startup
@@ -136,7 +137,7 @@ workflow SPLINE {
     scripts_path = "${workflow.projectDir}/bin"
 
     // Run TRENDY with input data
-    TRENDY(
+    trendy_results = TRENDY(
         pathogens,
         censusFileB,
         censusFileP,
@@ -146,20 +147,21 @@ workflow SPLINE {
         params.cidt,
         dashboardTemplate
     )
-    
-    // Collect dashboard output
-    dashboard = TRENDY.out.dashboard.ifEmpty([])
-    
+
+    // Run dashboard generation after all modeling is complete
+    dashboard = GENERATE_DASHBOARD(
+        params.outdir + '/' + projID,
+        projID,
+        dashboardTemplate
+    )
+
     // Handle workflow completion
     workflow.onComplete {
         def status = workflow.success ? 'COMPLETED' : 'FAILED'
-        
-        // Check if dashboard was created
         def dashboardInfo = ""
         if (dashboard) {
             dashboardInfo = "\nDashboard       : Available in output directory"
         }
-        
         log.info """
         ==============================================
         FoodNet Trends Analysis: ${status}
