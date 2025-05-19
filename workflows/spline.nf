@@ -76,12 +76,12 @@ workflow SPLINE {
     }
     if (metadataFile != null && !metadataFile.exists()) {
         // Try to check if the metadata file might exist in the 'metadata' subdirectory
-        def metadataDir = file("${metadataFile.getParent()}/metadata")
-        def altMetadataFile = file("${metadataDir}/${metadataFile.getName()}")
+        def altDir = file("${metadataFile.getParent()}/metadata")
+        def altPath = file("${altDir}/${metadataFile.getName()}")
         
-        if (altMetadataFile.exists()) {
-            log.info "Found metadata file in alternate location: ${altMetadataFile}"
-            metadataFile = altMetadataFile
+        if (altPath.exists()) {
+            log.info "Found metadata file in alternate location: ${altPath}"
+            metadataFile = altPath
         } else {
             error "Metadata file not found: ${params.metadata}"
         }
