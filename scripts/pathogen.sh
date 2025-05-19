@@ -87,9 +87,25 @@ select_pathogens() {
         default_pathogens="CAMPYLOBACTER,CYCLOSPORA"
     fi
     
-    # Debug output - for development only
-    # echo "DEBUG: all_pathogens=$all_pathogens"
-    # echo "DEBUG: default_pathogens=$default_pathogens"
+    # Ensure all_pathogens contains valid values
+    if [[ -z "$all_pathogens" || "$all_pathogens" == "metadata" ]]; then
+        # If all_pathogens is empty or just "metadata", use a safe default
+        all_pathogens="CAMPYLOBACTER,CYCLOSPORA,SALMONELLA,SHIGELLA,STEC,VIBRIO,YERSINIA"
+    fi
+    
+    # Make sure the default pathogens are part of all_pathogens
+    # Extract pathogens from default_pathogens
+    IFS=',' read -ra DEFAULT_ARRAY <<< "$default_pathogens"
+    local safe_all_pathogens="$all_pathogens"
+    
+    # Add each default pathogen to all_pathogens if not already present
+    for p in "${DEFAULT_ARRAY[@]}"; do
+        if [[ "$safe_all_pathogens" != *"$p"* ]]; then
+            safe_all_pathogens="$safe_all_pathogens,$p"
+        fi
+    done
+    # Use the updated all_pathogens list
+    all_pathogens="$safe_all_pathogens"
     
     echo ""
     echo "======== Pathogen Selection ========"
@@ -98,7 +114,10 @@ select_pathogens() {
     # Parse the comma-separated list and display each pathogen
     IFS=',' read -ra PATHOGEN_ARRAY <<< "$all_pathogens"
     for p in "${PATHOGEN_ARRAY[@]}"; do
-        echo "- $p"
+        # Skip empty items or just "metadata"
+        if [[ -n "$p" && "$p" != "metadata" ]]; then
+            echo "- $p"
+        fi
     done
     echo ""
     
@@ -118,8 +137,11 @@ select_pathogens() {
         read -p "Leave blank for default (${default_pathogens}): " pathogens
         pathogens=${pathogens:-"$default_pathogens"}
         
-        # Use the validation function
-        validate_list "$pathogens" "$all_pathogens" "pathogen"
+        # Skip validation if it's the default pathogens we just ensured are valid
+        if [[ "$pathogens" != "$default_pathogens" ]]; then
+            # Use the validation function
+            validate_list "$pathogens" "$all_pathogens" "pathogen"
+        fi
         
         echo "$pathogens"
     fi
