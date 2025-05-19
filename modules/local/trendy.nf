@@ -74,11 +74,11 @@ process TRENDY {
     Rscript ${scripts_path}/trendy.R \
         --pathogen=${pathogen} \
         --mmwrFile=${mmwrFile} \
-        --censusBact=${censusFileBact} \
-        --censusParas=${censusFileParas} \
+        --censusFileB=${censusFileBact} \
+        --censusFileP=${censusFileParas} \
         --projID=${projID} \
-        --filter_travel=${filter_travel} \
-        --filter_cidt=${filter_cidt} \
+        --travel=${filter_travel} \
+        --cidt=${filter_cidt} \
         --outDir=./
     
     # If this is the last pathogen (determined by task ID), generate the dashboard

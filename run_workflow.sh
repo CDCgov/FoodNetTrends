@@ -76,7 +76,6 @@ mkdir -p "$TMPDIR/nextflow" 2>/dev/null
 timestamp=$(date +%Y%m%d_%H%M%S)
 
 # Display welcome banner
-echo "Your Nextflow temporary/cache files will be placed in $TMPDIR/nextflow/ by default"
 echo "========================================="
 echo "   FoodNet Trends Analysis Pipeline      "
 echo "========================================="
@@ -534,29 +533,17 @@ outDir=${user_outdir:-$outDir}
 # Trim any leading/trailing spaces
 outDir=$(echo "$outDir" | xargs)
 
-# Dashboard preferences
+# Dashboard preferences - simplified and automatic
 echo ""
 echo "======== Dashboard Generation ========"
-echo "An interactive HTML dashboard can be generated to visualize results."
-read -p "Generate interactive dashboard? (y/n) [y]: " enable_dashboard
-enable_dashboard=${enable_dashboard:-y}
+echo "An interactive HTML dashboard will be automatically generated with run details included."
 
-if [[ "$enable_dashboard" =~ ^[Yy]$ ]]; then
-    # Get custom dashboard title
-    read -p "Custom dashboard title [FoodNet Trends Analysis]: " dashboard_title
-    dashboard_title=${dashboard_title:-"FoodNet Trends Analysis"}
-    
-    # Get logo path (optional)
-    read -p "Path to logo image for dashboard (optional): " dashboard_logo
-    
-    # Construct dashboard parameters
-    dashboard_params="--enable_dashboard true --dashboard_title \"$dashboard_title\""
-    if [[ -n "$dashboard_logo" ]]; then
-        dashboard_params="$dashboard_params --dashboard_logo \"$dashboard_logo\""
-    fi
-else
-    dashboard_params="--enable_dashboard false"
-fi
+# Automatically generate dashboard title with timestamp for identification
+dashboard_title="FoodNet Trends Analysis - Run ${timestamp}"
+dashboard_params="--enable_dashboard true --dashboard_title \"$dashboard_title\""
+
+# Tell the user what's happening
+echo "Dashboard will be created with title: \"$dashboard_title\""
 
 # Build the command
 cmd="nextflow run main.nf -profile singularity"
