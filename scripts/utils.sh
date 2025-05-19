@@ -24,7 +24,7 @@ validate_list() {
         done
         
         if [[ "$valid" == false ]]; then
-            echo -e "${YELLOW}Warning: '$item' is not in the discovered $item_type list and may cause errors.${NC}"
+            echo "Warning: '$item' is not in the discovered $item_type list and may cause errors."
             echo "$(date): Invalid $item_type: $item" >> "$error_log"
             invalid_found=true
         fi
@@ -35,7 +35,7 @@ validate_list() {
         read -p "Continue anyway? (y/n) [n]: " continue_choice
         continue_choice=${continue_choice:-n}
         if [[ ! "$continue_choice" =~ ^[Yy]$ ]]; then
-            echo -e "${RED}Exiting.${NC}"
+            echo "Exiting."
             echo "$(date): User canceled due to invalid $item_type" >> "$error_log"
             exit 1
         fi
@@ -50,17 +50,17 @@ validate_file() {
     
     if [ ! -f "${file_path}" ]; then
         if [ "$required" = true ]; then
-            echo -e "${RED}Error: $file_type file does not exist: ${file_path}${NC}"
+            echo "Error: $file_type file does not exist: ${file_path}"
             echo "$(date): Missing required $file_type file: ${file_path}" >> "$error_log"
-            echo -e "${RED}Exiting.${NC}"
+            echo "Exiting."
             exit 1
         else
-            echo -e "${YELLOW}Warning: $file_type file does not exist: ${file_path}${NC}"
+            echo "Warning: $file_type file does not exist: ${file_path}"
             echo "$(date): Missing $file_type file: ${file_path}" >> "$error_log"
             read -p "Continue anyway? (y/n) [n]: " continue_choice
             continue_choice=${continue_choice:-n}
             if [[ ! "$continue_choice" =~ ^[Yy]$ ]]; then
-                echo -e "${RED}Exiting.${NC}"
+                echo "Exiting."
                 exit 1
             fi
         fi

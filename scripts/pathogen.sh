@@ -14,8 +14,8 @@ load_metadata() {
     local metadata_values=()
     
     if [[ -n "${preprocessed_metadata}" && -f "${preprocessed_metadata}" ]]; then
-        echo -e "${BLUE}Found metadata file: ${preprocessed_metadata}${NC}"
-        echo -e "${BLUE}Metadata will be used by the workflow directly.${NC}"
+        echo "Found metadata file: ${preprocessed_metadata}"
+        echo "Metadata will be used by the workflow directly."
         
         # Set flag to indicate metadata is available
         has_metadata=true
@@ -23,16 +23,16 @@ load_metadata() {
         # Check if file contains serotypes
         if has_serotypes "${preprocessed_metadata}"; then
             has_serotypes=true
-            echo -e "${BLUE}Metadata contains Salmonella serotype information.${NC}"
+            echo "Metadata contains Salmonella serotype information."
         fi
         
         # Extract key information from metadata file
-        echo -e "${BLUE}Extracting key information from metadata:${NC}"
+        echo "Extracting key information from metadata:"
         
         # Extract record count using basic parsing
         record_count=$(parse_json_value "${preprocessed_metadata}" "record_count")
         if [ -n "$record_count" ]; then
-            echo -e "${GREEN}Dataset contains approximately $record_count records${NC}"
+            echo "Dataset contains approximately $record_count records"
         fi
         
         # Try to extract and display pathogens from metadata
@@ -45,7 +45,7 @@ load_metadata() {
         fi
         
         if [ -n "$metadata_pathogens" ]; then
-            echo -e "${GREEN}Pathogens in dataset: $metadata_pathogens${NC}"
+            echo "Pathogens in dataset: $metadata_pathogens"
             # Update ALL_PATHOGENS if we found valid ones in metadata
             ALL_PATHOGENS="$metadata_pathogens"
         fi
@@ -60,12 +60,12 @@ load_metadata() {
         fi
         
         if [ -n "$metadata_states" ]; then
-            echo -e "${GREEN}States in dataset: $metadata_states${NC}"
+            echo "States in dataset: $metadata_states"
             # Update ALL_STATES if we found valid ones in metadata
             ALL_STATES="$metadata_states"
         fi
     else
-        echo -e "${YELLOW}Warning: No metadata file found. Using default values.${NC}"
+        echo "Warning: No metadata file found. Using default values."
         has_metadata=false
     fi
     
@@ -80,7 +80,7 @@ select_pathogens() {
     local default_pathogens=$2
     
     echo ""
-    echo -e "${BLUE}======== Pathogen Selection ========${NC}"
+    echo "======== Pathogen Selection ========"
     echo "Available pathogens in this dataset:"
     
     # Parse the comma-separated list and display each pathogen
@@ -97,12 +97,12 @@ select_pathogens() {
     
     if [[ "$pathogen_mode" == "1" ]]; then
         # Use all pathogens
-        echo -e "${GREEN}Selected: ALL pathogens (${all_pathogens})${NC}"
+        echo "Selected: ALL pathogens (${all_pathogens})"
         echo "$all_pathogens"
     else
         # Ask for specific pathogens
         echo ""
-        echo -e "Enter pathogens to analyze (comma-separated with NO spaces)"
+        echo "Enter pathogens to analyze (comma-separated with NO spaces)"
         read -p "Leave blank for default (${default_pathogens}): " pathogens
         pathogens=${pathogens:-"$default_pathogens"}
         
@@ -118,7 +118,7 @@ select_states() {
     local all_states=$1
     
     echo ""
-    echo -e "${BLUE}======== State Selection ========${NC}"
+    echo "======== State Selection ========"
     echo "Available states in this dataset:"
     
     # Parse the comma-separated list and display each state
@@ -135,12 +135,12 @@ select_states() {
     
     if [[ "$state_mode" == "1" ]]; then
         # Use all states
-        echo -e "${GREEN}Selected: ALL states (${all_states})${NC}"
+        echo "Selected: ALL states (${all_states})"
         echo "$all_states"
     else
         # Ask for specific states
         echo ""
-        echo -e "Enter states to analyze (comma-separated with NO spaces)"
+        echo "Enter states to analyze (comma-separated with NO spaces)"
         read -p "Leave blank for all states: " states
         states=${states:-"$all_states"}
         
@@ -161,7 +161,7 @@ select_serotypes() {
     if [[ ",$pathogens," == *",SALMONELLA,"* ]] && [[ "$has_serotypes" == "true" ]] && [[ -n "$preprocessed_metadata" ]]; then
         # Check if serotypes are available
         echo ""
-        echo -e "${BLUE}======== Salmonella Serotype Analysis ========${NC}"
+        echo "======== Salmonella Serotype Analysis ========"
         echo "Salmonella was selected. Do you want to:"
         echo "1) Analyze ALL Salmonella serotypes together"
         echo "2) Analyze specific serotypes separately"
@@ -172,7 +172,7 @@ select_serotypes() {
         if [[ "$serotype_mode" == "2" ]]; then
             # Display available serotypes (top 20 to keep it manageable)
             echo ""
-            echo -e "${BLUE}Top Salmonella serotypes in dataset:${NC}"
+            echo "Top Salmonella serotypes in dataset:"
             
             if [[ "$have_jq" == true ]]; then
                 # Use jq for more advanced display if available
@@ -181,7 +181,7 @@ select_serotypes() {
                 if [[ -n "$top_serotypes" ]]; then
                     echo "$top_serotypes" | sed 's/^/- /'
                 else
-                    echo -e "${YELLOW}Warning: Could not process serotype information with jq.${NC}"
+                    echo "Warning: Could not process serotype information with jq."
                     # Fallback to basic parsing
                     basic_serotypes=$(grep -o "\"[^\"]*\":[0-9]*" "${preprocessed_metadata}" | sort -t':' -k2,2nr | head -n 20)
                     echo "$basic_serotypes" | sed 's/"//g' | sed 's/:/: /' | sed 's/^/- /'
@@ -193,7 +193,7 @@ select_serotypes() {
             fi
             
             echo ""
-            echo -e "Enter serotypes to analyze (comma-separated with NO spaces)"
+            echo "Enter serotypes to analyze (comma-separated with NO spaces)"
             read -p "Serotypes: " serotypes
             
             # Validate serotypes
@@ -201,7 +201,7 @@ select_serotypes() {
                 # Add parameter for serotypes
                 serotype_param="--salmonella_serotypes \"$serotypes\""
             else
-                echo -e "${YELLOW}Warning: No serotypes specified. Analyzing all Salmonella together.${NC}"
+                echo "Warning: No serotypes specified. Analyzing all Salmonella together."
                 serotype_param=""
             fi
         elif [[ "$serotype_mode" == "3" ]]; then
@@ -215,10 +215,10 @@ select_serotypes() {
             fi
             
             if [[ -n "$top_serotype" ]]; then
-                echo -e "${GREEN}Will focus on top serotype: $top_serotype${NC}"
+                echo "Will focus on top serotype: $top_serotype"
                 serotype_param="--salmonella_serotypes \"$top_serotype\""
             else
-                echo -e "${YELLOW}Warning: Could not determine top serotype. Analyzing all Salmonella together.${NC}"
+                echo "Warning: Could not determine top serotype. Analyzing all Salmonella together."
                 echo "$(date): Failed to extract top serotype" >> "$error_log"
                 serotype_param=""
             fi
