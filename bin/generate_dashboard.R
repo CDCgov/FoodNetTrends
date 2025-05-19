@@ -337,6 +337,11 @@ generate_dashboard <- function() {
     stop("Invalid results directory")
   }
   
+  # Ensure output directory exists (option 2 fix)
+  if (!dir.exists(args$outDir)) {
+    dir.create(args$outDir, recursive = TRUE)
+  }
+  
   # Find pathogen result files
   cat("Finding incidence rate files...\n")
   ir_files <- find_result_files(args$resultDir, "_IRCatch.csv")
