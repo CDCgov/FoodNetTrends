@@ -48,7 +48,7 @@ def validateFilePaths() {
         error "Invalid MMWR file path format: ${params.mmwrFile}"
     }
     
-    // Census files are now optional with warnings
+    // Census files are now optional with placeholders
     if (params.containsKey('censusFileB')) {
         if (params.censusFileB == null || params.censusFileB == "") {
             log.warn "Census bacterial file parameter is empty, will use placeholder"
@@ -57,7 +57,7 @@ def validateFilePaths() {
                 def censusPath = params.censusFileB.toString()
                 log.info "Census bacterial file path: ${censusPath}"
             } catch (Exception e) {
-                log.warn "Invalid census bacterial file path format: ${params.censusFileB}"
+                log.warn "Invalid census bacterial file path format"
             }
         }
     } else {
@@ -72,7 +72,7 @@ def validateFilePaths() {
                 def censusPath = params.censusFileP.toString()
                 log.info "Census parasitic file path: ${censusPath}"
             } catch (Exception e) {
-                log.warn "Invalid census parasitic file path format: ${params.censusFileP}"
+                log.warn "Invalid census parasitic file path format"
             }
         }
     } else {
