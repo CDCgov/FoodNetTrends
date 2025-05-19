@@ -75,20 +75,24 @@ process PREPROCESS {
         exit 1
     fi
     if [ ! -f "${censusFileB}" ]; then
-        echo "ERROR: Census bacterial file does not exist: ${censusFileB}" > ${outputBase}_error.log
-        exit 1
+        echo "WARNING: Census bacterial file does not exist: ${censusFileB}" >> ${outputBase}_warnings.log
+        echo "Creating empty placeholder for census bacterial file" >> ${outputBase}_warnings.log
+        touch empty_census_bacterial.csv
+        censusFileB="empty_census_bacterial.csv"
     fi
     if [ ! -f "${censusFileP}" ]; then
-        echo "ERROR: Census parasitic file does not exist: ${censusFileP}" > ${outputBase}_error.log
-        exit 1
+        echo "WARNING: Census parasitic file does not exist: ${censusFileP}" >> ${outputBase}_warnings.log
+        echo "Creating empty placeholder for census parasitic file" >> ${outputBase}_warnings.log
+        touch empty_census_parasitic.csv
+        censusFileP="empty_census_parasitic.csv"
     fi
     
     # Execute the R preprocessing script with output capturing
     # Note: tee command duplicates output to both console and log file
     Rscript ${workflow.projectDir}/bin/calcIR.R \
       --mmwrFile ${mmwrFile} \
-      --censusFileB ${censusFileB} \
-      --censusFileP ${censusFileP} \
+      --censusFileB "${censusFileB}" \
+      --censusFileP "${censusFileP}" \
       --outputFile ${outputBase}.csv \
       --generate_metadata ${generateMetadata} \
       2>&1 | tee ${outputBase}_R.log

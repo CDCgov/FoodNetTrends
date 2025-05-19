@@ -25,49 +25,73 @@ workflow PREPROCESS_WORKFLOW {
     if (!params.mmwrFile) {
         error "Missing required parameter: --mmwrFile must be specified"
     }
+    // Census files are now optional with warnings
     if (!params.censusFileB) {
-        error "Missing required parameter: --censusFileB must be specified"
+        log.warn "No census bacterial file specified. Using placeholder."
     }
     if (!params.censusFileP) {
-        error "Missing required parameter: --censusFileP must be specified"
+        log.warn "No census parasitic file specified. Using placeholder."
     }
     if (!params.outdir) {
         error "Missing required parameter: --outdir must be specified"
     }
     
     // Define input channel
-    mmwrFile = file(params.mmwrFile, checkIfExists: true)
-    censusFileB = file(params.censusFileB, checkIfExists: true)
-    censusFileP = file(params.censusFileP, checkIfExists: true)
+    def mmwrFilePath = params.mmwrFile
+    mmwrFile = file(mmwrFilePath, checkIfExists: false)
+    
+    // Handle empty census file parameters
+    def censusFileB = ""
+    def censusFileP = ""
+    
+    // Check if census file parameters are not empty strings
+    if (params.censusFileB && params.censusFileB != "") {
+        censusFileB = file(params.censusFileB, checkIfExists: false)
+        if (!censusFileB.exists()) {
+            log.warn "WARNING: Census bacterial file does not exist: ${params.censusFileB}"
+            log.warn "Will proceed with placeholder census bacterial file"
+        }
+    } else {
+        log.warn "WARNING: Census bacterial file parameter is empty"
+        log.warn "Will proceed with placeholder census bacterial file"
+    }
+    
+    if (params.censusFileP && params.censusFileP != "") {
+        censusFileP = file(params.censusFileP, checkIfExists: false)
+        if (!censusFileP.exists()) {
+            log.warn "WARNING: Census parasitic file does not exist: ${params.censusFileP}"
+            log.warn "Will proceed with placeholder census parasitic file"
+        }
+    } else {
+        log.warn "WARNING: Census parasitic file parameter is empty"
+        log.warn "Will proceed with placeholder census parasitic file"
+    }
     
     // Set output base name (derived from file or parameter)
-    outputBase = params.outputBase ?: file(params.mmwrFile).getBaseName()
-
+    def outputBase = ""
+    try {
+        outputBase = params.outputBase ?: new File(params.mmwrFile).getName().replaceFirst("[.][^.]+\$", "")
+    } catch (Exception e) {
+        log.warn "Could not determine base name from file: ${e.message}"
+        outputBase = "foodnet_data_" + new Date().format('yyyyMMdd_HHmmss')
+    }
+    
     // Set metadata generation flag (default to true for this workflow)
-    generateMetadata = params.generateMetadata ?: true
-
-    // Check if file exists
+    def generateMetadata = params.generateMetadata ?: true
+    
+    // Check if MMWR file exists
     if (!mmwrFile.exists()) {
         error "MMWR file not found: ${params.mmwrFile}"
     }
-    if (!censusFileB.exists()) {
-        error "Census bacterial file not found: ${params.censusFileB}"
-    }
-    if (!censusFileP.exists()) {
-        error "Census parasitic file not found: ${params.censusFileP}"
-    }
-
+    
     // Log preprocessing start
     log.info """
     ==============================================
     FoodNet Trends Preprocessing
     ==============================================
-    MMWR File         : ${params.mmwrFile} 
-                        (${mmwrFile.size() >= 1024*1024 ? 
-                            String.format('%.2f MB', mmwrFile.size()/(1024*1024)) : 
-                            String.format('%.2f KB', mmwrFile.size()/1024)})
-    Census File (B)   : ${params.censusFileB}
-    Census File (P)   : ${params.censusFileP}
+    MMWR File         : ${params.mmwrFile}
+    Census File (B)   : ${params.censusFileB} ${censusFileB && censusFileB.exists() ? "✓" : "✗"}
+    Census File (P)   : ${params.censusFileP} ${censusFileP && censusFileP.exists() ? "✓" : "✗"}
     Output Base       : ${outputBase}
     Generate Metadata : ${generateMetadata}
     Output Dir        : ${params.outdir}/preprocessed
@@ -75,15 +99,20 @@ workflow PREPROCESS_WORKFLOW {
     Starting time     : ${new Date()}
     ==============================================
     """
-
+    
     // Run the preprocessing
-    PREPROCESS(
-        mmwrFile,
-        censusFileB,
-        censusFileP,
-        outputBase,
-        generateMetadata
-    )
+    try {
+        PREPROCESS(
+            mmwrFile,
+            censusFileB,
+            censusFileP,
+            outputBase,
+            generateMetadata
+        )
+    } catch (Exception e) {
+        log.error "Error in preprocessing: ${e.message}"
+        throw e
+    }
     
     // Handle workflow completion
     workflow.onComplete {

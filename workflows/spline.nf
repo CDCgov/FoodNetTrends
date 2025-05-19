@@ -52,8 +52,12 @@ workflow SPLINE {
         error "Missing required parameter(s): ${missingParams.join(', ')}"
     }
 
-    // Input files
-    mmwrFile = file(params.mmwrFile, checkIfExists: true)
+    // Input files - handle carefully to avoid getFileSystem errors
+    def mmwrFilePath = params.mmwrFile
+    mmwrFile = file(mmwrFilePath, checkIfExists: false)
+    if (!mmwrFile.exists()) {
+        error "MMWR file does not exist: ${mmwrFilePath}"
+    }
 
     // Handle empty census file parameters
     def censusFileB = ""
@@ -85,9 +89,13 @@ workflow SPLINE {
     // Flag for preprocessed data
     isPreprocessed = params.preprocessed ?: false
 
-    // Check file sizes to catch obvious issues
-    if (mmwrFile.size() == 0) {
-        error "MMWR file is empty: ${params.mmwrFile}"
+    // Check file size to catch obvious issues
+    try {
+        if (mmwrFile.size() == 0) {
+            error "MMWR file is empty: ${mmwrFilePath}"
+        }
+    } catch (Exception e) {
+        log.warn "Could not check MMWR file size: ${e.message}"
     }
 
     // Only check census files if they exist
@@ -100,15 +108,27 @@ workflow SPLINE {
     }
     
     // Get metadata file with alternate path fallback
-    if (params.metadata) {
+    def metadataFile = null
+    if (params.metadata && params.metadata != "") {
         metadataFile = findMetadataFile(params.metadata)
     } else {
-        metadataFile = null
+        log.warn "No metadata file provided. Some features may be limited."
     }
     
     // Dashboard template file
-    dashboardTemplate = file("${workflow.projectDir}/assets/dashboard_template.html", checkIfExists: true)
-    dashboardScript = file("${workflow.projectDir}/bin/generate_dashboard.R", checkIfExists: true)
+    def dashboardTemplateFile = "${workflow.projectDir}/assets/dashboard_template.html"
+    def dashboardScriptFile = "${workflow.projectDir}/bin/generate_dashboard.R"
+
+    dashboardTemplate = file(dashboardTemplateFile, checkIfExists: false)
+    dashboardScript = file(dashboardScriptFile, checkIfExists: false)
+
+    if (!dashboardTemplate.exists()) {
+        log.warn "Dashboard template file not found: ${dashboardTemplateFile}"
+    }
+
+    if (!dashboardScript.exists()) {
+        log.warn "Dashboard script not found: ${dashboardScriptFile}"
+    }
 
     // Set default projID if not specified
     def projID = params.projID ?: new Date().format('yyyyMMdd_HHmmss')
@@ -119,16 +139,16 @@ workflow SPLINE {
     FoodNet Trends Spline Analysis
     ==============================================
     Project ID    : ${projID}
-    MMWR File     : ${params.mmwrFile} (${formatSize(mmwrFile.size())})
+    MMWR File     : ${params.mmwrFile}
     Preprocessed  : ${isPreprocessed}
     Census Files  : 
-      Bacterial   : ${params.censusFileB} ${censusFileB && censusFileB.exists() ? "(${formatSize(censusFileB.size())})" : "(not found)"}
-      Parasitic   : ${params.censusFileP} ${censusFileP && censusFileP.exists() ? "(${formatSize(censusFileP.size())})" : "(not found)"}
+      Bacterial   : ${params.censusFileB} ${censusFileB && censusFileB.exists() ? "✓" : "✗"}
+      Parasitic   : ${params.censusFileP} ${censusFileP && censusFileP.exists() ? "✓" : "✗"}
     Travel        : ${params.travel}
     CIDT          : ${params.cidt}
     Pathogens     : ${params.pathogen ?: 'default (CAMPYLOBACTER,CYCLOSPORA)'}
     States        : ${params.states ?: 'all'}
-    Dashboard     : Enabled
+    Dashboard     : ${dashboardTemplate.exists() ? "Enabled" : "Template not found"}
     Cores         : ${params.cpus ?: 'default'}
     Chains        : ${params.chains}
     Iterations    : ${params.iterations}
@@ -144,48 +164,63 @@ workflow SPLINE {
     // Always run preprocessing first if not using preprocessed data
     if (!isPreprocessed) {
         log.info "Preprocessing raw data files"
-        PREPROCESS(
-            mmwrFile,
-            censusFileB,
-            censusFileP,
-            projID,
-            true  // Generate metadata
-        )
-        
-        // Use the preprocessed file for downstream analysis
-        processedFile = PREPROCESS.out.cleanedData.first()
-        metadataFromProcess = PREPROCESS.out.metadata.first()
-        
-        // Replace mmwrFile for downstream processes with the preprocessed version
-        pathogens = pathogens.map { pathogen, file -> [pathogen, processedFile] }
-        
-        // Log successful preprocessing
-        log.info "Raw data preprocessing complete, proceeding to analysis"
+        try {
+            PREPROCESS(
+                mmwrFile,
+                censusFileB,
+                censusFileP,
+                projID,
+                true  // Generate metadata
+            )
+            
+            // Use the preprocessed file for downstream analysis
+            processedFile = PREPROCESS.out.cleanedData.first()
+            metadataFromProcess = PREPROCESS.out.metadata.first()
+            
+            // Replace mmwrFile for downstream processes with the preprocessed version
+            pathogens = pathogens.map { pathogen, file -> [pathogen, processedFile] }
+            
+            // Log successful preprocessing
+            log.info "Raw data preprocessing complete, proceeding to analysis"
+        } catch (Exception e) {
+            log.error "Error in preprocessing: ${e.message}"
+            throw e
+        }
     }
 
     // Scripts directory path
-    scripts_path = "${workflow.projectDir}/bin"
+    def scripts_path = "${workflow.projectDir}/bin"
 
     // Run TRENDY with input data
-    (model, summary, ir_outputs, plots, irr_outputs, dashboard_trendy, logs) = TRENDY(
-        pathogens,
-        censusFileB,
-        censusFileP,
-        projID,
-        scripts_path,
-        params.travel,
-        params.cidt,
-        dashboardTemplate
-    )
+    try {
+        (model, summary, ir_outputs, plots, irr_outputs, dashboard_trendy, logs) = TRENDY(
+            pathogens,
+            censusFileB,
+            censusFileP,
+            projID,
+            scripts_path,
+            params.travel,
+            params.cidt,
+            dashboardTemplate
+        )
+    } catch (Exception e) {
+        log.error "Error running TRENDY process: ${e.message}"
+        throw e
+    }
 
     // Run dashboard generation after all modeling is complete
-    dashboard = GENERATE_DASHBOARD(
-        ir_outputs.collect(),
-        ".",
-        projID,
-        dashboardTemplate,
-        dashboardScript
-    )
+    try {
+        dashboard = GENERATE_DASHBOARD(
+            ir_outputs.collect(),
+            ".",
+            projID,
+            dashboardTemplate,
+            dashboardScript
+        )
+    } catch (Exception e) {
+        log.error "Error in dashboard generation: ${e.message}"
+        log.warn "Continuing without dashboard"
+    }
 
     // Handle workflow completion
     workflow.onComplete {
@@ -209,34 +244,30 @@ workflow SPLINE {
     }
 }
 
-// Helper function to format file sizes
-def formatSize(size) {
-    if (size < 1024) return "${size} B"
-    else if (size < 1024*1024) return String.format("%.2f KB", size/1024)
-    else if (size < 1024*1024*1024) return String.format("%.2f MB", size/(1024*1024))
-    else return String.format("%.2f GB", size/(1024*1024*1024))
-}
-
 // Helper function to find metadata file in standard or alternate locations
 def findMetadataFile(String path) {
-    def mainFile = file(path)
+    // First try the exact path as provided
+    def mainFilePath = path
+    def mainFile = file(mainFilePath, checkIfExists: false)
     
     if (mainFile.exists()) {
-        log.info "Using metadata file: ${mainFile}"
+        log.info "Using metadata file: ${mainFilePath}"
         return mainFile
     }
     
-    // Try to find it in the metadata subdirectory
-    def baseName = mainFile.getName()
-    def parentDir = mainFile.getParent()
-    def metadataPath = "${parentDir}/metadata/${baseName}"
-    def altFile = file(metadataPath)
+    // Try to find it in the metadata subdirectory by constructing the path manually
+    def mainFileName = new File(mainFilePath).getName()
+    def parentDir = new File(mainFilePath).getParent()
+    def altFilePath = "${parentDir}/metadata/${mainFileName}"
+    def altFile = file(altFilePath, checkIfExists: false)
     
     if (altFile.exists()) {
-        log.info "Found metadata file in alternate location: ${altFile}"
+        log.info "Found metadata file in alternate location: ${altFilePath}"
         return altFile
     }
     
     // If we get here, the file doesn't exist in either location
-    error "Metadata file not found: ${path} (also checked in ${metadataPath})"
+    log.warn "Metadata file not found: ${path} (also checked in ${altFilePath})"
+    // Return an empty string or null to indicate not found
+    return ""
 }
