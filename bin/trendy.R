@@ -554,6 +554,42 @@ tryCatch({
   debug_force_year <- function(df) { df$year <- as.numeric(as.character(df$year)); df }
   mmwrdata <- debug_force_state(mmwrdata); mmwrdata <- debug_force_year(mmwrdata)
   census <- debug_force_state(census); census <- debug_force_year(census)
+
+  # After importing mmwrdata and census, compare (state, year) pairs for coverage
+  mmwr_pairs <- unique(mmwrdata[, c("state", "year")])
+  census_pairs <- unique(census[, c("state", "year")])
+
+  # Find (state, year) pairs in MMWR but not in census
+  mmwr_not_in_census <- anti_join(mmwr_pairs, census_pairs, by = c("state", "year"))
+  # Find (state, year) pairs in census but not in MMWR
+  census_not_in_mmwr <- anti_join(census_pairs, mmwr_pairs, by = c("state", "year"))
+
+  # Print summary to console
+  cat('PREPROCESS CHECK: (state, year) pairs in MMWR but missing in census:', nrow(mmwr_not_in_census), '\n')
+  if (nrow(mmwr_not_in_census) > 0) {
+    print(mmwr_not_in_census)
+  }
+  cat('PREPROCESS CHECK: (state, year) pairs in census but missing in MMWR:', nrow(census_not_in_mmwr), '\n')
+  if (nrow(census_not_in_mmwr) > 0) {
+    print(census_not_in_mmwr)
+  }
+
+  # Write to file in output directory
+  coverage_report_file <- file.path(outDir, "state_year_coverage_report.txt")
+  cat("State-Year Coverage Report\n", file=coverage_report_file)
+  cat("========================\n", file=coverage_report_file, append=TRUE)
+  cat("(state, year) pairs in MMWR but missing in census (n=", nrow(mmwr_not_in_census), "):\n", sep="", file=coverage_report_file, append=TRUE)
+  if (nrow(mmwr_not_in_census) > 0) {
+    write.table(mmwr_not_in_census, file=coverage_report_file, append=TRUE, row.names=FALSE, col.names=TRUE, sep="\t", quote=FALSE)
+  } else {
+    cat("(None)\n", file=coverage_report_file, append=TRUE)
+  }
+  cat("\n(state, year) pairs in census but missing in MMWR (n=", nrow(census_not_in_mmwr), "):\n", sep="", file=coverage_report_file, append=TRUE)
+  if (nrow(census_not_in_mmwr) > 0) {
+    write.table(census_not_in_mmwr, file=coverage_report_file, append=TRUE, row.names=FALSE, col.names=TRUE, sep="\t", quote=FALSE)
+  } else {
+    cat("(None)\n", file=coverage_report_file, append=TRUE)
+  }
 }, error = function(e) {
   stop("Error importing census data: ", e$message)
 })
@@ -727,6 +763,9 @@ dropped_rows <- bact %>% filter(is.na(population))
 # Remove rows with unresolved NA population before modeling
 bact <- bact %>% filter(!is.na(population))
 
+# Force population to numeric after imputation and dropping
+bact$population <- as.numeric(bact$population)
+
 # Write imputation report
 impute_report_file <- file.path(outDir, "population_imputation_report.txt")
 cat("Population Imputation Report\n", file=impute_report_file)
@@ -742,6 +781,14 @@ if (nrow(dropped_rows) > 0) {
   write.table(dropped_rows[, c("state", "year", "pathogen")], file=impute_report_file, append=TRUE, row.names=FALSE, col.names=TRUE, sep="\t", quote=FALSE)
 } else {
   cat("(None)\n", file=impute_report_file, append=TRUE)
+}
+
+# Print summary to console for debugging
+cat('DEBUG: Number of rows after imputation and dropping:', nrow(bact), '\n')
+cat('DEBUG: Number of imputed rows:', nrow(imputed_rows), '\n')
+cat('DEBUG: Number of dropped rows:', nrow(dropped_rows), '\n')
+if (nrow(bact) == 0) {
+  cat('WARNING: All data has been dropped after population imputation! Check your census and MMWR data for mismatched (state, year) pairs.\n')
 }
 
 # ==========================================================================
