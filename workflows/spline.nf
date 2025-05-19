@@ -81,6 +81,7 @@ workflow SPLINE {
     
     // Dashboard template file
     dashboardTemplate = file("${workflow.projectDir}/assets/dashboard_template.html", checkIfExists: true)
+    dashboardScript = file("${workflow.projectDir}/bin/generate_dashboard.R", checkIfExists: true)
 
     // Set default projID if not specified
     def projID = params.projID ?: new Date().format('yyyyMMdd_HHmmss')
@@ -152,7 +153,8 @@ workflow SPLINE {
     dashboard = GENERATE_DASHBOARD(
         params.outdir + '/' + projID,
         projID,
-        dashboardTemplate
+        dashboardTemplate,
+        dashboardScript
     )
 
     // Handle workflow completion

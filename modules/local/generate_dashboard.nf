@@ -8,6 +8,7 @@ process GENERATE_DASHBOARD {
     val outDir
     val projID
     path dashboardTemplate
+    val dashboardScript
 
     output:
     path "${projID}_dashboard.html", emit: dashboard
@@ -15,7 +16,7 @@ process GENERATE_DASHBOARD {
     script:
     """
     Rscript \
-      {workflow.projectDir}/bin/generate_dashboard.R \
+      ${dashboardScript} \
       --outDir=${outDir} \
       --resultDir=${outDir} \
       --outputFile=${projID}_dashboard.html \
