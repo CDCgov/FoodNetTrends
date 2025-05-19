@@ -39,7 +39,7 @@ process TRENDY {
     
     publishDir params.outdir, mode: params.publish_dir_mode, pattern: "*.log"
     publishDir "${params.outdir}/${params.projID}", mode: params.publish_dir_mode, pattern: "{*.png,*_summary.txt,*_IRCatch.csv,*.Rds,*_EstIRRCatch_*.csv}"
-    publishDir "${params.outdir}/${params.projID}", mode: params.publish_dir_mode, pattern: "dashboard.html", saveAs: { "${params.projID}_" + new java.text.SimpleDateFormat("yyyyMMdd").format(new Date()) + "_dashboard.html" }
+    publishDir "${params.outdir}/${params.projID}", mode: params.publish_dir_mode, pattern: "dashboard.html", saveAs: { "${params.projID}_dashboard.html" }
     
     input:
     tuple val(pathogen), path(mmwrFile)
@@ -65,22 +65,38 @@ process TRENDY {
     
     script:
     """
+    set -e
     echo "Starting analysis for pathogen: ${pathogen}" > ${pathogen}_trendy.log
     echo "Using MMWR data file: ${mmwrFile}" >> ${pathogen}_trendy.log
     echo "Using Census bacterial file: ${censusFileBact}" >> ${pathogen}_trendy.log
     echo "Using Census parasitic file: ${censusFileParas}" >> ${pathogen}_trendy.log
     
-    # Determine if census files are valid or empty
-    def censusB_arg = censusFileBact.exists() ? "--censusFileB=${censusFileBact.getName()}" : "--censusFileB=''"
-    def censusP_arg = censusFileParas.exists() ? "--censusFileP=${censusFileParas.getName()}" : "--censusFileP=''"
+    # Determine if census files are valid or empty - use bash conditions
+    CENSUS_B_ARG=""
+    CENSUS_P_ARG=""
     
-    # Run the main trend analysis - use the filename only, not the full path
-    # Nextflow stages input files in the work directory
+    if [ -f "${censusFileBact}" ] && [ -s "${censusFileBact}" ]; then
+        CENSUS_B_ARG="--censusFileB=${censusFileBact}"
+        echo "Census bacterial file exists and not empty" >> ${pathogen}_trendy.log
+    else
+        CENSUS_B_ARG="--censusFileB=''"
+        echo "Census bacterial file missing or empty" >> ${pathogen}_trendy.log
+    fi
+    
+    if [ -f "${censusFileParas}" ] && [ -s "${censusFileParas}" ]; then
+        CENSUS_P_ARG="--censusFileP=${censusFileParas}"
+        echo "Census parasitic file exists and not empty" >> ${pathogen}_trendy.log
+    else
+        CENSUS_P_ARG="--censusFileP=''"
+        echo "Census parasitic file missing or empty" >> ${pathogen}_trendy.log
+    fi
+    
+    # Run the main trend analysis
     Rscript ${scripts_path}/trendy.R \
         --pathogen=${pathogen} \
-        --mmwrFile=${mmwrFile.getName()} \
-        ${censusB_arg} \
-        ${censusP_arg} \
+        --mmwrFile=${mmwrFile} \
+        \${CENSUS_B_ARG} \
+        \${CENSUS_P_ARG} \
         --projID=${projID} \
         --travel=${filter_travel} \
         --cidt=${filter_cidt} \
