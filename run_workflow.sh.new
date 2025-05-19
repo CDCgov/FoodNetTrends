@@ -1,0 +1,67 @@
+#!/bin/bash
+#==============================================================================
+# FoodNet Trends Pipeline v1.0 - Main Execution Script
+#==============================================================================
+
+# Check for jq but make it optional
+have_jq=true
+if ! command -v jq &> /dev/null; then
+    echo "Warning: jq is not installed. Basic functionality will work, but advanced serotype filtering will be limited."
+    have_jq=false
+fi
+
+# Set up paths, files
+# Make data directory path environment-aware
+if [ -d "/scicomp/groups-pure/OID/NCEZID/DFWED/EDEB/foodnet/trends/data/" ]; then
+  DEFAULT_DATA_DIR="/scicomp/groups-pure/OID/NCEZID/DFWED/EDEB/foodnet/trends/data/"
+elif [ -d "/project/foodnet/data" ]; then
+  DEFAULT_DATA_DIR="/project/foodnet/data"
+else
+  DEFAULT_DATA_DIR="./data"
+  # Create local data directory if it doesn't exist
+  mkdir -p "$DEFAULT_DATA_DIR"
+fi
+outDir="output"  # Default to "output" directory in current location
+
+# Initialize log file for error tracking
+error_log="foodnet_errors.log"
+echo "$(date): Starting FoodNet Trends Analysis Pipeline" > "$error_log"
+
+# Set up modules if we're in an HPC environment
+if command -v module &> /dev/null; then
+    module purge
+    module load nextflow/24.10.4
+    module load singularity/4.1.4
+    module load java/17.0.6
+else
+    echo "Warning: Module system not detected. Assuming dependencies are available in PATH."
+    echo "$(date): Module system not detected" >> "$error_log"
+fi
+
+# Make sure TMPDIR is set
+TMPDIR=${TMPDIR:-/scicomp/scratch/$(whoami)}
+mkdir -p "$TMPDIR/nextflow" 2>/dev/null
+
+# Create timestamp for automatic project ID
+timestamp=$(date +%Y%m%d_%H%M%S)
+
+# Display welcome banner
+echo "Your Nextflow temporary/cache files will be placed in $TMPDIR/nextflow/ by default"
+echo "========================================="
+echo "   FoodNet Trends Analysis Pipeline      "
+echo "========================================="
+echo ""
+
+# Ask for workflow mode
+echo "Select mode:"
+echo "1) Preprocess data (clean raw data files and generate metadata)"
+echo "2) Run analysis (with complete pipeline)"
+echo "3) Use existing preprocessed data"
+read -p "Enter selection [1]: " workflow_mode
+workflow_mode=${workflow_mode:-1}
+
+# Display what was selected
+echo "You selected option: $workflow_mode"
+
+# This is a basic skeleton to verify the menu functionality works
+echo "Menu test completed." 

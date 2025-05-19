@@ -4,7 +4,7 @@ From: rocker/r-ver:4.4
 %labels
     author Josh Forstedt
     date 2025-5-18
-    description FoodNet container with efficient R package installation
+    description FoodNet Trends container with necessary R packages
     version v1.0
 
 %post

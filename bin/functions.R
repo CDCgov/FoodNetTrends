@@ -503,15 +503,21 @@ linpred_draw <- function(data, model) {
   data <- as_tibble(data) %>%
     ungroup() %>%
     mutate(
-      .row = row_number(),
-      Population = if ("Population" %in% names(.)) {
-          parse_number(as.character(Population))
-        } else if ("population" %in% names(.)) {
-          parse_number(as.character(population))
-        } else {
-          stop("No population column found")
-        }
+      .row = row_number()
     )
+  
+  # Handle population explicitly and carefully
+  if ("Population" %in% names(data)) {
+    data$Population <- as.numeric(as.character(data$Population))
+    cat("Using 'Population' column with type:", class(data$Population), "\n")
+    cat("First few values:", head(data$Population), "\n")
+  } else if ("population" %in% names(data)) {
+    data$Population <- as.numeric(as.character(data$population))
+    cat("Using 'population' column with type:", class(data$Population), "\n")
+    cat("First few values:", head(data$Population), "\n")
+  } else {
+    stop("No population column found")
+  }
 
   # Ensure population is numeric
   if (!is.numeric(data$Population) || any(is.na(data$Population))) {
