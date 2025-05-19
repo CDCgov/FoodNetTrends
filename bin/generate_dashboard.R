@@ -737,9 +737,11 @@ generate_dashboard <- function() {
   
   # Replace template variables (always, even if NULL)
   for (name in names(template_vars)) {
-    placeholder <- paste0("{{", name, "}}")
+    placeholder2 <- paste0("{{", name, "}}")
+    placeholder3 <- paste0("{{{", name, "}}}")
     value <- template_vars[[name]]
-    html_template <- gsub(placeholder, value, html_template, fixed = TRUE)
+    html_template <- gsub(placeholder2, value, html_template, fixed = TRUE)
+    html_template <- gsub(placeholder3, value, html_template, fixed = TRUE)
   }
 
   # Remove logo block from HTML template
