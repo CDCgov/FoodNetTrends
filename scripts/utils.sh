@@ -24,9 +24,21 @@ validate_list() {
         done
         
         if [[ "$valid" == false ]]; then
-            echo "Warning: '$item' is not in the discovered $item_type list and may cause errors."
-            echo "$(date): Invalid $item_type: $item" >> "$error_log"
-            invalid_found=true
+            # Strip any trailing periods which may be causing confusion
+            cleaned_item="${item%.}"
+            # Check again with cleaned item
+            for valid_item in "${VALID_ARRAY[@]}"; do
+                if [[ "$cleaned_item" == "$valid_item" ]]; then
+                    valid=true
+                    break
+                fi
+            done
+            
+            if [[ "$valid" == false ]]; then
+                echo "Warning: '$item' is not in the discovered $item_type list and may cause errors."
+                echo "$(date): Invalid $item_type: $item" >> "$error_log"
+                invalid_found=true
+            fi
         fi
     done
     
