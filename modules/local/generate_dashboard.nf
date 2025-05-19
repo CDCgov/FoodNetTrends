@@ -5,6 +5,7 @@ process GENERATE_DASHBOARD {
     container 'foodnet.sif'
 
     input:
+    path ir_outputs
     val outDir
     val projID
     path dashboardTemplate
