@@ -37,9 +37,8 @@ process PREPROCESS {
     publishDir "${params.outdir}/preprocessed", mode: params.publish_dir_mode, saveAs: { filename ->
         if (filename.endsWith('.log')) {
             return "logs/$filename"
-        } else if (filename.endsWith('.json')) {
-            return "metadata/$filename"
         } else {
+            // Keep metadata files at the root level to match workflow expectations
             return filename
         }
     }

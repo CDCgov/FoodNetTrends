@@ -75,7 +75,16 @@ workflow SPLINE {
         error "Census parasitic file is empty: ${params.censusFileP}"
     }
     if (metadataFile != null && !metadataFile.exists()) {
-        error "Metadata file not found: ${params.metadata}"
+        // Try to check if the metadata file might exist in the 'metadata' subdirectory
+        def metadataDir = file("${metadataFile.getParent()}/metadata")
+        def altMetadataFile = file("${metadataDir}/${metadataFile.getName()}")
+        
+        if (altMetadataFile.exists()) {
+            log.info "Found metadata file in alternate location: ${altMetadataFile}"
+            metadataFile = altMetadataFile
+        } else {
+            error "Metadata file not found: ${params.metadata}"
+        }
     }
 
     // Set default projID if not specified

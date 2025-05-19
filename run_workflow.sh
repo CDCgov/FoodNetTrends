@@ -170,6 +170,12 @@ if [[ "$workflow_mode" == "1" ]]; then
     preprocessed_data="${preprocessedDir}/preprocessed/${outputBase}.csv"
     preprocessed_metadata="${preprocessedDir}/preprocessed/${outputBase}_metadata.json"
     
+    # Check for metadata in alternate location (for backward compatibility)
+    if [ ! -f "${preprocessed_metadata}" ] && [ -f "${preprocessedDir}/preprocessed/metadata/${outputBase}_metadata.json" ]; then
+        echo "Found metadata file in alternate location, using it instead."
+        preprocessed_metadata="${preprocessedDir}/preprocessed/metadata/${outputBase}_metadata.json"
+    fi
+    
     # Check if files were created
     if [ ! -f "${preprocessed_data}" ]; then
         echo "Preprocessing failed to create expected CSV file: ${preprocessed_data}"
@@ -239,16 +245,26 @@ else
     
     # Validate metadata file exists if provided
     if [ -n "${preprocessed_metadata}" ] && [ ! -f "${preprocessed_metadata}" ]; then
-        echo "Warning: Metadata file does not exist: ${preprocessed_metadata}"
-        echo "$(date): Missing metadata file: ${preprocessed_metadata}" >> "$error_log"
-        read -p "Continue anyway? (y/n) [n]: " continue_choice
-        continue_choice=${continue_choice:-n}
-        if [[ ! "$continue_choice" =~ ^[Yy]$ ]]; then
-            echo "Exiting."
-            exit 1
+        # Try to find metadata in alternate location (in metadata subdirectory)
+        metadata_dir=$(dirname "${preprocessed_metadata}")
+        metadata_basename=$(basename "${preprocessed_metadata}")
+        alt_metadata_path="${metadata_dir}/metadata/${metadata_basename}"
+        
+        if [ -f "${alt_metadata_path}" ]; then
+            echo "Found metadata file in alternate location: ${alt_metadata_path}"
+            preprocessed_metadata="${alt_metadata_path}"
+        else
+            echo "Warning: Metadata file does not exist: ${preprocessed_metadata}"
+            echo "$(date): Missing metadata file: ${preprocessed_metadata}" >> "$error_log"
+            read -p "Continue anyway? (y/n) [n]: " continue_choice
+            continue_choice=${continue_choice:-n}
+            if [[ ! "$continue_choice" =~ ^[Yy]$ ]]; then
+                echo "Exiting."
+                exit 1
+            fi
+            # Clear metadata file if continuing without it
+            preprocessed_metadata=""
         fi
-        # Clear metadata file if continuing without it
-        preprocessed_metadata=""
     fi
 fi
 
