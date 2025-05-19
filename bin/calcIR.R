@@ -236,8 +236,40 @@ main <- function() {
 
   # Load census files for coverage check
   cat("Loading census files for coverage check...\n")
-  census_b <- haven::read_sas(args$censusFileB) %>% dplyr::mutate(state = toupper(as.character(state)), year = as.numeric(as.character(year)))
-  census_p <- haven::read_sas(args$censusFileP) %>% dplyr::mutate(state = toupper(as.character(state)), year = as.numeric(as.character(year)))
+  census_b <- haven::read_sas(args$censusFileB)
+  census_p <- haven::read_sas(args$censusFileP)
+
+  # Check for state column names - might be STATE, state, etc.
+  state_col_b <- grep("^state$|^STATE$", colnames(census_b), ignore.case = TRUE, value = TRUE)[1]
+  year_col_b <- grep("^year$|^YEAR$", colnames(census_b), ignore.case = TRUE, value = TRUE)[1]
+  state_col_p <- grep("^state$|^STATE$", colnames(census_p), ignore.case = TRUE, value = TRUE)[1]
+  year_col_p <- grep("^year$|^YEAR$", colnames(census_p), ignore.case = TRUE, value = TRUE)[1]
+
+  # Print column names to help with debugging
+  cat("Census file column names (bacterial):", paste(colnames(census_b), collapse=", "), "\n")
+  cat("Census file column names (parasitic):", paste(colnames(census_p), collapse=", "), "\n")
+  cat("Found state column (bacterial):", state_col_b, "\n")
+  cat("Found year column (bacterial):", year_col_b, "\n")
+  cat("Found state column (parasitic):", state_col_p, "\n")
+  cat("Found year column (parasitic):", year_col_p, "\n")
+
+  # Standardize column names using the detected names
+  if (!is.na(state_col_b) && !is.na(year_col_b)) {
+    census_b <- census_b %>%
+      mutate(state = toupper(as.character(.data[[state_col_b]])),
+             year = as.numeric(as.character(.data[[year_col_b]])))
+  } else {
+    stop("Could not find state and year columns in bacterial census file")
+  }
+
+  if (!is.na(state_col_p) && !is.na(year_col_p)) {
+    census_p <- census_p %>%
+      mutate(state = toupper(as.character(.data[[state_col_p]])),
+             year = as.numeric(as.character(.data[[year_col_p]])))
+  } else {
+    stop("Could not find state and year columns in parasitic census file")
+  }
+
   census <- dplyr::bind_rows(
     census_b %>% dplyr::mutate(pathogentype = "Bacterial"),
     census_p %>% dplyr::mutate(pathogentype = "Parasitic")
@@ -247,30 +279,58 @@ main <- function() {
   cleaned_data$year <- as.numeric(as.character(cleaned_data$year))
   mmwr_pairs <- unique(cleaned_data[, c("state", "year")])
 
-  # Find (state, year) pairs in cleaned data but not in census
-  mmwr_not_in_census <- dplyr::anti_join(mmwr_pairs, census_pairs, by = c("state", "year"))
+  # Find (state, year) pairs in MMWR but not in census
+  mmwr_not_in_census <- anti_join(mmwr_pairs, census_pairs, by = c("state", "year"))
+  # Find (state, year) pairs in census but not in MMWR
+  census_not_in_mmwr <- anti_join(census_pairs, mmwr_pairs, by = c("state", "year"))
 
-  # Write report to preprocessed directory
-  output_dir <- dirname(args$outputFile)
-  coverage_report_file <- file.path(output_dir, "state_year_coverage_report.txt")
-  cat("State-Year Coverage Report\n", file=coverage_report_file)
-  cat("========================\n", file=coverage_report_file, append=TRUE)
-  cat("(state, year) pairs in cleaned data but missing in census (n=", nrow(mmwr_not_in_census), "):\n", sep="", file=coverage_report_file, append=TRUE)
+  # Print summary to console
+  cat('PREPROCESS CHECK: (state, year) pairs in MMWR but missing in census:', nrow(mmwr_not_in_census), '\n')
   if (nrow(mmwr_not_in_census) > 0) {
-    write.table(mmwr_not_in_census, file=coverage_report_file, append=TRUE, row.names=FALSE, col.names=TRUE, sep="\t", quote=FALSE)
-  } else {
-    cat("(None)\n", file=coverage_report_file, append=TRUE)
+    cat('  These state-year combinations in your MMWR data have no matching census data:\n')
+    print(mmwr_not_in_census)
   }
 
-  # Print warning and drop records if needed
-  if (nrow(mmwr_not_in_census) > 0) {
-    cat("WARNING: Some (state, year) pairs in the cleaned data are missing from the census files.\n")
-    cat("These records will be removed before modeling.\n")
-    cat("See state_year_coverage_report.txt in the preprocessed data directory for details.\n")
-    # Drop records with missing census coverage
-    cleaned_data <- dplyr::semi_join(cleaned_data, census_pairs, by = c("state", "year"))
-    cat("Dropped", nrow(mmwr_not_in_census), "records with missing census coverage.\n")
+  cat('PREPROCESS CHECK: (state, year) pairs in census but not used in MMWR:', nrow(census_not_in_mmwr), '\n')
+  if (nrow(census_not_in_mmwr) > 0) {
+    cat('  These state-year combinations in your census data have no matching MMWR data:\n')
+    print(census_not_in_mmwr)
   }
+
+  # Write detailed report to file
+  coverage_report_file <- file.path(dirname(args$outputFile), "state_year_coverage_report.txt")
+  cat("Writing coverage report to:", coverage_report_file, "\n")
+  sink(coverage_report_file)
+  cat("FoodNet State-Year Coverage Report\n")
+  cat("=================================\n\n")
+  cat("Generated on:", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "\n\n")
+
+  cat("MMWR Data File:", args$mmwrFile, "\n")
+  cat("Census Files:", args$censusFileB, "and", args$censusFileP, "\n\n")
+
+  cat("Summary:\n")
+  cat("- Total state-year pairs in MMWR data:", nrow(mmwr_pairs), "\n")
+  cat("- Total state-year pairs in census data:", nrow(census_pairs), "\n")
+  cat("- State-year pairs in MMWR but missing from census:", nrow(mmwr_not_in_census), "\n")
+  cat("- State-year pairs in census but not used in MMWR:", nrow(census_not_in_mmwr), "\n\n")
+
+  if (nrow(mmwr_not_in_census) > 0) {
+    cat("MMWR state-year pairs missing from census (will be DROPPED in analysis):\n")
+    print(mmwr_not_in_census)
+    cat("\n")
+  }
+
+  if (nrow(census_not_in_mmwr) > 0) {
+    cat("Census state-year pairs not used in MMWR (informational only):\n")
+    print(census_not_in_mmwr)
+    cat("\n")
+  }
+
+  cat("IMPORTANT: Records with (state, year) pairs found in MMWR but not in census will be DROPPED\n")
+  cat("from analysis because population data is required for rate calculations.\n\n")
+
+  cat("End of report\n")
+  sink()
 
   # Extract base name without extension for consistent naming
   output_base <- tools::file_path_sans_ext(basename(args$outputFile))
