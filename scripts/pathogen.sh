@@ -69,7 +69,10 @@ load_metadata() {
         has_metadata=false
     fi
     
-    # Package values into an array
+    # Make sure DEFAULT_PATHOGENS is set to a valid value
+    DEFAULT_PATHOGENS=${DEFAULT_PATHOGENS:-"CAMPYLOBACTER,CYCLOSPORA"}
+    
+    # Package values into an array - ONE LINE ONLY, no debug output
     metadata_values=("$has_metadata" "$has_serotypes" "$ALL_PATHOGENS" "$ALL_STATES" "$DEFAULT_PATHOGENS")
     echo "${metadata_values[@]}"
 }
@@ -78,6 +81,15 @@ load_metadata() {
 select_pathogens() {
     local all_pathogens=$1
     local default_pathogens=$2
+    
+    # Ensure default pathogens is not empty or invalid
+    if [[ -z "$default_pathogens" || "$default_pathogens" == "found." ]]; then
+        default_pathogens="CAMPYLOBACTER,CYCLOSPORA"
+    fi
+    
+    # Debug output - for development only
+    # echo "DEBUG: all_pathogens=$all_pathogens"
+    # echo "DEBUG: default_pathogens=$default_pathogens"
     
     echo ""
     echo "======== Pathogen Selection ========"

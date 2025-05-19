@@ -13,23 +13,29 @@ NC="" # No Color
 
 # Function to display the welcome banner
 display_welcome() {
+  echo "DEBUG: Starting display_welcome function"
+  
   # Make sure TMPDIR is set before referencing it
   TMPDIR=${TMPDIR:-/scicomp/scratch/$(whoami)}
+  echo "DEBUG: TMPDIR is set to: $TMPDIR"
   
   # Ensure nextflow directory exists
   mkdir -p "$TMPDIR/nextflow" 2>/dev/null
+  echo "DEBUG: Created nextflow directory in TMPDIR"
   
   echo "Your Nextflow temporary/cache files will be placed in ${TMPDIR}/nextflow/ by default"
   echo "========================================="
   echo "   FoodNet Trends Analysis Pipeline      "
   echo "========================================="
   echo ""
+  
+  echo "DEBUG: Finished display_welcome function"
 }
 
 # Function to get workflow mode from the user
 get_workflow_mode() {
-  # Debug output
-  echo "DEBUG: Starting get_workflow_mode function"
+  # Store debug output to stderr instead of stdout
+  >&2 echo "DEBUG: Starting get_workflow_mode function"
   
   # Explicitly print each option with plain text formatting
   echo "Select mode:"
@@ -38,21 +44,24 @@ get_workflow_mode() {
   echo "2) Run analysis (with complete pipeline)"
   echo "3) Use existing preprocessed data"
   echo ""
-  # Add debug output
-  echo "Waiting for your selection (enter 1, 2, or 3)..."
+  # Add debug output to stderr
+  >&2 echo "DEBUG: Waiting for your selection (enter 1, 2, or 3)..."
   read -p "Enter selection [1]: " workflow_mode
   workflow_mode=${workflow_mode:-1}
   
-  # Echo the selection for debugging
-  echo "DEBUG: You selected: $workflow_mode"
+  # Echo the selection for debugging to stderr
+  >&2 echo "DEBUG: You selected: $workflow_mode"
   
   # Validate workflow mode
   if [[ ! "$workflow_mode" =~ ^[1-3]$ ]]; then
+    >&2 echo "DEBUG: Invalid mode selection"
     echo "Error: Invalid mode selection. Using default (Preprocess data)."
     echo "$(date): Invalid workflow_mode: ${workflow_mode}" >> "$error_log"
     workflow_mode=1
   fi
   
+  >&2 echo "DEBUG: Returning workflow_mode: $workflow_mode"
+  # ONLY return the workflow mode number, nothing else
   echo "$workflow_mode"
 }
 
