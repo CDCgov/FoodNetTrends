@@ -39,10 +39,26 @@ include { PREPROCESS_WORKFLOW } from './workflows/preprocess.nf'
 
 // Default workflow
 workflow {
-    SPLINE()
+    try {
+        SPLINE()
+    } catch (Exception e) {
+        log.error "Error in SPLINE workflow: ${e.message}"
+        if (e.message.contains("getFileSystem")) {
+            log.error "This appears to be a file path handling issue. Check that your input paths are valid."
+        }
+        System.exit(1)
+    }
 }
 
 // PREPROCESS_ONLY workflow entry point
 workflow PREPROCESS_ONLY {
-    PREPROCESS_WORKFLOW()
+    try {
+        PREPROCESS_WORKFLOW()
+    } catch (Exception e) {
+        log.error "Error in PREPROCESS_WORKFLOW: ${e.message}"
+        if (e.message.contains("getFileSystem")) {
+            log.error "This appears to be a file path handling issue. Check that your input paths are valid."
+        }
+        System.exit(1)
+    }
 }

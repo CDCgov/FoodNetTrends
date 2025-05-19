@@ -46,17 +46,41 @@ workflow SPLINE {
     // Validate required parameters
     def missingParams = []
     if (!params.mmwrFile) missingParams << "--mmwrFile"
-    if (!params.censusFileB) missingParams << "--censusFileB"
-    if (!params.censusFileP) missingParams << "--censusFileP"
-    
+    // Census files are now optional with warnings
+
     if (missingParams.size() > 0) {
         error "Missing required parameter(s): ${missingParams.join(', ')}"
     }
 
     // Input files
     mmwrFile = file(params.mmwrFile, checkIfExists: true)
-    censusFileB = file(params.censusFileB, checkIfExists: true)
-    censusFileP = file(params.censusFileP, checkIfExists: true)
+
+    // Handle empty census file parameters
+    def censusFileB = ""
+    def censusFileP = ""
+
+    // Check if census file parameters are not empty strings
+    if (params.censusFileB?.trim()) {
+        censusFileB = file(params.censusFileB, checkIfExists: false)
+        if (!censusFileB.exists()) {
+            log.warn "WARNING: Census bacterial file does not exist: ${params.censusFileB}"
+            log.warn "Will proceed without census bacterial file"
+        }
+    } else {
+        log.warn "WARNING: Census bacterial file parameter is empty"
+        log.warn "Will proceed without census bacterial file"
+    }
+
+    if (params.censusFileP?.trim()) {
+        censusFileP = file(params.censusFileP, checkIfExists: false)
+        if (!censusFileP.exists()) {
+            log.warn "WARNING: Census parasitic file does not exist: ${params.censusFileP}"
+            log.warn "Will proceed without census parasitic file"
+        }
+    } else {
+        log.warn "WARNING: Census parasitic file parameter is empty"
+        log.warn "Will proceed without census parasitic file"
+    }
     
     // Flag for preprocessed data
     isPreprocessed = params.preprocessed ?: false
@@ -65,11 +89,14 @@ workflow SPLINE {
     if (mmwrFile.size() == 0) {
         error "MMWR file is empty: ${params.mmwrFile}"
     }
-    if (censusFileB.size() == 0) {
-        error "Census bacterial file is empty: ${params.censusFileB}"
+
+    // Only check census files if they exist
+    if (censusFileB && censusFileB.exists() && censusFileB.size() == 0) {
+        log.warn "Census bacterial file is empty: ${params.censusFileB}"
     }
-    if (censusFileP.size() == 0) {
-        error "Census parasitic file is empty: ${params.censusFileP}"
+
+    if (censusFileP && censusFileP.exists() && censusFileP.size() == 0) {
+        log.warn "Census parasitic file is empty: ${params.censusFileP}"
     }
     
     // Get metadata file with alternate path fallback
@@ -95,8 +122,8 @@ workflow SPLINE {
     MMWR File     : ${params.mmwrFile} (${formatSize(mmwrFile.size())})
     Preprocessed  : ${isPreprocessed}
     Census Files  : 
-      Bacterial   : ${params.censusFileB} (${formatSize(censusFileB.size())})
-      Parasitic   : ${params.censusFileP} (${formatSize(censusFileP.size())})
+      Bacterial   : ${params.censusFileB} ${censusFileB && censusFileB.exists() ? "(${formatSize(censusFileB.size())})" : "(not found)"}
+      Parasitic   : ${params.censusFileP} ${censusFileP && censusFileP.exists() ? "(${formatSize(censusFileP.size())})" : "(not found)"}
     Travel        : ${params.travel}
     CIDT          : ${params.cidt}
     Pathogens     : ${params.pathogen ?: 'default (CAMPYLOBACTER,CYCLOSPORA)'}
