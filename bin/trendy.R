@@ -122,6 +122,10 @@ parser$add_argument("--seed", type="integer", default=123,
 parser$add_argument("--debug", type="logical", default=FALSE,
                     help="Run in debug mode with default parameters (default: FALSE)")
 
+# Add argument for STEC serotypes
+parser$add_argument("--stec_serotypes", type="character", default=NULL,
+                    help="Comma-separated list of STEC serotypes to include")
+
 # Parse arguments with error handling
 tryCatch({
   opts <- parser$parse_args()
@@ -472,6 +476,27 @@ tryCatch({
                                           "to", new_count, "records based on Salmonella serotype selection"))
     } else {
       report_progress("WARNING", message="Could not identify serotype column for filtering")
+    }
+  }
+
+  # After Salmonella serotype filtering, add STEC serotype filtering
+  if (!is.null(opts$stec_serotypes)) {
+    serotypes_to_analyze <- clean_list(opts$stec_serotypes)
+    serotype_col <- NULL
+    if ("serotypesummary" %in% names(mmwrdata)) {
+      serotype_col <- "serotypesummary"
+    } else if ("sero2" %in% names(mmwrdata)) {
+      serotype_col <- "sero2"
+    } else if ("sero1" %in% names(mmwrdata)) {
+      serotype_col <- "sero1"
+    }
+    if (!is.null(serotype_col)) {
+      stec_rows <- mmwrdata$pathogen == "STEC" & mmwrdata[[serotype_col]] %in% serotypes_to_analyze
+      mmwrdata <- mmwrdata[stec_rows | mmwrdata$pathogen != "STEC", ]
+      report_progress("DATA", message=paste("Filtering for STEC serotypes:",
+                                            paste(serotypes_to_analyze, collapse=", ")))
+    } else {
+      report_progress("WARNING", message="Could not identify STEC serotype column for filtering")
     }
   }
 

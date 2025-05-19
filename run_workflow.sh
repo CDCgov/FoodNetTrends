@@ -458,6 +458,14 @@ else
     pathogens=${pathogens:-"$DEFAULT_PATHOGENS"}
 fi
 
+# After pathogen selection, add STEC serotype selection
+
+echo ""
+echo "======== STEC Serotype Selection (optional) ========"
+echo "If you want to filter by specific STEC serotypes, enter a comma-separated list (e.g., O157,O26,O45)."
+echo "Leave blank to include all STEC serotypes."
+read -p "STEC serotypes to include: " stec_serotypes
+
 # Get state selection
 echo ""
 echo "======== State Selection ========"
@@ -630,6 +638,11 @@ if [[ "$background" == true ]]; then
     log_file="logs/foodnet_run_${timestamp}.log"
     cmd="nohup $cmd > \"${log_file}\" 2>&1 &"
     echo "Process will run in background with log: ${log_file}"
+fi
+
+# When building the Nextflow command, add:
+if [[ -n "$stec_serotypes" ]]; then
+    cmd="$cmd --stec_serotypes \"$stec_serotypes\""
 fi
 
 # Display summary
