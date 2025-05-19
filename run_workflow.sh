@@ -224,7 +224,7 @@ else
 
     # Search for preprocessed CSV files
     echo "Searching for preprocessed CSV files..."
-    mapfile -t found_csv < <(find . -type f -name "*preprocessed*.csv" 2>/dev/null)
+    mapfile -t found_csv < <(find . -type f -path "*/preprocessed/*.csv" 2>/dev/null)
     if [[ ${#found_csv[@]} -gt 0 ]]; then
         echo "Found the following preprocessed CSV files:"
         for i in "${!found_csv[@]}"; do
@@ -257,7 +257,7 @@ else
     # Search for preprocessed JSON metadata files
     echo ""
     echo "Searching for preprocessed metadata JSON files..."
-    mapfile -t found_json < <(find . -type f -name "*preprocessed*.json" 2>/dev/null)
+    mapfile -t found_json < <(find . -type f -path "*/preprocessed/*.json" 2>/dev/null)
     if [[ ${#found_json[@]} -gt 0 ]]; then
         echo "Found the following preprocessed metadata JSON files:"
         for i in "${!found_json[@]}"; do
