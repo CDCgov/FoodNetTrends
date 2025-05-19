@@ -217,11 +217,35 @@ proposed_bm <- function(data, cores = 16, chains = 2, iterations = 500,
     stop("Missing required columns in data: ", paste(missing_cols, collapse = ", "))
   }
   
-  # Ensure population is numeric
-  data$population <- as.numeric(data$population)
+  # Print data structure for debugging
+  cat("Data structure before type conversion:\n")
+  cat("Count column class:", class(data$count), "\n")
+  cat("Population column class:", class(data$population), "\n")
+  cat("Year column class:", class(data$year), "\n")
+  cat("First few count values:", head(data$count), "\n")
   
-  # Ensure count is integer
-  data$count <- as.integer(as.numeric(data$count))
+  # Ensure all columns have correct types
+  data$population <- as.numeric(as.character(data$population))
+  data$count <- as.integer(as.numeric(as.character(data$count)))
+  data$year <- as.numeric(as.character(data$year))
+  data$state <- as.character(data$state)
+  
+  # Check for NA values after conversion
+  na_count <- sum(is.na(data$count))
+  na_pop <- sum(is.na(data$population))
+  
+  if (na_count > 0) {
+    warning("Found ", na_count, " NA values in count after type conversion")
+    # Replace NA with zeros for count
+    data$count[is.na(data$count)] <- 0
+  }
+  
+  if (na_pop > 0) {
+    warning("Found ", na_pop, " NA values in population after type conversion")
+    # Use mean population for NA values
+    mean_pop <- mean(data$population, na.rm = TRUE)
+    data$population[is.na(data$population)] <- mean_pop
+  }
   
   # Handle zero-count data
   if (all(data$count == 0) || sum(data$count) == 0) {

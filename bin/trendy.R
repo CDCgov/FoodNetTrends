@@ -530,13 +530,30 @@ tryCatch({
   if("CIDT+" %in% cidt) {
     report_progress("ANALYSIS", message="Processing Cyclospora data")
     cyloDF <- cyclospora_analysis(mmwrdata, census)
-
+    
+    # Ensure consistent column types before combining
+    cyloDF$pathogen <- "CYCLOSPORA"  # Add missing pathogen column
+    cyloDF$count <- as.numeric(cyloDF$count)
+    cyloDF$population <- as.numeric(cyloDF$population)
+    cyloDF$year <- as.numeric(as.character(cyloDF$year))
+    
     report_progress("ANALYSIS", message="Processing Salmonella data")
     salDF <- salmonella_analysis(mmwrdata, census)
-
-    # Combine all pathogen data
-    bact <- gtools::smartbind(pathDf, cyloDF) %>%
-      gtools::smartbind(salDF)
+    
+    # Ensure consistent column types before combining
+    salDF$pathogen <- "SALMONELLA"  # Add missing pathogen column
+    salDF$count <- as.numeric(salDF$count)
+    salDF$population <- as.numeric(salDF$population)
+    salDF$year <- as.numeric(as.character(salDF$year))
+    
+    # Ensure pathDf has correct types
+    pathDf$count <- as.numeric(pathDf$count)
+    pathDf$population <- as.numeric(pathDf$population)
+    pathDf$year <- as.numeric(as.character(pathDf$year))
+    
+    # Create combined data frame with proper column types maintained
+    # Instead of using smartbind which converts to character, use bind_rows
+    bact <- bind_rows(pathDf, cyloDF, salDF)
   } else {
     bact <- pathDf
   }
