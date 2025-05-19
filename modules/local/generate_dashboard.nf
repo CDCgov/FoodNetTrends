@@ -16,6 +16,7 @@ process GENERATE_DASHBOARD {
 
     script:
     """
+    mkdir -p ${outDir}
     Rscript \
       ${dashboardScript} \
       --outDir=${outDir} \
