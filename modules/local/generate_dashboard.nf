@@ -13,6 +13,7 @@ process GENERATE_DASHBOARD {
 
     output:
     path "${projID}_dashboard.html", emit: dashboard
+    publishDir "${params.outdir}/${params.projID}", mode: params.publish_dir_mode
 
     script:
     """
