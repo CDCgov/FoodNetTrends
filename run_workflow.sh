@@ -567,7 +567,7 @@ cmd="$cmd --states \"${states}\""
 # Add MMWR file parameter based on workflow mode
 if [[ "$workflow_mode" == "3" ]]; then
     # Using preprocessed data
-    cmd="$cmd --mmwrFile \"$mmwrFile\" --preprocessed true"
+    cmd="$cmd --mmwrFile \"$mmwrFile\" --preprocessed true --cleanFile \"$mmwrFile\""
     
     # Add metadata file if available
     if [[ -n "$preprocessed_metadata" ]]; then
@@ -579,7 +579,7 @@ else
     
     # If this is workflow_mode 1, we already preprocessed
     if [[ "$workflow_mode" == "1" ]]; then
-        cmd="$cmd --preprocessed true"
+        cmd="$cmd --preprocessed true --cleanFile \"$mmwrFile\""
         if [[ -n "$preprocessed_metadata" ]]; then
             cmd="$cmd --metadata \"$preprocessed_metadata\""
         fi
