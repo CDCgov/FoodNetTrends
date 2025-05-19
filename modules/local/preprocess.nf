@@ -10,6 +10,8 @@
  *
  * Inputs:
  *   - MMWR data file in SAS format
+ *   - Census bacterial file in SAS format
+ *   - Census parasitic file in SAS format
  *   - Output base name
  *   - Flag to generate metadata
  *
@@ -45,6 +47,8 @@ process PREPROCESS {
 
     input:
     path mmwrFile
+    path censusFileB
+    path censusFileP
     val outputBase
     val generateMetadata
 
@@ -60,6 +64,8 @@ process PREPROCESS {
     
     echo "Starting preprocessing at \$(date)" | tee ${outputBase}_process.log
     echo "Input file: ${mmwrFile}" | tee -a ${outputBase}_process.log
+    echo "Census file (bacterial): ${censusFileB}" | tee -a ${outputBase}_process.log
+    echo "Census file (parasitic): ${censusFileP}" | tee -a ${outputBase}_process.log
     echo "Output base: ${outputBase}" | tee -a ${outputBase}_process.log
     echo "Generate metadata: ${generateMetadata}" | tee -a ${outputBase}_process.log
     
@@ -68,13 +74,23 @@ process PREPROCESS {
         echo "ERROR: Input file does not exist: ${mmwrFile}" > ${outputBase}_error.log
         exit 1
     fi
+    if [ ! -f "${censusFileB}" ]; then
+        echo "ERROR: Census bacterial file does not exist: ${censusFileB}" > ${outputBase}_error.log
+        exit 1
+    fi
+    if [ ! -f "${censusFileP}" ]; then
+        echo "ERROR: Census parasitic file does not exist: ${censusFileP}" > ${outputBase}_error.log
+        exit 1
+    fi
     
     # Execute the R preprocessing script with output capturing
     # Note: tee command duplicates output to both console and log file
-    Rscript ${workflow.projectDir}/bin/calcIR.R \\
-      --mmwrFile ${mmwrFile} \\
-      --outputFile ${outputBase}.csv \\
-      --generate_metadata ${generateMetadata} \\
+    Rscript ${workflow.projectDir}/bin/calcIR.R \
+      --mmwrFile ${mmwrFile} \
+      --censusFileB ${censusFileB} \
+      --censusFileP ${censusFileP} \
+      --outputFile ${outputBase}.csv \
+      --generate_metadata ${generateMetadata} \
       2>&1 | tee ${outputBase}_R.log
     
     # Verify script created expected output before proceeding

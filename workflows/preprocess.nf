@@ -25,13 +25,20 @@ workflow PREPROCESS_WORKFLOW {
     if (!params.mmwrFile) {
         error "Missing required parameter: --mmwrFile must be specified"
     }
-    
+    if (!params.censusFileB) {
+        error "Missing required parameter: --censusFileB must be specified"
+    }
+    if (!params.censusFileP) {
+        error "Missing required parameter: --censusFileP must be specified"
+    }
     if (!params.outdir) {
         error "Missing required parameter: --outdir must be specified"
     }
     
     // Define input channel
     mmwrFile = file(params.mmwrFile, checkIfExists: true)
+    censusFileB = file(params.censusFileB, checkIfExists: true)
+    censusFileP = file(params.censusFileP, checkIfExists: true)
     
     // Set output base name (derived from file or parameter)
     outputBase = params.outputBase ?: file(params.mmwrFile).getBaseName()
@@ -43,6 +50,12 @@ workflow PREPROCESS_WORKFLOW {
     if (!mmwrFile.exists()) {
         error "MMWR file not found: ${params.mmwrFile}"
     }
+    if (!censusFileB.exists()) {
+        error "Census bacterial file not found: ${params.censusFileB}"
+    }
+    if (!censusFileP.exists()) {
+        error "Census parasitic file not found: ${params.censusFileP}"
+    }
 
     // Log preprocessing start
     log.info """
@@ -53,6 +66,8 @@ workflow PREPROCESS_WORKFLOW {
                         (${mmwrFile.size() >= 1024*1024 ? 
                             String.format('%.2f MB', mmwrFile.size()/(1024*1024)) : 
                             String.format('%.2f KB', mmwrFile.size()/1024)})
+    Census File (B)   : ${params.censusFileB}
+    Census File (P)   : ${params.censusFileP}
     Output Base       : ${outputBase}
     Generate Metadata : ${generateMetadata}
     Output Dir        : ${params.outdir}/preprocessed
@@ -64,6 +79,8 @@ workflow PREPROCESS_WORKFLOW {
     // Run the preprocessing
     PREPROCESS(
         mmwrFile,
+        censusFileB,
+        censusFileP,
         outputBase,
         generateMetadata
     )

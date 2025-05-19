@@ -119,6 +119,8 @@ workflow SPLINE {
         log.info "Preprocessing raw data files"
         PREPROCESS(
             mmwrFile,
+            censusFileB,
+            censusFileP,
             projID,
             true  // Generate metadata
         )
