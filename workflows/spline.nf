@@ -256,8 +256,14 @@ def findMetadataFile(String path) {
     }
     
     // Try to find it in the metadata subdirectory by constructing the path manually
-    def mainFileName = new File(mainFilePath).getName()
-    def parentDir = new File(mainFilePath).getParent()
+    // Use string operations instead of File objects to avoid getFileSystem errors
+    def lastSlash = mainFilePath.lastIndexOf('/')
+    if (lastSlash == -1) {
+        lastSlash = mainFilePath.lastIndexOf('\\')
+    }
+    
+    def mainFileName = lastSlash > -1 ? mainFilePath.substring(lastSlash + 1) : mainFilePath
+    def parentDir = lastSlash > -1 ? mainFilePath.substring(0, lastSlash) : "."
     def altFilePath = "${parentDir}/metadata/${mainFileName}"
     def altFile = file(altFilePath, checkIfExists: false)
     

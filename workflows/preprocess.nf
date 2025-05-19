@@ -70,7 +70,20 @@ workflow PREPROCESS_WORKFLOW {
     // Set output base name (derived from file or parameter)
     def outputBase = ""
     try {
-        outputBase = params.outputBase ?: new File(params.mmwrFile).getName().replaceFirst("[.][^.]+\$", "")
+        if (params.outputBase) {
+            outputBase = params.outputBase
+        } else {
+            // Extract the filename using string operations instead of File object
+            def mmwrPath = params.mmwrFile.toString()
+            def lastSlash = mmwrPath.lastIndexOf('/')
+            if (lastSlash == -1) {
+                lastSlash = mmwrPath.lastIndexOf('\\')
+            }
+            
+            def fileName = lastSlash > -1 ? mmwrPath.substring(lastSlash + 1) : mmwrPath
+            def lastDot = fileName.lastIndexOf('.')
+            outputBase = lastDot > -1 ? fileName.substring(0, lastDot) : fileName
+        }
     } catch (Exception e) {
         log.warn "Could not determine base name from file: ${e.message}"
         outputBase = "foodnet_data_" + new Date().format('yyyyMMdd_HHmmss')
