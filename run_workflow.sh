@@ -221,11 +221,28 @@ elif [[ "$workflow_mode" == "2" ]]; then
 else
     echo ""
     echo "======== Input Files ========"
-    
-    # Ask for preprocessed data file
-    echo "Enter path to preprocessed CSV file:"
-    read -p "Preprocessed data file: " preprocessed_data
-    
+
+    # Search for preprocessed CSV files
+    echo "Searching for preprocessed CSV files..."
+    mapfile -t found_csv < <(find . -type f -name "*preprocessed*.csv" 2>/dev/null)
+    if [[ ${#found_csv[@]} -gt 0 ]]; then
+        echo "Found the following preprocessed CSV files:"
+        for i in "${!found_csv[@]}"; do
+            printf "%2d) %s\n" $((i+1)) "${found_csv[$i]}"
+        done
+        echo "$(( ${#found_csv[@]} + 1 ))) Enter a file path manually"
+        read -p "Select a CSV file [1]: " csv_choice
+        csv_choice=${csv_choice:-1}
+        if [[ "$csv_choice" -ge 1 && "$csv_choice" -le ${#found_csv[@]} ]]; then
+            preprocessed_data="${found_csv[$((csv_choice-1))]}"
+        else
+            read -p "Preprocessed data file: " preprocessed_data
+        fi
+    else
+        echo "No preprocessed CSV files found. Please enter the path manually."
+        read -p "Preprocessed data file: " preprocessed_data
+    fi
+
     # Validate file exists
     if [ ! -f "${preprocessed_data}" ]; then
         echo "Error: Preprocessed data file does not exist: ${preprocessed_data}"
@@ -233,22 +250,39 @@ else
         echo "Exiting."
         exit 1
     fi
-    
+
     # Set MMWR file to preprocessed data
     mmwrFile=$preprocessed_data
-    
-    # Ask for metadata file
+
+    # Search for preprocessed JSON metadata files
     echo ""
-    echo "Do you have a metadata JSON file for this preprocessed data?"
-    read -p "Enter path to metadata file (leave blank if none): " preprocessed_metadata
-    
+    echo "Searching for preprocessed metadata JSON files..."
+    mapfile -t found_json < <(find . -type f -name "*preprocessed*.json" 2>/dev/null)
+    if [[ ${#found_json[@]} -gt 0 ]]; then
+        echo "Found the following preprocessed metadata JSON files:"
+        for i in "${!found_json[@]}"; do
+            printf "%2d) %s\n" $((i+1)) "${found_json[$i]}"
+        done
+        echo "$(( ${#found_json[@]} + 1 ))) Enter a file path manually or leave blank for none"
+        read -p "Select a metadata file [${#found_json[@]}+1]: " json_choice
+        json_choice=${json_choice:-$(( ${#found_json[@]} + 1 ))}
+        if [[ "$json_choice" -ge 1 && "$json_choice" -le ${#found_json[@]} ]]; then
+            preprocessed_metadata="${found_json[$((json_choice-1))]}"
+        else
+            read -p "Enter path to metadata file (leave blank if none): " preprocessed_metadata
+        fi
+    else
+        echo "No preprocessed metadata JSON files found. Enter path manually or leave blank for none."
+        read -p "Enter path to metadata file (leave blank if none): " preprocessed_metadata
+    fi
+
     # Validate metadata file exists if provided
     if [ -n "${preprocessed_metadata}" ] && [ ! -f "${preprocessed_metadata}" ]; then
         # Try to find metadata in alternate location (in metadata subdirectory)
         metadata_dir=$(dirname "${preprocessed_metadata}")
         metadata_basename=$(basename "${preprocessed_metadata}")
         alt_metadata_path="${metadata_dir}/metadata/${metadata_basename}"
-        
+
         if [ -f "${alt_metadata_path}" ]; then
             echo "Found metadata file in alternate location: ${alt_metadata_path}"
             preprocessed_metadata="${alt_metadata_path}"

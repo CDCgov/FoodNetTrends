@@ -742,7 +742,7 @@ generate_dashboard <- function() {
   html_template <- gsub('<div id="dashboard-container"></div>', widget_html, html_template, fixed = TRUE)
   
   # Write HTML to file
-  output_path <- file.path(args$outDir, args$outputFile)
+  output_path <- args$outputFile
   cat("Writing dashboard to:", output_path, "\n")
   writeLines(html_template, output_path)
   
