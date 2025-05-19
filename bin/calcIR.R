@@ -67,6 +67,8 @@ parser$add_argument("--mmwrFile", type = "character", help = "Path to the raw MM
 parser$add_argument("--outputFile", type = "character", help = "Path to save the cleaned CSV file", required = TRUE)
 parser$add_argument("--generate_metadata", type = "logical", default = FALSE, 
                    help = "Whether to generate a metadata JSON file (default: FALSE)")
+parser$add_argument("--censusFileB", type = "character", help = "Path to census file for bacterial pathogens", required = TRUE)
+parser$add_argument("--censusFileP", type = "character", help = "Path to census file for parasitic pathogens", required = TRUE)
 args <- parser$parse_args()
 
 #' Define helper functions if not available from functions.R
@@ -231,7 +233,45 @@ main <- function() {
   
   # Clean data
   cleaned_data <- clean_mmwr_data(mmwrdata)
-  
+
+  # Load census files for coverage check
+  cat("Loading census files for coverage check...\n")
+  census_b <- haven::read_sas(args$censusFileB) %>% dplyr::mutate(state = toupper(as.character(state)), year = as.numeric(as.character(year)))
+  census_p <- haven::read_sas(args$censusFileP) %>% dplyr::mutate(state = toupper(as.character(state)), year = as.numeric(as.character(year)))
+  census <- dplyr::bind_rows(
+    census_b %>% dplyr::mutate(pathogentype = "Bacterial"),
+    census_p %>% dplyr::mutate(pathogentype = "Parasitic")
+  )
+  census_pairs <- unique(census[, c("state", "year")])
+  cleaned_data$state <- toupper(as.character(cleaned_data$state))
+  cleaned_data$year <- as.numeric(as.character(cleaned_data$year))
+  mmwr_pairs <- unique(cleaned_data[, c("state", "year")])
+
+  # Find (state, year) pairs in cleaned data but not in census
+  mmwr_not_in_census <- dplyr::anti_join(mmwr_pairs, census_pairs, by = c("state", "year"))
+
+  # Write report to preprocessed directory
+  output_dir <- dirname(args$outputFile)
+  coverage_report_file <- file.path(output_dir, "state_year_coverage_report.txt")
+  cat("State-Year Coverage Report\n", file=coverage_report_file)
+  cat("========================\n", file=coverage_report_file, append=TRUE)
+  cat("(state, year) pairs in cleaned data but missing in census (n=", nrow(mmwr_not_in_census), "):\n", sep="", file=coverage_report_file, append=TRUE)
+  if (nrow(mmwr_not_in_census) > 0) {
+    write.table(mmwr_not_in_census, file=coverage_report_file, append=TRUE, row.names=FALSE, col.names=TRUE, sep="\t", quote=FALSE)
+  } else {
+    cat("(None)\n", file=coverage_report_file, append=TRUE)
+  }
+
+  # Print warning and drop records if needed
+  if (nrow(mmwr_not_in_census) > 0) {
+    cat("WARNING: Some (state, year) pairs in the cleaned data are missing from the census files.\n")
+    cat("These records will be removed before modeling.\n")
+    cat("See state_year_coverage_report.txt in the preprocessed data directory for details.\n")
+    # Drop records with missing census coverage
+    cleaned_data <- dplyr::semi_join(cleaned_data, census_pairs, by = c("state", "year"))
+    cat("Dropped", nrow(mmwr_not_in_census), "records with missing census coverage.\n")
+  }
+
   # Extract base name without extension for consistent naming
   output_base <- tools::file_path_sans_ext(basename(args$outputFile))
   output_dir <- dirname(args$outputFile)
