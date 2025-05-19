@@ -136,6 +136,12 @@ path_analysis <- function(mmwrdata, census) {
   # Define standard pathogens
   pathogens <- c("CAMPYLOBACTER", "CYCLOSPORA", "SALMONELLA", "SHIGELLA", "STEC", "VIBRIO", "YERSINIA")
   
+  # Coerce state and year to same type/case
+  mmwrdata$state <- toupper(as.character(mmwrdata$state))
+  mmwrdata$year <- as.numeric(as.character(mmwrdata$year))
+  census$state <- toupper(as.character(census$state))
+  census$year <- as.numeric(as.character(census$year))
+  
   # Create a data frame with counts per year, state, and pathogen
   selectDf <- mmwrdata %>%
     filter(pathogen %in% pathogens) %>%
@@ -146,6 +152,10 @@ path_analysis <- function(mmwrdata, census) {
     # Join with census data to get population values
     left_join(census %>% filter(pathogentype == "Bacterial"), by = c("year", "state")) %>%
     mutate(year = as.numeric(as.character(year)))
+  
+  if (any(is.na(selectDf$population))) {
+    warning("NA population values after join in path_analysis for some rows!")
+  }
   
   return(selectDf)
 }
@@ -159,6 +169,10 @@ path_analysis <- function(mmwrdata, census) {
 #' @param census Census data frame
 #' @return Aggregated data frame with counts and population by year and state for Cyclospora
 cyclospora_analysis <- function(mmwrdata, census) {
+  mmwrdata$state <- toupper(as.character(mmwrdata$state))
+  mmwrdata$year <- as.numeric(as.character(mmwrdata$year))
+  census$state <- toupper(as.character(census$state))
+  census$year <- as.numeric(as.character(census$year))
   # Filter for Cyclospora, aggregate by year and state, and join with census data
   # Note: Using parasitic pathogen type for population denominator
   cyclo <- mmwrdata %>%
@@ -167,7 +181,9 @@ cyclospora_analysis <- function(mmwrdata, census) {
     summarise(count = n(), .groups = "drop") %>%
     complete(year, state, fill = list(count = 0)) %>%
     left_join(census %>% filter(pathogentype == "Parasitic"), by = c("year", "state"))
-
+  if (any(is.na(cyclo$population))) {
+    warning("NA population values after join in cyclospora_analysis for some rows!")
+  }
   return(cyclo)
 }
 
@@ -180,6 +196,10 @@ cyclospora_analysis <- function(mmwrdata, census) {
 #' @param census Census data frame
 #' @return Aggregated data frame with counts and population by year and state for Salmonella
 salmonella_analysis <- function(mmwrdata, census) {
+  mmwrdata$state <- toupper(as.character(mmwrdata$state))
+  mmwrdata$year <- as.numeric(as.character(mmwrdata$year))
+  census$state <- toupper(as.character(census$state))
+  census$year <- as.numeric(as.character(census$year))
   # Filter for Salmonella, aggregate by year and state, and join with census data
   # Note: Using bacterial pathogen type for population denominator
   sal <- mmwrdata %>%
@@ -188,7 +208,9 @@ salmonella_analysis <- function(mmwrdata, census) {
     summarise(count = n(), .groups = "drop") %>%
     complete(year, state, fill = list(count = 0)) %>%
     left_join(census %>% filter(pathogentype == "Bacterial"), by = c("year", "state"))
-
+  if (any(is.na(sal$population))) {
+    warning("NA population values after join in salmonella_analysis for some rows!")
+  }
   return(sal)
 }
 

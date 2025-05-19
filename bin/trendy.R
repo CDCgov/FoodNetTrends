@@ -501,6 +501,12 @@ tryCatch({
   }
 
   report_progress("DATA", message=paste("Processed", nrow(mmwrdata), "MMWR records"))
+
+  # After importing mmwrdata
+  cat('DEBUG: Unique pathogens in mmwrdata:', paste(unique(mmwrdata$pathogen), collapse=', '), '\n')
+  cat('DEBUG: Unique years in mmwrdata:', paste(unique(mmwrdata$year), collapse=', '), '\n')
+  cat('DEBUG: Unique states in mmwrdata:', paste(unique(mmwrdata$state), collapse=', '), '\n')
+  cat('DEBUG: Number of records in mmwrdata:', nrow(mmwrdata), '\n')
 }, error = function(e) {
   stop("Error importing MMWR data: ", e$message)
 })
@@ -535,6 +541,19 @@ tryCatch({
   report_progress("DATA", message=paste("Processed census data with",
                                        length(unique(census$year)), "years and",
                                        length(unique(census$state)), "states"))
+
+  # After importing census
+  debug_census_states <- unique(census$state)
+  debug_census_years <- unique(census$year)
+  cat('DEBUG: Unique states in census:', paste(debug_census_states, collapse=', '), '\n')
+  cat('DEBUG: Unique years in census:', paste(debug_census_years, collapse=', '), '\n')
+  cat('DEBUG: Number of records in census:', nrow(census), '\n')
+
+  # Before joining, coerce state and year to character/numeric in both
+  debug_force_state <- function(df) { df$state <- toupper(as.character(df$state)); df }
+  debug_force_year <- function(df) { df$year <- as.numeric(as.character(df$year)); df }
+  mmwrdata <- debug_force_state(mmwrdata); mmwrdata <- debug_force_year(mmwrdata)
+  census <- debug_force_state(census); census <- debug_force_year(census)
 }, error = function(e) {
   stop("Error importing census data: ", e$message)
 })
@@ -646,6 +665,14 @@ tryCatch({
       # Combine all minimal datasets
       bact <- do.call(rbind, minimal_data_list)
     }
+
+    # After filtering for requested pathogens (if block)
+    cat('DEBUG: Number of records in bact after pathogen filtering:', nrow(bact), '\n')
+    cat('DEBUG: Unique pathogens in bact:', paste(unique(bact$pathogen), collapse=', '), '\n')
+    cat('DEBUG: Unique years in bact:', paste(unique(bact$year), collapse=', '), '\n')
+    cat('DEBUG: Unique states in bact:', paste(unique(bact$state), collapse=', '), '\n')
+    cat('DEBUG: Number of NA populations in bact:', sum(is.na(bact$population)), '\n')
+    cat('DEBUG: Number of zero counts in bact:', sum(bact$count == 0), '\n')
   } else {
     # Otherwise use the default filtering from the original code
     bact <- subset(bact, pathogen == "CAMPYLOBACTER" | pathogen == "CYCLOSPORA")
@@ -666,6 +693,16 @@ tryCatch({
                                           length(target_pathogens),
                                           "pathogens:",
                                           paste(target_pathogens, collapse=", ")))
+
+  # After aggregation and join (path_analysis)
+  cat('DEBUG: Head of pathDf after aggregation and join:\n')
+  print(head(pathDf))
+  cat('DEBUG: Unique pathogens in pathDf:', paste(unique(pathDf$pathogen), collapse=', '), '\n')
+  cat('DEBUG: Unique years in pathDf:', paste(unique(pathDf$year), collapse=', '), '\n')
+  cat('DEBUG: Unique states in pathDf:', paste(unique(pathDf$state), collapse=', '), '\n')
+  cat('DEBUG: Number of NA populations in pathDf:', sum(is.na(pathDf$population)), '\n')
+  cat('DEBUG: Number of zero counts in pathDf:', sum(pathDf$count == 0), '\n')
+  cat('DEBUG: Number of records in pathDf:', nrow(pathDf), '\n')
 }, error = function(e) {
   stop("Error in pathogen analysis: ", e$message)
 })
