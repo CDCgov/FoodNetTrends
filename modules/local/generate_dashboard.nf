@@ -5,8 +5,7 @@ process GENERATE_DASHBOARD {
     container 'foodnet.sif'
 
     input:
-    path ir_outputs
-    val outDir
+    path resultDir
     val projID
     path dashboardTemplate
     val dashboardScript
@@ -17,11 +16,10 @@ process GENERATE_DASHBOARD {
 
     script:
     """
-    mkdir -p ${outDir}
     Rscript \
       ${dashboardScript} \
-      --outDir=${outDir} \
-      --resultDir=${outDir} \
+      --outDir=${resultDir} \
+      --resultDir=${resultDir} \
       --outputFile=${projID}_dashboard.html \
       --title="FoodNet Trends Analysis: ${projID}" \
       --templateFile=${dashboardTemplate}

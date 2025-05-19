@@ -151,7 +151,6 @@ workflow SPLINE {
 
     // Run dashboard generation after all modeling is complete
     dashboard = GENERATE_DASHBOARD(
-        ir_outputs.collect(),
         params.outdir + '/' + projID,
         projID,
         dashboardTemplate,
