@@ -56,10 +56,6 @@ workflow SPLINE {
     mmwrFile = file(params.mmwrFile, checkIfExists: true)
     censusFileB = file(params.censusFileB, checkIfExists: true)
     censusFileP = file(params.censusFileP, checkIfExists: true)
-    metadataFile = params.metadata ? file(params.metadata) : null
-    
-    // Dashboard template file
-    dashboardTemplate = file("${workflow.projectDir}/assets/dashboard_template.html", checkIfExists: true)
     
     // Flag for preprocessed data
     isPreprocessed = params.preprocessed ?: false
@@ -74,18 +70,16 @@ workflow SPLINE {
     if (censusFileP.size() == 0) {
         error "Census parasitic file is empty: ${params.censusFileP}"
     }
-    if (metadataFile != null && !metadataFile.exists()) {
-        // Try to check if the metadata file might exist in the 'metadata' subdirectory
-        def altDir = file("${metadataFile.getParent()}/metadata")
-        def altPath = file("${altDir}/${metadataFile.getName()}")
-        
-        if (altPath.exists()) {
-            log.info "Found metadata file in alternate location: ${altPath}"
-            metadataFile = altPath
-        } else {
-            error "Metadata file not found: ${params.metadata}"
-        }
+    
+    // Get metadata file with alternate path fallback
+    if (params.metadata) {
+        metadataFile = findMetadataFile(params.metadata)
+    } else {
+        metadataFile = null
     }
+    
+    // Dashboard template file
+    dashboardTemplate = file("${workflow.projectDir}/assets/dashboard_template.html", checkIfExists: true)
 
     // Set default projID if not specified
     def projID = params.projID ?: new Date().format('yyyyMMdd_HHmmss')
@@ -187,4 +181,26 @@ def formatSize(size) {
     else if (size < 1024*1024) return String.format("%.2f KB", size/1024)
     else if (size < 1024*1024*1024) return String.format("%.2f MB", size/(1024*1024))
     else return String.format("%.2f GB", size/(1024*1024*1024))
+}
+
+// Helper function to find metadata file in standard or alternate locations
+def findMetadataFile(String path) {
+    def mainFile = file(path)
+    
+    if (mainFile.exists()) {
+        return mainFile
+    }
+    
+    // Try to find it in the metadata subdirectory
+    def parentDir = file(mainFile.getParent())
+    def metadataDir = file("${parentDir}/metadata")
+    def altFile = file("${metadataDir}/${mainFile.getName()}")
+    
+    if (altFile.exists()) {
+        log.info "Found metadata file in alternate location: ${altFile}"
+        return altFile
+    }
+    
+    // If we get here, the file doesn't exist in either location
+    error "Metadata file not found: ${path} (also checked in ${metadataDir})"
 }
