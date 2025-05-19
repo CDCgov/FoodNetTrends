@@ -5,7 +5,8 @@ process GENERATE_DASHBOARD {
     container 'foodnet.sif'
 
     input:
-    path resultDir
+    path ir_outputs
+    val resultDir
     val projID
     path dashboardTemplate
     val dashboardScript
