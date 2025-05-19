@@ -506,6 +506,11 @@ linpred_draw <- function(data, model) {
       .row = row_number()
     )
   
+  # Ensure year is numeric for prediction
+  if ("year" %in% names(data)) {
+    data$year <- as.numeric(as.character(data$year))
+  }
+  
   # Handle population explicitly and carefully
   if ("Population" %in% names(data)) {
     data$Population <- as.numeric(as.character(data$Population))

@@ -82,17 +82,15 @@ process TRENDY {
         --cidt=${filter_cidt} \
         --outDir=./
     
-    # If this is the last pathogen (determined by task ID), generate the dashboard
-    if [[ \$TASK_ID == \$TASK_MAX ]]; then
-        echo "Generating interactive dashboard..." >> ${pathogen}_trendy.log
-        Rscript ${scripts_path}/generate_dashboard.R \
-            --outDir=./ \
-            --resultDir=./ \
-            --outputFile=${params.projID}_dashboard.html \
-            --title="FoodNet Trends Analysis: ${params.projID}" \
-            --templateFile=${template_path}/dashboard_template.html || \
-            echo "Warning: Dashboard generation failed, proceeding with standard outputs" >> ${pathogen}_trendy.log
-    fi
+    # Always attempt to generate the dashboard, but do not fail if it errors
+    echo "Generating interactive dashboard..." >> ${pathogen}_trendy.log
+    Rscript ${scripts_path}/generate_dashboard.R \
+        --outDir=./ \
+        --resultDir=./ \
+        --outputFile=${params.projID}_dashboard.html \
+        --title="FoodNet Trends Analysis: ${params.projID}" \
+        --templateFile=${template_path}/dashboard_template.html || \
+        echo "Warning: Dashboard generation failed, proceeding with standard outputs" >> ${pathogen}_trendy.log
     
     echo "Analysis completed successfully" >> ${pathogen}_trendy.log
     """
