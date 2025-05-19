@@ -195,13 +195,15 @@ def findMetadataFile(String path) {
     def mainFile = file(path)
     
     if (mainFile.exists()) {
+        log.info "Using metadata file: ${mainFile}"
         return mainFile
     }
     
     // Try to find it in the metadata subdirectory
-    def parentDir = file(mainFile.getParent())
-    def metadataDir = file("${parentDir}/metadata")
-    def altFile = file("${metadataDir}/${mainFile.getName()}")
+    def baseName = mainFile.getName()
+    def parentDir = mainFile.getParent()
+    def metadataPath = "${parentDir}/metadata/${baseName}"
+    def altFile = file(metadataPath)
     
     if (altFile.exists()) {
         log.info "Found metadata file in alternate location: ${altFile}"
@@ -209,5 +211,5 @@ def findMetadataFile(String path) {
     }
     
     // If we get here, the file doesn't exist in either location
-    error "Metadata file not found: ${path} (also checked in ${metadataDir})"
+    error "Metadata file not found: ${path} (also checked in ${metadataPath})"
 }
