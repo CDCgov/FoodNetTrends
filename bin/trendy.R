@@ -370,10 +370,23 @@ if (!is.null(opts$salmonella_serotypes)) {
 # Import MMWR data
 report_progress("DATA", message="Importing MMWR data")
 tryCatch({
-  if (preprocessed && !is.null(cleanFile) && file.exists(cleanFile)) {
-    report_progress("DATA", message=paste("Using preprocessed data from:", cleanFile))
-    # Read the preprocessed CSV file
-    mmwrdata <- readr::read_csv(cleanFile, show_col_types = FALSE)
+  # First, check if this is a preprocessed CSV file based on file extension
+  is_csv_file <- grepl("\\.csv$", mmwrFile, ignore.case = TRUE)
+  
+  if (preprocessed || is_csv_file) {
+    # For preprocessed data, use readr::read_csv
+    report_progress("DATA", message=paste("Using preprocessed data from:", mmwrFile))
+    
+    # Use either cleanFile (if provided) or mmwrFile
+    file_to_use <- if (!is.null(cleanFile) && file.exists(cleanFile)) cleanFile else mmwrFile
+    
+    # Make sure the file exists in the current directory
+    if (!file.exists(file_to_use) && file.exists(basename(file_to_use))) {
+      file_to_use <- basename(file_to_use)
+    }
+    
+    report_progress("DATA", message=paste("Reading CSV from:", file_to_use))
+    mmwrdata <- readr::read_csv(file_to_use, show_col_types = FALSE)
     
     # Make column names consistent - ensure key columns are lowercase
     names(mmwrdata) <- gsub("^Pathogen$", "pathogen", names(mmwrdata), ignore.case = TRUE)
