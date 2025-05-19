@@ -219,23 +219,31 @@ if (opts$debug == FALSE) {
 #' @return None, but stops execution if validation fails
 validate_params <- function() {
   errors <- c()
+  warnings <- c()
 
   # Check required file parameters
   if (is.null(mmwrFile) || mmwrFile == "")
     errors <- c(errors, "Missing required parameter: mmwrFile")
-  if (is.null(censusFileB) || censusFileB == "")
-    errors <- c(errors, "Missing required parameter: censusFileB")
-  if (is.null(censusFileP) || censusFileP == "")
-    errors <- c(errors, "Missing required parameter: censusFileP")
+  
+  # Census files are now optional with warnings
+  if (is.null(censusFileB) || censusFileB == "" || censusFileB == "''") {
+    warnings <- c(warnings, "Warning: Census bacterial file parameter is empty")
+  }
+    
+  if (is.null(censusFileP) || censusFileP == "" || censusFileP == "''") {
+    warnings <- c(warnings, "Warning: Census parasitic file parameter is empty")
+  }
 
-  # Check file existence if parameters are provided
+  # Check file existence if parameters are provided and not empty
   if (length(errors) == 0) {
     if (!file.exists(mmwrFile))
       errors <- c(errors, paste("MMWR file does not exist:", mmwrFile))
-    if (!file.exists(censusFileB))
-      errors <- c(errors, paste("Census bacterial file does not exist:", censusFileB))
-    if (!file.exists(censusFileP))
-      errors <- c(errors, paste("Census parasitic file does not exist:", censusFileP))
+    
+    if (!is.null(censusFileB) && censusFileB != "" && censusFileB != "''" && !file.exists(censusFileB))
+      warnings <- c(warnings, paste("Warning: Census bacterial file does not exist:", censusFileB))
+    
+    if (!is.null(censusFileP) && censusFileP != "" && censusFileP != "''" && !file.exists(censusFileP))
+      warnings <- c(warnings, paste("Warning: Census parasitic file does not exist:", censusFileP))
   }
 
   # Check preprocessed file if specified
@@ -247,21 +255,22 @@ validate_params <- function() {
   # Check metadata if specified
   if (!is.null(metadata) && metadata != "") {
     if (!file.exists(metadata))
-      errors <- c(errors, paste("Metadata file does not exist:", metadata))
+      warnings <- c(warnings, paste("Warning: Metadata file does not exist:", metadata))
   }
 
-  # Default project ID if not provided
-  if (is.null(projID) || projID == "") {
-    projID <<- format(Sys.time(), "%Y%m%d%H%M")
-    report_progress("SETUP", message=paste("No projID provided, using timestamp:", projID))
-  }
-
-  # Return errors if any
-  if (length(errors) > 0) {
-    for (err in errors) {
-      report_progress("ERROR", message=err)
+  # Output warnings but don't fail
+  if (length(warnings) > 0) {
+    for (warning in warnings) {
+      cat(warning, "\n")
     }
-    stop(paste(errors, collapse="\n"))
+  }
+
+  # Fail if there are errors
+  if (length(errors) > 0) {
+    for (error in errors) {
+      cat(error, "\n")
+    }
+    stop("Parameter validation failed")
   }
 }
 
@@ -372,144 +381,178 @@ if (!is.null(opts$salmonella_serotypes)) {
 # ==========================================================================
 
 # Import MMWR data
-report_progress("DATA", message="Importing MMWR data")
-tryCatch({
-  # First, check if this is a preprocessed CSV file based on file extension
-  is_csv_file <- grepl("\\.csv$", mmwrFile, ignore.case = TRUE)
+report_progress("DATA", message="Loading data files")
+
+# Load MMWR data
+if (preprocessed) {
+  report_progress("DATA", message=paste("Using preprocessed data:", cleanFile))
+  mmwrdata <- read.csv(cleanFile, stringsAsFactors = FALSE)
+} else {
+  report_progress("DATA", message=paste("Loading raw MMWR data:", mmwrFile))
+  mmwrdata <- haven::read_sas(mmwrFile)
+}
+
+# Load or create census data
+census <- NULL
+if ((!is.null(censusFileB) && censusFileB != "" && censusFileB != "''") || 
+    (!is.null(censusFileP) && censusFileP != "" && censusFileP != "''")) {
+  # At least one census file is provided
   
-  if (preprocessed || is_csv_file) {
-    # For preprocessed data, use readr::read_csv
-    report_progress("DATA", message=paste("Using preprocessed data from:", mmwrFile))
+  if (!is.null(censusFileB) && censusFileB != "" && censusFileB != "''" && file.exists(censusFileB)) {
+    # Load bacterial census data
+    report_progress("DATA", message=paste("Loading bacterial census data:", censusFileB))
+    census_b <- haven::read_sas(censusFileB)
+    census_b$pathogentype <- "Bacterial"
     
-    # Use either cleanFile (if provided) or mmwrFile
-    file_to_use <- if (!is.null(cleanFile) && file.exists(cleanFile)) cleanFile else mmwrFile
-    
-    # Make sure the file exists in the current directory
-    if (!file.exists(file_to_use) && file.exists(basename(file_to_use))) {
-      file_to_use <- basename(file_to_use)
+    # Check and standardize column names
+    if (!"state" %in% tolower(names(census_b))) {
+      census_b$state <- toupper(as.character(census_b$STATE))
+    } else {
+      census_b$state <- toupper(as.character(census_b$state))
     }
     
-    report_progress("DATA", message=paste("Reading CSV from:", file_to_use))
-    mmwrdata <- readr::read_csv(file_to_use, show_col_types = FALSE)
+    if (!"year" %in% tolower(names(census_b))) {
+      census_b$year <- as.numeric(census_b$YEAR)
+    } else {
+      census_b$year <- as.numeric(census_b$year)
+    }
     
-    # Make column names consistent - ensure key columns are lowercase
-    names(mmwrdata) <- gsub("^Pathogen$", "pathogen", names(mmwrdata), ignore.case = TRUE)
-    names(mmwrdata) <- gsub("^State$", "state", names(mmwrdata), ignore.case = TRUE) 
-    names(mmwrdata) <- gsub("^Year$", "year", names(mmwrdata), ignore.case = TRUE)
-    
-    report_progress("DATA", message="Standardized column names from preprocessed file")
+    if (is.null(census)) {
+      census <- census_b
+    } else {
+      census <- rbind(census, census_b)
+    }
   } else {
-    # Read raw SAS data
-    report_progress("DATA", message=paste("Reading raw SAS data from:", mmwrFile))
-    mmwrdata <- haven::read_sas(mmwrFile) %>% as.data.frame()
-    
-    # Convert all column names to lowercase for consistency
-    names(mmwrdata) <- tolower(names(mmwrdata))
-    
-    report_progress("DATA", message="Standardized column names from raw SAS file")
-  }
-
-  # Define standard list of pathogens for filtering
-  pathogens <- c("CAMPYLOBACTER", "CYCLOSPORA", "SALMONELLA", "SHIGELLA", "STEC", "VIBRIO", "YERSINIA")
-  report_progress("DATA", message="Defined standard pathogen list")
-
-  # Ensure pathogen column has consistent casing for filtering
-  if ("pathogen" %in% names(mmwrdata)) {
-    # Standardize pathogen names to uppercase
-    mmwrdata$pathogen <- toupper(mmwrdata$pathogen)
-    report_progress("DATA", message="Standardized pathogen column for consistent filtering")
-  }
-
-  # Ensure required columns exist
-  required_cols <- c("pathogen", "year", "state")
-  missing_cols <- required_cols[!required_cols %in% names(mmwrdata)]
-  if (length(missing_cols) > 0) {
-    stop("Required columns missing from MMWR data: ", paste(missing_cols, collapse=", "))
+    report_progress("WARNING", message="No valid bacterial census file provided. Population data will be imputed.")
   }
   
-  # Ensure pathogentype column exists
-  if (!"pathogentype" %in% names(mmwrdata)) {
-    mmwrdata$pathogentype <- ifelse(mmwrdata$pathogen %in% c("CRYPTOSPORIDIUM", "CYCLOSPORA"), 
-                                   "Parasitic", "Bacterial")
-    report_progress("DATA", message="Added pathogentype column")
-  }
-
-  # Apply state filtering if specified
-  if (!is.null(opts$states)) {
-    states_to_analyze <- clean_list(opts$states)
-    report_progress("DATA", message=paste("Filtering for states:", paste(states_to_analyze, collapse=", ")))
+  if (!is.null(censusFileP) && censusFileP != "" && censusFileP != "''" && file.exists(censusFileP)) {
+    # Load parasitic census data
+    report_progress("DATA", message=paste("Loading parasitic census data:", censusFileP))
+    census_p <- haven::read_sas(censusFileP)
+    census_p$pathogentype <- "Parasitic"
     
-    # Filter data by states
+    # Check and standardize column names
+    if (!"state" %in% tolower(names(census_p))) {
+      census_p$state <- toupper(as.character(census_p$STATE))
+    } else {
+      census_p$state <- toupper(as.character(census_p$state))
+    }
+    
+    if (!"year" %in% tolower(names(census_p))) {
+      census_p$year <- as.numeric(census_p$YEAR)
+    } else {
+      census_p$year <- as.numeric(census_p$year)
+    }
+    
+    if (is.null(census)) {
+      census <- census_p
+    } else {
+      census <- rbind(census, census_p)
+    }
+  } else {
+    report_progress("WARNING", message="No valid parasitic census file provided. Population data will be imputed.")
+  }
+} else {
+  # No census files provided - create dummy census data based on MMWR data
+  report_progress("WARNING", message="No census files provided. Creating dummy census data.")
+  report_progress("WARNING", message="Population values will be inferred from MMWR data where available.")
+  
+  # Create placeholder census data from MMWR data structure
+  census <- data.frame(
+    state = unique(toupper(as.character(mmwrdata$state))),
+    stringsAsFactors = FALSE
+  )
+  
+  # Add years from MMWR data
+  years <- unique(as.numeric(as.character(mmwrdata$year)))
+  census <- census[rep(1:nrow(census), each = length(years)), ]
+  census$year <- rep(years, times = length(unique(toupper(as.character(mmwrdata$state)))))
+  
+  # Add pathogentype column based on pathogen in MMWR data
+  if (tolower(target_pathogen) %in% c("cryptosporidium", "cyclospora")) {
+    census$pathogentype <- "Parasitic"
+  } else {
+    census$pathogentype <- "Bacterial"
+  }
+  
+  # Initialize population column with NA (will be imputed later)
+  census$population <- NA
+}
+
+# Apply state filtering if specified
+if (!is.null(opts$states)) {
+  states_to_analyze <- clean_list(opts$states)
+  report_progress("DATA", message=paste("Filtering for states:", paste(states_to_analyze, collapse=", ")))
+  
+  # Filter data by states
+  original_count <- nrow(mmwrdata)
+  mmwrdata <- mmwrdata[toupper(mmwrdata$state) %in% toupper(states_to_analyze), ]
+  new_count <- nrow(mmwrdata)
+  
+  report_progress("DATA", message=paste("Filtered from", original_count, 
+                                      "to", new_count, "records based on state selection"))
+}
+
+# Apply Salmonella serotype filtering if specified
+if (!is.null(opts$salmonella_serotypes)) {
+  serotypes_to_analyze <- clean_list(opts$salmonella_serotypes)
+  report_progress("DATA", message=paste("Filtering for Salmonella serotypes:", 
+                                      paste(serotypes_to_analyze, collapse=", ")))
+  
+  # Find the likely serotype column
+  serotype_col <- NULL
+  if ("serotypesummary" %in% names(mmwrdata)) {
+    serotype_col <- "serotypesummary"
+  } else if ("sero2" %in% names(mmwrdata)) {
+    serotype_col <- "sero2"
+  } else if ("sero1" %in% names(mmwrdata)) {
+    serotype_col <- "sero1"
+  }
+  
+  if (!is.null(serotype_col)) {
+    # Filter Salmonella data by serotypes
     original_count <- nrow(mmwrdata)
-    mmwrdata <- mmwrdata[toupper(mmwrdata$state) %in% toupper(states_to_analyze), ]
+    sal_rows <- mmwrdata$pathogen == "SALMONELLA" & mmwrdata[[serotype_col]] %in% serotypes_to_analyze
+    other_path_rows <- mmwrdata$pathogen != "SALMONELLA"
+    mmwrdata <- mmwrdata[sal_rows | other_path_rows, ]
     new_count <- nrow(mmwrdata)
     
     report_progress("DATA", message=paste("Filtered from", original_count, 
-                                        "to", new_count, "records based on state selection"))
+                                        "to", new_count, "records based on Salmonella serotype selection"))
+  } else {
+    report_progress("WARNING", message="Could not identify serotype column for filtering")
   }
+}
 
-  # Apply Salmonella serotype filtering if specified
-  if (!is.null(opts$salmonella_serotypes)) {
-    serotypes_to_analyze <- clean_list(opts$salmonella_serotypes)
-    report_progress("DATA", message=paste("Filtering for Salmonella serotypes:", 
-                                        paste(serotypes_to_analyze, collapse=", ")))
-    
-    # Find the likely serotype column
-    serotype_col <- NULL
-    if ("serotypesummary" %in% names(mmwrdata)) {
-      serotype_col <- "serotypesummary"
-    } else if ("sero2" %in% names(mmwrdata)) {
-      serotype_col <- "sero2"
-    } else if ("sero1" %in% names(mmwrdata)) {
-      serotype_col <- "sero1"
-    }
-    
-    if (!is.null(serotype_col)) {
-      # Filter Salmonella data by serotypes
-      original_count <- nrow(mmwrdata)
-      sal_rows <- mmwrdata$pathogen == "SALMONELLA" & mmwrdata[[serotype_col]] %in% serotypes_to_analyze
-      other_path_rows <- mmwrdata$pathogen != "SALMONELLA"
-      mmwrdata <- mmwrdata[sal_rows | other_path_rows, ]
-      new_count <- nrow(mmwrdata)
-      
-      report_progress("DATA", message=paste("Filtered from", original_count, 
-                                          "to", new_count, "records based on Salmonella serotype selection"))
-    } else {
-      report_progress("WARNING", message="Could not identify serotype column for filtering")
-    }
+# After Salmonella serotype filtering, add STEC serotype filtering
+if (!is.null(opts$stec_serotypes)) {
+  serotypes_to_analyze <- clean_list(opts$stec_serotypes)
+  serotype_col <- NULL
+  if ("serotypesummary" %in% names(mmwrdata)) {
+    serotype_col <- "serotypesummary"
+  } else if ("sero2" %in% names(mmwrdata)) {
+    serotype_col <- "sero2"
+  } else if ("sero1" %in% names(mmwrdata)) {
+    serotype_col <- "sero1"
   }
-
-  # After Salmonella serotype filtering, add STEC serotype filtering
-  if (!is.null(opts$stec_serotypes)) {
-    serotypes_to_analyze <- clean_list(opts$stec_serotypes)
-    serotype_col <- NULL
-    if ("serotypesummary" %in% names(mmwrdata)) {
-      serotype_col <- "serotypesummary"
-    } else if ("sero2" %in% names(mmwrdata)) {
-      serotype_col <- "sero2"
-    } else if ("sero1" %in% names(mmwrdata)) {
-      serotype_col <- "sero1"
-    }
-    if (!is.null(serotype_col)) {
-      stec_rows <- mmwrdata$pathogen == "STEC" & mmwrdata[[serotype_col]] %in% serotypes_to_analyze
-      mmwrdata <- mmwrdata[stec_rows | mmwrdata$pathogen != "STEC", ]
-      report_progress("DATA", message=paste("Filtering for STEC serotypes:",
-                                            paste(serotypes_to_analyze, collapse=", ")))
-    } else {
-      report_progress("WARNING", message="Could not identify STEC serotype column for filtering")
-    }
+  if (!is.null(serotype_col)) {
+    stec_rows <- mmwrdata$pathogen == "STEC" & mmwrdata[[serotype_col]] %in% serotypes_to_analyze
+    mmwrdata <- mmwrdata[stec_rows | mmwrdata$pathogen != "STEC", ]
+    report_progress("DATA", message=paste("Filtering for STEC serotypes:",
+                                          paste(serotypes_to_analyze, collapse=", ")))
+  } else {
+    report_progress("WARNING", message="Could not identify STEC serotype column for filtering")
   }
+}
 
-  report_progress("DATA", message=paste("Processed", nrow(mmwrdata), "MMWR records"))
+report_progress("DATA", message=paste("Processed", nrow(mmwrdata), "MMWR records"))
 
-  # After importing mmwrdata
-  cat('DEBUG: Unique pathogens in mmwrdata:', paste(unique(mmwrdata$pathogen), collapse=', '), '\n')
-  cat('DEBUG: Unique years in mmwrdata:', paste(unique(mmwrdata$year), collapse=', '), '\n')
-  cat('DEBUG: Unique states in mmwrdata:', paste(unique(mmwrdata$state), collapse=', '), '\n')
-  cat('DEBUG: Number of records in mmwrdata:', nrow(mmwrdata), '\n')
-}, error = function(e) {
-  stop("Error importing MMWR data: ", e$message)
-})
+# After importing mmwrdata
+cat('DEBUG: Unique pathogens in mmwrdata:', paste(unique(mmwrdata$pathogen), collapse=', '), '\n')
+cat('DEBUG: Unique years in mmwrdata:', paste(unique(mmwrdata$year), collapse=', '), '\n')
+cat('DEBUG: Unique states in mmwrdata:', paste(unique(mmwrdata$state), collapse=', '), '\n')
+cat('DEBUG: Number of records in mmwrdata:', nrow(mmwrdata), '\n')
 
 # Import census data
 report_progress("DATA", message="Importing census data")

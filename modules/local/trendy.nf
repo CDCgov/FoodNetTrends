@@ -70,13 +70,17 @@ process TRENDY {
     echo "Using Census bacterial file: ${censusFileBact}" >> ${pathogen}_trendy.log
     echo "Using Census parasitic file: ${censusFileParas}" >> ${pathogen}_trendy.log
     
+    # Determine if census files are valid or empty
+    def censusB_arg = censusFileBact.exists() ? "--censusFileB=${censusFileBact.getName()}" : "--censusFileB=''"
+    def censusP_arg = censusFileParas.exists() ? "--censusFileP=${censusFileParas.getName()}" : "--censusFileP=''"
+    
     # Run the main trend analysis - use the filename only, not the full path
     # Nextflow stages input files in the work directory
     Rscript ${scripts_path}/trendy.R \
         --pathogen=${pathogen} \
         --mmwrFile=${mmwrFile.getName()} \
-        --censusFileB=${censusFileBact.getName()} \
-        --censusFileP=${censusFileParas.getName()} \
+        ${censusB_arg} \
+        ${censusP_arg} \
         --projID=${projID} \
         --travel=${filter_travel} \
         --cidt=${filter_cidt} \
