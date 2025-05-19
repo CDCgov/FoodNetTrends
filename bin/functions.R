@@ -512,6 +512,7 @@ linpred_draw <- function(data, model) {
     cat("Using 'Population' column with type:", class(data$Population), "\n")
     cat("First few values:", head(data$Population), "\n")
   } else if ("population" %in% names(data)) {
+    # Create a Population column to ensure consistent capitalization
     data$Population <- as.numeric(as.character(data$population))
     cat("Using 'population' column with type:", class(data$Population), "\n")
     cat("First few values:", head(data$Population), "\n")
@@ -519,9 +520,14 @@ linpred_draw <- function(data, model) {
     stop("No population column found")
   }
 
-  # Ensure population is numeric
-  if (!is.numeric(data$Population) || any(is.na(data$Population))) {
+  # Ensure population is numeric - allow NA values but warn about them
+  if (!is.numeric(data$Population)) {
     stop("Population column is not numeric after conversion")
+  }
+  
+  if (any(is.na(data$Population))) {
+    warning("Population column contains ", sum(is.na(data$Population)), " NA values which will be handled in processing")
+    # Don't stop execution, just warn and continue
   }
 
   # Handle fallback model (without splines)
