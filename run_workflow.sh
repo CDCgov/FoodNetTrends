@@ -56,7 +56,7 @@ source "$SCRIPT_DIR/execution.sh"
 # Get dashboard preferences
 get_dashboard_preference() {
   echo ""
-  echo -e "${BLUE}======== Dashboard Generation ========${NC}"
+  echo "======== Dashboard Generation ========"
   echo "An interactive HTML dashboard can be generated to visualize results."
   read -p "Generate interactive dashboard? (y/n) [y]: " enable_dashboard
   enable_dashboard=${enable_dashboard:-y}
@@ -150,7 +150,7 @@ main() {
       
       if [ $preprocess_result -eq 1 ]; then
         # Preprocessing failed
-        echo -e "${RED}Preprocessing failed. Exiting.${NC}"
+        echo "Preprocessing failed. Exiting."
         exit 1
       elif [ $preprocess_result -eq 0 ]; then
         # User chose not to continue to analysis
@@ -171,7 +171,7 @@ main() {
   # For modes 1 and 3, we need to ask for census files
   if [[ "$workflow_mode" == "1" || "$workflow_mode" == "3" ]]; then
     echo ""
-    echo -e "${BLUE}======== Census Files ========${NC}"
+    echo "======== Census Files ========"
     
     # Default census data files
     defaultCensusFileB="${DEFAULT_DATA_DIR}/cen9624.sas7bdat"
@@ -223,7 +223,7 @@ main() {
     # Use default values for resumed runs
     mcmc_params=(2 500 0.95 10)
     echo ""
-    echo -e "${BLUE}Resume Mode: Using parameters from previous run${NC}"
+    echo "Resume Mode: Using parameters from previous run"
   fi
   
   # Extract MCMC parameters
@@ -237,6 +237,8 @@ main() {
   
   # Get output directory
   outDir=$(get_output_directory "$outDir")
+  # Trim any leading/trailing spaces
+  outDir=$(echo "$outDir" | xargs)
   
   # Build the command
   resume_flag="false"
@@ -264,14 +266,14 @@ main() {
   
   # Get confirmation from user
   if get_execution_confirmation; then
-    echo -e "${GREEN}Starting analysis...${NC}"
+    echo "Starting analysis..."
     
     # Log file for background jobs
     log_file="logs/foodnet_run_${timestamp}.log"
     
     # Execute the command
     if ! execute_command "$final_cmd" "$outDir" "$background" "$log_file"; then
-      echo -e "${RED}Error in execution.${NC}"
+      echo "Error in execution."
       exit 1
     fi
   fi

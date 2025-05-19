@@ -15,16 +15,16 @@ get_mcmc_params() {
     
     # Validate chains
     if ! [[ "$chains" =~ ^[0-9]+$ ]]; then
-        echo -e "${RED}Error: Invalid input. Using default value (2).${NC}"
+        echo "Error: Invalid input. Using default value (2)."
         echo "$(date): Invalid chains value: ${chains}" >> "$error_log"
         chains=2
     elif [ "$chains" -lt 2 ]; then
-        echo -e "${YELLOW}Warning: At least 2 chains recommended for convergence diagnostics.${NC}"
-        echo -e "${YELLOW}Continuing with $chains chain(s).${NC}"
+        echo "Warning: At least 2 chains recommended for convergence diagnostics."
+        echo "Continuing with $chains chain(s)."
         echo "$(date): Using only ${chains} chain(s) (not recommended)" >> "$error_log"
     elif [ "$chains" -gt 8 ]; then
-        echo -e "${YELLOW}Warning: Large number of chains may significantly increase runtime.${NC}"
-        echo -e "${YELLOW}Continuing with $chains chains.${NC}"
+        echo "Warning: Large number of chains may significantly increase runtime."
+        echo "Continuing with $chains chains."
         echo "$(date): Using high chain count: ${chains}" >> "$error_log"
     fi
     
@@ -35,16 +35,16 @@ get_mcmc_params() {
     
     # Validate iterations
     if ! [[ "$iterations" =~ ^[0-9]+$ ]]; then
-        echo -e "${RED}Error: Invalid input. Using default value (500).${NC}"
+        echo "Error: Invalid input. Using default value (500)."
         echo "$(date): Invalid iterations value: ${iterations}" >> "$error_log"
         iterations=500
     elif [ "$iterations" -lt 200 ]; then
-        echo -e "${YELLOW}Warning: Low iteration count may lead to poor convergence.${NC}"
-        echo -e "${YELLOW}Continuing with $iterations iterations.${NC}"
+        echo "Warning: Low iteration count may lead to poor convergence."
+        echo "Continuing with $iterations iterations."
         echo "$(date): Low iteration count: ${iterations}" >> "$error_log"
     elif [ "$iterations" -gt 2000 ]; then
-        echo -e "${YELLOW}Warning: High iteration count will significantly increase runtime.${NC}"
-        echo -e "${YELLOW}Continuing with $iterations iterations.${NC}"
+        echo "Warning: High iteration count will significantly increase runtime."
+        echo "Continuing with $iterations iterations."
         echo "$(date): High iteration count: ${iterations}" >> "$error_log"
     fi
     
@@ -55,16 +55,16 @@ get_mcmc_params() {
     
     # Validate adapt delta without bc
     if [[ ! "$adapt_delta" =~ ^0?\.[0-9]+$ ]]; then
-        echo -e "${RED}Error: Invalid input. Using default value (0.95).${NC}"
+        echo "Error: Invalid input. Using default value (0.95)."
         echo "$(date): Invalid adapt_delta value: ${adapt_delta}" >> "$error_log"
         adapt_delta=0.95
     elif [[ "$adapt_delta" == "0.7"* ]] || [[ "$adapt_delta" == "0.6"* ]] || [[ "$adapt_delta" == "0.5"* ]] || [[ "$adapt_delta" == "0.4"* ]] || [[ "$adapt_delta" == "0.3"* ]] || [[ "$adapt_delta" == "0.2"* ]] || [[ "$adapt_delta" == "0.1"* ]] || [[ "$adapt_delta" == "0.0"* ]]; then
-        echo -e "${YELLOW}Warning: Low adapt_delta may cause algorithm issues.${NC}"
-        echo -e "${YELLOW}Continuing with adapt_delta=$adapt_delta.${NC}"
+        echo "Warning: Low adapt_delta may cause algorithm issues."
+        echo "Continuing with adapt_delta=$adapt_delta."
         echo "$(date): Low adapt_delta value: ${adapt_delta}" >> "$error_log"
     elif [[ "$adapt_delta" == "0.99"* ]] || [[ "$adapt_delta" == "1.0"* ]]; then
-        echo -e "${YELLOW}Warning: Very high adapt_delta may significantly increase runtime.${NC}"
-        echo -e "${YELLOW}Continuing with adapt_delta=$adapt_delta.${NC}"
+        echo "Warning: Very high adapt_delta may significantly increase runtime."
+        echo "Continuing with adapt_delta=$adapt_delta."
         echo "$(date): High adapt_delta value: ${adapt_delta}" >> "$error_log"
     fi
     
@@ -75,16 +75,16 @@ get_mcmc_params() {
     
     # Validate max treedepth
     if ! [[ "$max_treedepth" =~ ^[0-9]+$ ]]; then
-        echo -e "${RED}Error: Invalid input. Using default value (10).${NC}"
+        echo "Error: Invalid input. Using default value (10)."
         echo "$(date): Invalid max_treedepth: ${max_treedepth}" >> "$error_log"
         max_treedepth=10
     elif [ "$max_treedepth" -lt 8 ]; then
-        echo -e "${YELLOW}Warning: Low max_treedepth may cause truncated trajectories.${NC}"
-        echo -e "${YELLOW}Continuing with max_treedepth=$max_treedepth.${NC}"
+        echo "Warning: Low max_treedepth may cause truncated trajectories."
+        echo "Continuing with max_treedepth=$max_treedepth."
         echo "$(date): Low max_treedepth value: ${max_treedepth}" >> "$error_log"
     elif [ "$max_treedepth" -gt 15 ]; then
-        echo -e "${YELLOW}Warning: High max_treedepth will significantly increase runtime.${NC}"
-        echo -e "${YELLOW}Continuing with max_treedepth=$max_treedepth.${NC}"
+        echo "Warning: High max_treedepth will significantly increase runtime."
+        echo "Continuing with max_treedepth=$max_treedepth."
         echo "$(date): High max_treedepth value: ${max_treedepth}" >> "$error_log"
     fi
     
@@ -101,11 +101,11 @@ get_test_params() {
     local max_treedepth=8
     
     echo ""
-    echo -e "${BLUE}Test Mode: Using minimal settings${NC}"
-    echo -e "Chains: ${GREEN}$chains${NC}"
-    echo -e "Iterations: ${GREEN}$iterations${NC}"
-    echo -e "Adapt delta: ${GREEN}$adapt_delta${NC}"
-    echo -e "Max treedepth: ${GREEN}$max_treedepth${NC}"
+    echo "Test Mode: Using minimal settings"
+    echo "Chains: $chains"
+    echo "Iterations: $iterations"
+    echo "Adapt delta: $adapt_delta"
+    echo "Max treedepth: $max_treedepth"
     
     # Return as an array
     local params=("$chains" "$iterations" "$adapt_delta" "$max_treedepth")
@@ -128,26 +128,34 @@ build_command() {
     local states=${12}
     local serotype_param=${13}
     
+    # Trim whitespace from all path variables
+    censusFileB=$(echo "$censusFileB" | xargs)
+    censusFileP=$(echo "$censusFileP" | xargs)
+    outDir=$(echo "$outDir" | xargs)
+    
     local resume_flag=""
     if [[ "$resume" == "true" ]]; then
         resume_flag="-resume"
     fi
     
-    cmd="nextflow run main.nf -profile singularity ${resume_flag} -entry SPLINE \
-  --censusFileB \"${censusFileB}\" \
-  --censusFileP \"${censusFileP}\" \
-  --travel \"${travel}\" \
-  --cidt \"${cidt}\" \
-  --iterations ${iterations} \
-  --chains ${chains} \
-  --adapt_delta ${adapt_delta} \
-  --max_treedepth ${max_treedepth} \
-  --seed 123 \
-  --outdir \"${outDir}\" \
-  --pathogen \"${pathogens}\" \
-  --states \"${states}\" \
-  ${serotype_param}"
-  
+    cmd="nextflow run main.nf -profile singularity ${resume_flag} -entry SPLINE"
+    cmd="${cmd} --censusFileB \"${censusFileB}\""
+    cmd="${cmd} --censusFileP \"${censusFileP}\""
+    cmd="${cmd} --travel \"${travel}\""
+    cmd="${cmd} --cidt \"${cidt}\""
+    cmd="${cmd} --iterations ${iterations}"
+    cmd="${cmd} --chains ${chains}"
+    cmd="${cmd} --adapt_delta ${adapt_delta}"
+    cmd="${cmd} --max_treedepth ${max_treedepth}"
+    cmd="${cmd} --seed 123"
+    cmd="${cmd} --outdir \"${outDir}\""
+    cmd="${cmd} --pathogen \"${pathogens}\""
+    cmd="${cmd} --states \"${states}\""
+    
+    if [[ -n "$serotype_param" ]]; then
+        cmd="${cmd} ${serotype_param}"
+    fi
+    
     echo "$cmd"
 }
 
@@ -159,6 +167,10 @@ finalize_command() {
     local preprocessed_metadata=$4
     local background=$5
     local timestamp=$6
+    
+    # Trim whitespace from all path variables
+    mmwrFile=$(echo "$mmwrFile" | xargs)
+    preprocessed_metadata=$(echo "$preprocessed_metadata" | xargs)
     
     # Add mmwrFile parameter
     if [[ -n "$mmwrFile" ]]; then
@@ -185,7 +197,7 @@ finalize_command() {
         echo "$(date): Starting background process, log file at ${log_file}" >> "$error_log"
         bg_cmd="nohup ${cmd} > \"${log_file}\" 2>&1 &"
         final_cmd="${bg_cmd}"
-        echo -e "${YELLOW}Process will run in background with log: ${log_file}${NC}"
+        echo "Process will run in background with log: ${log_file}"
     fi
     
     echo "$final_cmd"
