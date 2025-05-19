@@ -68,31 +68,26 @@ process TRENDY {
     set -e
     echo "Starting analysis for pathogen: ${pathogen}" > ${pathogen}_trendy.log
     echo "Using MMWR data file: ${mmwrFile}" >> ${pathogen}_trendy.log
-    echo "Using Census bacterial file: ${censusFileBact}" >> ${pathogen}_trendy.log
-    echo "Using Census parasitic file: ${censusFileParas}" >> ${pathogen}_trendy.log
     
-    # Determine if census files are valid or empty - use bash conditions
-    CENSUS_B_ARG=""
-    CENSUS_P_ARG=""
-    
-    if [ -f "${censusFileBact}" ] && [ -s "${censusFileBact}" ]; then
+    # These files may not exist - just note whether they do
+    if [ -f "${censusFileBact}" ]; then
+        echo "Census bacterial file exists: ${censusFileBact}" >> ${pathogen}_trendy.log
         CENSUS_B_ARG="--censusFileB=${censusFileBact}"
-        echo "Census bacterial file exists and not empty" >> ${pathogen}_trendy.log
     else
+        echo "Census bacterial file does not exist, using empty string" >> ${pathogen}_trendy.log
         CENSUS_B_ARG="--censusFileB=''"
-        echo "Census bacterial file missing or empty" >> ${pathogen}_trendy.log
     fi
     
-    if [ -f "${censusFileParas}" ] && [ -s "${censusFileParas}" ]; then
+    if [ -f "${censusFileParas}" ]; then
+        echo "Census parasitic file exists: ${censusFileParas}" >> ${pathogen}_trendy.log
         CENSUS_P_ARG="--censusFileP=${censusFileParas}"
-        echo "Census parasitic file exists and not empty" >> ${pathogen}_trendy.log
     else
+        echo "Census parasitic file does not exist, using empty string" >> ${pathogen}_trendy.log
         CENSUS_P_ARG="--censusFileP=''"
-        echo "Census parasitic file missing or empty" >> ${pathogen}_trendy.log
     fi
     
     # Run the main trend analysis
-    Rscript ${scripts_path}/trendy.R \
+    Rscript \${scripts_path}/trendy.R \
         --pathogen=${pathogen} \
         --mmwrFile=${mmwrFile} \
         \${CENSUS_B_ARG} \
