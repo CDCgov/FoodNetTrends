@@ -564,40 +564,98 @@ if (censusFileB_readable) {
       # Add pathogen type and standardize column names
       census_b$pathogentype <- "Bacterial"
       
-      # Ensure column names are consistent
+      # Ensure column names are consistent - ROBUST METHOD
       if (!"state" %in% tolower(names(census_b))) {
         if ("STATE" %in% names(census_b)) {
-          census_b$state <- toupper(as.character(census_b$STATE))
+          # More robust handling for STATE conversion
+          tryCatch({
+            census_b$state <- toupper(as.character(census_b$STATE))
+          }, error = function(e) {
+            report_progress("WARNING", message=paste("Error converting STATE to state:", e$message))
+            # Create state column if conversion fails
+            census_b$state <- as.character(census_b$STATE)
+          })
         } else {
           # Create state column if missing
           report_progress("WARNING", message="No state column found in bacterial census file, using default states")
           census_b$state <- "CA"  # Default state
         }
       } else {
-        census_b$state <- toupper(as.character(census_b$state))
+        # More robust handling for state conversion
+        tryCatch({
+          census_b$state <- toupper(as.character(census_b$state))
+        }, error = function(e) {
+          report_progress("WARNING", message=paste("Error converting state to uppercase:", e$message))
+          # Keep state as is if conversion fails
+          # This ensures we don't lose the column
+        })
       }
       
       if (!"year" %in% tolower(names(census_b))) {
         if ("YEAR" %in% names(census_b)) {
-          census_b$year <- as.numeric(census_b$YEAR)
+          # More robust year conversion
+          tryCatch({
+            census_b$year <- as.numeric(as.character(census_b$YEAR))
+          }, error = function(e) {
+            report_progress("WARNING", message=paste("Error converting YEAR:", e$message))
+            census_b$year <- 2020  # Default year
+          })
         } else {
           # Create year column if missing
           report_progress("WARNING", message="No year column found in bacterial census file, using default years")
           census_b$year <- 2020  # Default year
         }
       } else {
-        census_b$year <- as.numeric(census_b$year)
+        # More robust handling for year conversion
+        tryCatch({
+          census_b$year <- as.numeric(as.character(census_b$year))
+        }, error = function(e) {
+          report_progress("WARNING", message=paste("Error converting year:", e$message))
+          # Try to keep years as is if conversion fails
+          # If needed, set default value for any non-convertible years
+          na_idx <- is.na(census_b$year)
+          if(any(na_idx)) {
+            census_b$year[na_idx] <- 2020
+          }
+        })
       }
       
       # Ensure population column exists
       if (!"population" %in% tolower(names(census_b))) {
         if ("POPULATION" %in% names(census_b)) {
-          census_b$population <- as.numeric(census_b$POPULATION)
+          # More robust population conversion
+          tryCatch({
+            census_b$population <- as.numeric(as.character(census_b$POPULATION))
+            # Replace NAs with default value
+            na_idx <- is.na(census_b$population)
+            if(any(na_idx)) {
+              report_progress("WARNING", message=paste(sum(na_idx), "NA population values replaced with default"))
+              census_b$population[na_idx] <- 10000000
+            }
+          }, error = function(e) {
+            report_progress("WARNING", message=paste("Error converting POPULATION:", e$message))
+            census_b$population <- 10000000  # Default population
+          })
         } else {
           # Create population column if missing
           report_progress("WARNING", message="No population column found in bacterial census file, using default value")
           census_b$population <- 10000000  # Default population
         }
+      } else {
+        # More robust population conversion
+        tryCatch({
+          # Convert to character first then numeric to avoid type errors
+          census_b$population <- as.numeric(as.character(census_b$population))
+          # Replace NAs with default value
+          na_idx <- is.na(census_b$population)
+          if(any(na_idx)) {
+            report_progress("WARNING", message=paste(sum(na_idx), "NA population values replaced with default"))
+            census_b$population[na_idx] <- 10000000
+          }
+        }, error = function(e) {
+          report_progress("WARNING", message=paste("Error converting population:", e$message))
+          # Keep existing values where possible
+        })
       }
       
       # Check if we have enough data
@@ -683,40 +741,98 @@ if (censusFileP_readable) {
       # Add pathogen type and standardize column names
       census_p$pathogentype <- "Parasitic"
       
-      # Ensure column names are consistent
+      # Ensure column names are consistent - ROBUST METHOD
       if (!"state" %in% tolower(names(census_p))) {
         if ("STATE" %in% names(census_p)) {
-          census_p$state <- toupper(as.character(census_p$STATE))
+          # More robust handling for STATE conversion
+          tryCatch({
+            census_p$state <- toupper(as.character(census_p$STATE))
+          }, error = function(e) {
+            report_progress("WARNING", message=paste("Error converting STATE to state:", e$message))
+            # Create state column if conversion fails
+            census_p$state <- as.character(census_p$STATE)
+          })
         } else {
           # Create state column if missing
           report_progress("WARNING", message="No state column found in parasitic census file, using default states")
           census_p$state <- "CA"  # Default state
         }
       } else {
-        census_p$state <- toupper(as.character(census_p$state))
+        # More robust handling for state conversion
+        tryCatch({
+          census_p$state <- toupper(as.character(census_p$state))
+        }, error = function(e) {
+          report_progress("WARNING", message=paste("Error converting state to uppercase:", e$message))
+          # Keep state as is if conversion fails
+          # This ensures we don't lose the column
+        })
       }
       
       if (!"year" %in% tolower(names(census_p))) {
         if ("YEAR" %in% names(census_p)) {
-          census_p$year <- as.numeric(census_p$YEAR)
+          # More robust year conversion
+          tryCatch({
+            census_p$year <- as.numeric(as.character(census_p$YEAR))
+          }, error = function(e) {
+            report_progress("WARNING", message=paste("Error converting YEAR:", e$message))
+            census_p$year <- 2020  # Default year
+          })
         } else {
           # Create year column if missing
           report_progress("WARNING", message="No year column found in parasitic census file, using default years")
           census_p$year <- 2020  # Default year
         }
       } else {
-        census_p$year <- as.numeric(census_p$year)
+        # More robust handling for year conversion
+        tryCatch({
+          census_p$year <- as.numeric(as.character(census_p$year))
+        }, error = function(e) {
+          report_progress("WARNING", message=paste("Error converting year:", e$message))
+          # Try to keep years as is if conversion fails
+          # If needed, set default value for any non-convertible years
+          na_idx <- is.na(census_p$year)
+          if(any(na_idx)) {
+            census_p$year[na_idx] <- 2020
+          }
+        })
       }
       
       # Ensure population column exists
       if (!"population" %in% tolower(names(census_p))) {
         if ("POPULATION" %in% names(census_p)) {
-          census_p$population <- as.numeric(census_p$POPULATION)
+          # More robust population conversion
+          tryCatch({
+            census_p$population <- as.numeric(as.character(census_p$POPULATION))
+            # Replace NAs with default value
+            na_idx <- is.na(census_p$population)
+            if(any(na_idx)) {
+              report_progress("WARNING", message=paste(sum(na_idx), "NA population values replaced with default"))
+              census_p$population[na_idx] <- 10000000
+            }
+          }, error = function(e) {
+            report_progress("WARNING", message=paste("Error converting POPULATION:", e$message))
+            census_p$population <- 10000000  # Default population
+          })
         } else {
           # Create population column if missing
           report_progress("WARNING", message="No population column found in parasitic census file, using default value")
           census_p$population <- 10000000  # Default population
         }
+      } else {
+        # More robust population conversion
+        tryCatch({
+          # Convert to character first then numeric to avoid type errors
+          census_p$population <- as.numeric(as.character(census_p$population))
+          # Replace NAs with default value
+          na_idx <- is.na(census_p$population)
+          if(any(na_idx)) {
+            report_progress("WARNING", message=paste(sum(na_idx), "NA population values replaced with default"))
+            census_p$population[na_idx] <- 10000000
+          }
+        }, error = function(e) {
+          report_progress("WARNING", message=paste("Error converting population:", e$message))
+          # Keep existing values where possible
+        })
       }
       
       # Check if we have enough data
