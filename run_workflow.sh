@@ -633,14 +633,22 @@ if [[ "$flag" == "resume" ]]; then
     cmd="$cmd -resume"
 fi
 
-cmd="$cmd --censusFileB \"${censusFileB}\""
-cmd="$cmd --censusFileP \"${censusFileP}\""
+# Only include census file parameters if they have non-empty values
+if [[ -n "${censusFileB}" && "${censusFileB}" != "true" ]]; then
+    cmd="$cmd --censusFileB \"${censusFileB}\""
+fi
+
+if [[ -n "${censusFileP}" && "${censusFileP}" != "true" ]]; then
+    cmd="$cmd --censusFileP \"${censusFileP}\""
+fi
+
 cmd="$cmd --travel \"${travel}\""
 cmd="$cmd --cidt \"${cidt}\""
 cmd="$cmd --iterations ${iterations}"
 cmd="$cmd --chains ${chains}"
 cmd="$cmd --adapt_delta ${adapt_delta}"
 cmd="$cmd --max_treedepth ${max_treedepth}"
+cmd="$cmd --cores ${chains}"
 cmd="$cmd --seed 123"
 cmd="$cmd --outdir \"${outDir}\""
 cmd="$cmd --pathogen \"${pathogens}\""
