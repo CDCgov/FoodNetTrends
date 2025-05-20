@@ -444,6 +444,36 @@ if (preprocessed) {
   })
 }
 
+# After importing mmwrdata
+cat('DEBUG: Unique pathogens in mmwrdata:', paste(unique(mmwrdata$pathogen), collapse=', '), '\n')
+cat('DEBUG: Unique years in mmwrdata:', paste(unique(mmwrdata$year), collapse=', '), '\n')
+cat('DEBUG: Unique states in mmwrdata:', paste(unique(mmwrdata$state), collapse=', '), '\n')
+cat('DEBUG: Number of records in mmwrdata:', nrow(mmwrdata), '\n')
+
+# Debug information for census data (use existing census data from earlier import)
+cat('DEBUG: Unique states in census:', paste(unique(census$state), collapse=', '), '\n')
+cat('DEBUG: Unique years in census:', paste(unique(census$year), collapse=', '), '\n')
+cat('DEBUG: Number of records in census:', nrow(census), '\n')
+  
+# After importing mmwrdata and census, compare (state, year) pairs for coverage
+mmwr_pairs <- unique(mmwrdata[, c("state", "year")])
+census_pairs <- unique(census[, c("state", "year")])
+
+# Find (state, year) pairs in MMWR but not in census
+mmwr_not_in_census <- anti_join(mmwr_pairs, census_pairs, by = c("state", "year"))
+# Find (state, year) pairs in census but not in MMWR
+census_not_in_mmwr <- anti_join(census_pairs, mmwr_pairs, by = c("state", "year"))
+
+# Print summary to console
+cat('PREPROCESS CHECK: (state, year) pairs in MMWR but missing in census:', nrow(mmwr_not_in_census), '\n')
+if (nrow(mmwr_not_in_census) > 0) {
+  print(mmwr_not_in_census)
+}
+cat('PREPROCESS CHECK: (state, year) pairs in census but missing in MMWR:', nrow(census_not_in_mmwr), '\n')
+if (nrow(census_not_in_mmwr) > 0) {
+  print(census_not_in_mmwr)
+}
+
 # Load or create census data
 census <- NULL
 censusFileB_readable <- (!is.null(censusFileB) && censusFileB != "" && censusFileB != "''")
@@ -691,22 +721,17 @@ if (!census_p_loaded) {
   }
 }
 
-# Make sure we separate census data for bacterial and parasitic pathogens
-censusFileB <- census[census$pathogentype == "Bacterial", ]
+# Separate census data for bacterial and parasitic pathogens
+censusBact <- census[census$pathogentype == "Bacterial", ]
 censusParas <- census[census$pathogentype == "Parasitic", ]
 
-# Apply state filtering if specified
+# Apply state filtering to census data if specified
 if (!is.null(opts$states)) {
   states_to_analyze <- clean_list(opts$states)
-  report_progress("DATA", message=paste("Filtering for states:", paste(states_to_analyze, collapse=", ")))
-  
-  # Filter data by states
-  original_count <- nrow(mmwrdata)
-  mmwrdata <- mmwrdata[toupper(mmwrdata$state) %in% toupper(states_to_analyze), ]
-  new_count <- nrow(mmwrdata)
-  
-  report_progress("DATA", message=paste("Filtered from", original_count, 
-                                      "to", new_count, "records based on state selection"))
+  # Filter census data by states
+  census <- census[toupper(census$state) %in% toupper(states_to_analyze), ]
+  report_progress("DATA", message=paste("Filtered census data to", 
+                                      length(unique(census$state)), "states"))
 }
 
 # Apply Salmonella serotype filtering if specified
@@ -769,417 +794,28 @@ cat('DEBUG: Unique years in mmwrdata:', paste(unique(mmwrdata$year), collapse=',
 cat('DEBUG: Unique states in mmwrdata:', paste(unique(mmwrdata$state), collapse=', '), '\n')
 cat('DEBUG: Number of records in mmwrdata:', nrow(mmwrdata), '\n')
 
-# Import census data
-report_progress("DATA", message="Importing census data")
-tryCatch({
-  census <- NULL
-  census_b_loaded <- FALSE
-  census_p_loaded <- FALSE
+# Debug information for census data (use existing census data from earlier import)
+cat('DEBUG: Unique states in census:', paste(unique(census$state), collapse=', '), '\n')
+cat('DEBUG: Unique years in census:', paste(unique(census$year), collapse=', '), '\n')
+cat('DEBUG: Number of records in census:', nrow(census), '\n')
   
-  # Process bacterial census file
-  if (!is.null(censusFileB) && censusFileB != "" && censusFileB != "''") {
-    # First check if file exists before attempting to read it
-    if (file.exists(censusFileB)) {
-      # Determine file type by extension
-      file_ext <- tolower(tools::file_ext(censusFileB))
-      
-      if (file_ext == "csv") {
-        # Read as CSV
-        report_progress("DATA", message=paste("Reading bacterial census as CSV:", censusFileB))
-        census_b <- tryCatch({
-          read.csv(censusFileB, stringsAsFactors = FALSE)
-        }, error = function(e) {
-          report_progress("WARNING", message=paste("Error reading bacterial census CSV:", e$message))
-          NULL
-        })
-      } else if (file_ext == "sas7bdat") {
-        # Read as SAS file
-        report_progress("DATA", message=paste("Reading bacterial census as SAS:", censusFileB))
-        census_b <- tryCatch({
-          # Convert haven read_sas output to data.frame immediately to avoid type issues
-          out <- as.data.frame(haven::read_sas(censusFileB))
-          report_progress("DEBUG", message=paste("SAS file loaded, column names:", paste(names(out), collapse=", ")))
-          out
-        }, error = function(e) {
-          report_progress("WARNING", message=paste("Error reading bacterial census SAS file:", e$message))
-          NULL
-        })
-      } else {
-        # Try to read as CSV by default
-        report_progress("DATA", message=paste("Trying to read bacterial census as CSV:", censusFileB))
-        census_b <- tryCatch({
-          read.csv(censusFileB, stringsAsFactors = FALSE)
-        }, error = function(e) {
-          report_progress("WARNING", message=paste("Error reading bacterial census file:", e$message))
-          NULL
-        })
-      }
-      
-      if (!is.null(census_b)) {
-        # Ensure column names are lowercase
-        names(census_b) <- tolower(names(census_b))
-        
-        # Report columns found
-        report_progress("DEBUG", message=paste("Census columns found:", paste(names(census_b), collapse=", ")))
-        
-        # Ensure required columns exist, create them if missing
-        if (!"state" %in% names(census_b)) {
-          report_progress("WARNING", message="No 'state' column found in bacterial census file, creating one with default values")
-          census_b$state <- "DEFAULT"
-        }
-        
-        if (!"year" %in% names(census_b)) {
-          report_progress("WARNING", message="No 'year' column found in bacterial census file, creating one with default values")
-          census_b$year <- 2020
-        }
-        
-        if (!"population" %in% names(census_b)) {
-          report_progress("WARNING", message="No 'population' column found in bacterial census file, creating one with default values")
-          census_b$population <- 10000000
-        }
-        
-        # Ensure pathogentype column exists
-        if (!"pathogentype" %in% names(census_b)) {
-          census_b$pathogentype <- "Bacterial"
-        }
-        
-        # Ensure proper types for key columns
-        census_b$state <- toupper(as.character(census_b$state))
-        census_b$year <- as.numeric(as.character(census_b$year))
-        census_b$population <- as.numeric(as.character(census_b$population))
-        census_b$pathogentype <- as.character(census_b$pathogentype)
-        
-        # Remove NA values to avoid join issues
-        census_b <- census_b[!is.na(census_b$state) & !is.na(census_b$year) & !is.na(census_b$population), ]
-        
-        # Check if we have enough data
-        if (nrow(census_b) > 0) {
-          census <- census_b
-          census_b_loaded <- TRUE
-          report_progress("DATA", message=paste("Processed bacterial census with", nrow(census_b), "records"))
-          
-          # Debug census data
-          top_rows <- head(census_b, 5)
-          report_progress("DEBUG", message=paste("First few bacterial census records:"))
-          for (i in 1:min(5, nrow(top_rows))) {
-            report_progress("DEBUG", message=paste("  Record", i, ": state =", top_rows$state[i], 
-                                                "year =", top_rows$year[i], 
-                                                "population =", top_rows$population[i],
-                                                "pathogentype =", top_rows$pathogentype[i]))
-          }
-        } else {
-          report_progress("WARNING", message="Bacterial census file is empty, will use generated data")
-        }
-      }
-    } else {
-      report_progress("WARNING", message=paste("Bacterial census file not found:", censusFileB))
-    }
-  }
-  
-  # Process parasitic census file - similar structure to bacterial census
-  if (!is.null(censusFileP) && censusFileP != "" && censusFileP != "''") {
-    if (file.exists(censusFileP)) {
-      # Determine file type by extension
-      file_ext <- tolower(tools::file_ext(censusFileP))
-      
-      if (file_ext == "csv") {
-        # Read as CSV
-        report_progress("DATA", message=paste("Reading parasitic census as CSV:", censusFileP))
-        census_p <- tryCatch({
-          read.csv(censusFileP, stringsAsFactors = FALSE)
-        }, error = function(e) {
-          report_progress("WARNING", message=paste("Error reading parasitic census CSV:", e$message))
-          NULL
-        })
-      } else if (file_ext == "sas7bdat") {
-        # Read as SAS file 
-        report_progress("DATA", message=paste("Reading parasitic census as SAS:", censusFileP))
-        census_p <- tryCatch({
-          # Convert haven read_sas output to data.frame immediately to avoid type issues
-          out <- as.data.frame(haven::read_sas(censusFileP))
-          report_progress("DEBUG", message=paste("SAS file loaded, column names:", paste(names(out), collapse=", ")))
-          out
-        }, error = function(e) {
-          report_progress("WARNING", message=paste("Error reading parasitic census SAS file:", e$message))
-          NULL
-        })
-      } else {
-        # Try to read as CSV by default
-        report_progress("DATA", message=paste("Trying to read parasitic census as CSV:", censusFileP))
-        census_p <- tryCatch({
-          read.csv(censusFileP, stringsAsFactors = FALSE)
-        }, error = function(e) {
-          report_progress("WARNING", message=paste("Error reading parasitic census file:", e$message))
-          NULL
-        })
-      }
-      
-      if (!is.null(census_p)) {
-        # Ensure column names are lowercase
-        names(census_p) <- tolower(names(census_p))
-        
-        # Report columns found
-        report_progress("DEBUG", message=paste("Census columns found:", paste(names(census_p), collapse=", ")))
-        
-        # Ensure required columns exist, create them if missing
-        if (!"state" %in% names(census_p)) {
-          report_progress("WARNING", message="No 'state' column found in parasitic census file, creating one with default values")
-          census_p$state <- "DEFAULT"
-        }
-        
-        if (!"year" %in% names(census_p)) {
-          report_progress("WARNING", message="No 'year' column found in parasitic census file, creating one with default values")
-          census_p$year <- 2020
-        }
-        
-        if (!"population" %in% names(census_p)) {
-          report_progress("WARNING", message="No 'population' column found in parasitic census file, creating one with default values")
-          census_p$population <- 10000000
-        }
-        
-        # Ensure pathogentype column exists
-        if (!"pathogentype" %in% names(census_p)) {
-          census_p$pathogentype <- "Parasitic"
-        }
-        
-        # Ensure proper types for key columns
-        census_p$state <- toupper(as.character(census_p$state))
-        census_p$year <- as.numeric(as.character(census_p$year))
-        census_p$population <- as.numeric(as.character(census_p$population))
-        census_p$pathogentype <- as.character(census_p$pathogentype)
-        
-        # Remove NA values to avoid join issues
-        census_p <- census_p[!is.na(census_p$state) & !is.na(census_p$year) & !is.na(census_p$population), ]
-        
-        # Check if we have enough data
-        if (nrow(census_p) > 0) {
-          if (is.null(census)) {
-            census <- census_p
-          } else {
-            # Use rbind.data.frame to ensure consistent handling
-            census <- rbind.data.frame(census, census_p)
-          }
-          census_p_loaded <- TRUE
-          report_progress("DATA", message=paste("Processed parasitic census with", nrow(census_p), "records"))
-          
-          # Debug census data
-          top_rows <- head(census_p, 5)
-          report_progress("DEBUG", message=paste("First few parasitic census records:"))
-          for (i in 1:min(5, nrow(top_rows))) {
-            report_progress("DEBUG", message=paste("  Record", i, ": state =", top_rows$state[i], 
-                                                "year =", top_rows$year[i], 
-                                                "population =", top_rows$population[i],
-                                                "pathogentype =", top_rows$pathogentype[i]))
-          }
-        } else {
-          report_progress("WARNING", message="Parasitic census file is empty, will use generated data")
-        }
-      }
-    } else {
-      report_progress("WARNING", message=paste("Parasitic census file not found:", censusFileP))
-    }
-  }
-  
-  # Generate placeholder data if either census file wasn't loaded
-  if (!census_b_loaded || !census_p_loaded) {
-    # Extract states and years from MMWR data
-    report_progress("DATA", message="Creating placeholder census data")
-    
-    # Safe extraction of states
-    all_states <- tryCatch({
-      unique(as.character(mmwrdata$state))
-    }, error = function(e) {
-      report_progress("WARNING", message=paste("Error extracting states:", e$message))
-      c("CA", "CO", "CT", "GA", "MD", "MN", "NM", "NY", "OR", "TN")
-    })
-    
-    # Safely handle years conversion
-    all_years <- tryCatch({
-      # First ensure mmwrdata$year exists and isn't all NA
-      if ("year" %in% names(mmwrdata) && !all(is.na(mmwrdata$year))) {
-        # Convert to character first then numeric to handle various types
-        years_char <- as.character(mmwrdata$year)
-        years_num <- suppressWarnings(as.numeric(years_char))
-        # Filter out NA values that couldn't be converted
-        years_clean <- years_num[!is.na(years_num)]
-        if (length(years_clean) > 0) {
-          # Return unique years if we have any
-          unique(years_clean)
-        } else {
-          # Default to current year if no valid years found
-          as.numeric(format(Sys.Date(), "%Y"))
-        }
-      } else {
-        # Default to current year if year column doesn't exist
-        as.numeric(format(Sys.Date(), "%Y"))
-      }
-    }, error = function(e) {
-      report_progress("WARNING", message=paste("Error extracting years:", e$message))
-      # Default to current year on error
-      as.numeric(format(Sys.Date(), "%Y"))
-    })
-    
-    # If we don't have states or years, use defaults
-    if (length(all_states) == 0) {
-      all_states <- c("CA", "CO", "CT", "GA", "MD", "MN", "NM", "NY", "OR", "TN")
-      report_progress("WARNING", message="No states found in MMWR data, using default states")
-    }
-    
-    if (length(all_years) == 0) {
-      all_years <- as.numeric(format(Sys.Date(), "%Y"))
-      report_progress("WARNING", message="No years found in MMWR data, using current year")
-    }
-    
-    # Create placeholder bacterial census data if needed
-    if (!census_b_loaded) {
-      report_progress("WARNING", message="Creating placeholder bacterial census data")
-      
-      # Create a data frame with all state-year combinations
-      census_b <- expand.grid(
-        state = all_states,
-        year = all_years,
-        stringsAsFactors = FALSE
-      )
-      
-      # Add population and pathogen type
-      census_b$population <- 10000000
-      census_b$pathogentype <- "Bacterial"
-      
-      if (is.null(census)) {
-        census <- census_b
-      } else {
-        # Use rbind.data.frame to ensure consistent handling
-        census <- rbind.data.frame(census, census_b)
-      }
-      
-      report_progress("DATA", message=paste("Created placeholder bacterial census with", 
-                                          nrow(census_b), "records"))
-    }
-    
-    # Create placeholder parasitic census data if needed
-    if (!census_p_loaded) {
-      report_progress("WARNING", message="Creating placeholder parasitic census data")
-      
-      # Create a data frame with all state-year combinations
-      census_p <- expand.grid(
-        state = all_states,
-        year = all_years,
-        stringsAsFactors = FALSE
-      )
-      
-      # Add population and pathogen type
-      census_p$population <- 5000000
-      census_p$pathogentype <- "Parasitic"
-      
-      if (is.null(census)) {
-        census <- census_p
-      } else {
-        # Use rbind.data.frame to ensure consistent handling
-        census <- rbind.data.frame(census, census_p)
-      }
-      
-      report_progress("DATA", message=paste("Created placeholder parasitic census with", 
-                                          nrow(census_p), "records"))
-    }
-  }
-  
-  # Final validation checks and cleanup
-  
-  # Check that we have census data
-  if (is.null(census) || nrow(census) == 0) {
-    stop("No census data available after processing all sources")
-  }
-  
-  # Convert to data.frame if it's a tibble or other class
-  census <- as.data.frame(census)
-  
-  # Make sure census has the required columns
-  required_cols <- c("state", "year", "population", "pathogentype")
-  missing_cols <- required_cols[!required_cols %in% names(census)]
-  if (length(missing_cols) > 0) {
-    stop("Census data is missing required columns: ", paste(missing_cols, collapse=", "))
-  }
-  
-  # Final type conversions with explicit error handling
-  census$state <- toupper(as.character(census$state))
-  census$year <- as.numeric(as.character(census$year))
-  census$population <- as.numeric(as.character(census$population))
-  census$pathogentype <- as.character(census$pathogentype)
-  
-  # Remove any NA values that might have been introduced during conversion
-  na_rows <- is.na(census$state) | is.na(census$year) | is.na(census$population) | is.na(census$pathogentype)
-  if (any(na_rows)) {
-    report_progress("WARNING", message=paste("Removing", sum(na_rows), "rows with NA values"))
-    census <- census[!na_rows, ]
-  }
-  
-  report_progress("DATA", message=paste("Processed census data with",
-                                       length(unique(census$year)), "years and",
-                                       length(unique(census$state)), "states and",
-                                       length(unique(census$pathogentype)), "pathogen types"))
-  
-  # Confirm column types for debugging
-  report_progress("DEBUG", message=paste("Census column types:", 
-                                       "state =", class(census$state),
-                                       "year =", class(census$year),
-                                       "population =", class(census$population),
-                                       "pathogentype =", class(census$pathogentype)))
-  
-  # After importing census
-  debug_census_states <- unique(census$state)
-  debug_census_years <- unique(census$year)
-  cat('DEBUG: Unique states in census:', paste(debug_census_states, collapse=', '), '\n')
-  cat('DEBUG: Unique years in census:', paste(debug_census_years, collapse=', '), '\n')
-  cat('DEBUG: Number of records in census:', nrow(census), '\n')
-  
-  # Separate census data for bacterial and parasitic pathogens
-  censusFileB <- census[census$pathogentype == "Bacterial", ]
-  censusParas <- census[census$pathogentype == "Parasitic", ]
-  
-  # Apply state filtering to census data if specified
-  if (!is.null(opts$states)) {
-    states_to_analyze <- clean_list(opts$states)
-    # Filter census data by states
-    census <- census[toupper(census$state) %in% toupper(states_to_analyze), ]
-    report_progress("DATA", message=paste("Filtered census data to", 
-                                        length(unique(census$state)), "states"))
-  }
+# After importing mmwrdata and census, compare (state, year) pairs for coverage
+mmwr_pairs <- unique(mmwrdata[, c("state", "year")])
+census_pairs <- unique(census[, c("state", "year")])
 
-}, error = function(e) {
-  # Print detailed error information for easier debugging
-  cat("ERROR DETAILS:\n")
-  cat("Error Message:", e$message, "\n")
-  cat("Call:", deparse(e$call), "\n")
-  
-  # Try to print traceback if available
-  if (exists("traceback")) {
-    cat("Traceback:\n")
-    print(traceback())
-  }
-  
-  stop("Error importing census data: ", e$message)
-})
+# Find (state, year) pairs in MMWR but not in census
+mmwr_not_in_census <- anti_join(mmwr_pairs, census_pairs, by = c("state", "year"))
+# Find (state, year) pairs in census but not in MMWR
+census_not_in_mmwr <- anti_join(census_pairs, mmwr_pairs, by = c("state", "year"))
 
-# Continue with coverage checking if census exists
-if (exists("census") && !is.null(census)) {
-  # After importing mmwrdata and census, compare (state, year) pairs for coverage
-  mmwr_pairs <- unique(mmwrdata[, c("state", "year")])
-  census_pairs <- unique(census[, c("state", "year")])
-
-  # Find (state, year) pairs in MMWR but not in census
-  mmwr_not_in_census <- anti_join(mmwr_pairs, census_pairs, by = c("state", "year"))
-  # Find (state, year) pairs in census but not in MMWR
-  census_not_in_mmwr <- anti_join(census_pairs, mmwr_pairs, by = c("state", "year"))
-
-  # Print summary to console
-  cat('PREPROCESS CHECK: (state, year) pairs in MMWR but missing in census:', nrow(mmwr_not_in_census), '\n')
-  if (nrow(mmwr_not_in_census) > 0) {
-    print(mmwr_not_in_census)
-  }
-  cat('PREPROCESS CHECK: (state, year) pairs in census but missing in MMWR:', nrow(census_not_in_mmwr), '\n')
-  if (nrow(census_not_in_mmwr) > 0) {
-    print(census_not_in_mmwr)
-  }
+# Print summary to console
+cat('PREPROCESS CHECK: (state, year) pairs in MMWR but missing in census:', nrow(mmwr_not_in_census), '\n')
+if (nrow(mmwr_not_in_census) > 0) {
+  print(mmwr_not_in_census)
+}
+cat('PREPROCESS CHECK: (state, year) pairs in census but missing in MMWR:', nrow(census_not_in_mmwr), '\n')
+if (nrow(census_not_in_mmwr) > 0) {
+  print(census_not_in_mmwr)
 }
 
 # ==========================================================================
