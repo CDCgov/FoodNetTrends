@@ -26,7 +26,7 @@
  *   - Retries on memory/resource errors
  *   - Detailed logging for diagnostics
  *
- * Last updated: 2025-05-20
+ * Last updated: 2025-05-21
  * ==================================================================
  */
 
@@ -67,20 +67,54 @@ process TRENDY {
     // Get file extension to handle CSV vs SAS files properly
     def mmwrExt = mmwrFile.toString().toLowerCase().endsWith('.csv') ? 'csv' : 'sas7bdat'
     """
-    set -e
+    #!/usr/bin/env bash
+    set -e  # Exit immediately if a command exits with non-zero status
+    
+    # Setup error handling
+    error_exit() {
+        echo "ERROR: \$1" >> ${pathogen}_trendy.log
+        exit 1
+    }
+    
+    # Log start of analysis
     echo "Starting analysis for pathogen: ${pathogen}" > ${pathogen}_trendy.log
     echo "Using MMWR data file: ${mmwrFile} (${mmwrExt} format)" >> ${pathogen}_trendy.log
     
     # Make a local copy of the MMWR file to handle path issues
-    cp -v "${mmwrFile}" ./input_data.${mmwrExt}
+    cp -v "${mmwrFile}" ./input_data.${mmwrExt} || error_exit "Failed to copy MMWR file"
     echo "Created local copy of MMWR file as: input_data.${mmwrExt}" >> ${pathogen}_trendy.log
     
-    # Check for census files with correct basename
-    census_bact_basename=\$(basename "${censusFileBVal}")
-    census_para_basename=\$(basename "${censusFilePVal}")
+    # Default to using placeholders
+    CENSUS_B_ARG="--censusFileB=empty_census_bact.csv" 
+    CENSUS_P_ARG="--censusFileP=empty_census_para.csv"
     
-    # Create empty placeholder files if needed
-    if [ ! -f "${censusFileBVal}" ] || [ ! -s "${censusFileBVal}" ]; then
+    # Handle census bacterial file
+    if [ -f "${censusFileBVal}" ] && [ -s "${censusFileBVal}" ]; then
+        # File exists and is not empty
+        echo "Census bacterial file exists: ${censusFileBVal}" >> ${pathogen}_trendy.log
+        
+        # Get file extension from basename
+        CENSUS_B_BASENAME=\$(basename "${censusFileBVal}")
+        CENSUS_B_EXT="\${CENSUS_B_BASENAME##*.}"
+        echo "Census bacterial file extension: \${CENSUS_B_EXT}" >> ${pathogen}_trendy.log
+        
+        # Create appropriate local copy based on extension
+        if [ "\${CENSUS_B_EXT}" = "csv" ]; then
+            cp -v "${censusFileBVal}" ./census_bact.csv || error_exit "Failed to copy census bacterial CSV file"
+            echo "Created local copy of census bacterial file as: census_bact.csv" >> ${pathogen}_trendy.log
+            CENSUS_B_ARG="--censusFileB=census_bact.csv"
+        elif [ "\${CENSUS_B_EXT}" = "sas7bdat" ]; then
+            cp -v "${censusFileBVal}" ./census_bact.sas7bdat || error_exit "Failed to copy census bacterial SAS file"
+            echo "Created local copy of census bacterial file as: census_bact.sas7bdat" >> ${pathogen}_trendy.log
+            CENSUS_B_ARG="--censusFileB=census_bact.sas7bdat"
+        else
+            echo "Unknown census bacterial file extension, defaulting to CSV" >> ${pathogen}_trendy.log
+            cp -v "${censusFileBVal}" ./census_bact.csv || error_exit "Failed to copy census bacterial file"
+            echo "Created local copy of census bacterial file as: census_bact.csv" >> ${pathogen}_trendy.log
+            CENSUS_B_ARG="--censusFileB=census_bact.csv"
+        fi
+    else
+        # Create empty placeholder
         echo "Census bacterial file missing or empty, creating placeholder" >> ${pathogen}_trendy.log
         echo "state,population,year,pathogentype" > empty_census_bact.csv
         echo "CA,10000000,2020,Bacterial" >> empty_census_bact.csv
@@ -94,25 +128,35 @@ process TRENDY {
         echo "OR,3000000,2020,Bacterial" >> empty_census_bact.csv
         echo "TN,5000000,2020,Bacterial" >> empty_census_bact.csv
         CENSUS_B_ARG="--censusFileB=empty_census_bact.csv"
-    else
-        # Create local copy of census file with the correct extension
-        if [[ "${census_bact_basename}" == *.csv ]]; then
-            cp -v "${censusFileBVal}" ./census_bact.csv
-            echo "Created local copy of census bacterial file as: census_bact.csv" >> ${pathogen}_trendy.log
-            CENSUS_B_ARG="--censusFileB=census_bact.csv"
-        elif [[ "${census_bact_basename}" == *.sas7bdat ]]; then
-            cp -v "${censusFileBVal}" ./census_bact.sas7bdat
-            echo "Created local copy of census bacterial file as: census_bact.sas7bdat" >> ${pathogen}_trendy.log
-            CENSUS_B_ARG="--censusFileB=census_bact.sas7bdat"
-        else
-            # Default to csv format if extension is unknown
-            cp -v "${censusFileBVal}" ./census_bact.csv
-            echo "Created local copy of census bacterial file as: census_bact.csv" >> ${pathogen}_trendy.log
-            CENSUS_B_ARG="--censusFileB=census_bact.csv"
-        fi
     fi
     
-    if [ ! -f "${censusFilePVal}" ] || [ ! -s "${censusFilePVal}" ]; then
+    # Handle census parasitic file
+    if [ -f "${censusFilePVal}" ] && [ -s "${censusFilePVal}" ]; then
+        # File exists and is not empty
+        echo "Census parasitic file exists: ${censusFilePVal}" >> ${pathogen}_trendy.log
+        
+        # Get file extension from basename
+        CENSUS_P_BASENAME=\$(basename "${censusFilePVal}")
+        CENSUS_P_EXT="\${CENSUS_P_BASENAME##*.}"
+        echo "Census parasitic file extension: \${CENSUS_P_EXT}" >> ${pathogen}_trendy.log
+        
+        # Create appropriate local copy based on extension
+        if [ "\${CENSUS_P_EXT}" = "csv" ]; then
+            cp -v "${censusFilePVal}" ./census_para.csv || error_exit "Failed to copy census parasitic CSV file"
+            echo "Created local copy of census parasitic file as: census_para.csv" >> ${pathogen}_trendy.log
+            CENSUS_P_ARG="--censusFileP=census_para.csv"
+        elif [ "\${CENSUS_P_EXT}" = "sas7bdat" ]; then
+            cp -v "${censusFilePVal}" ./census_para.sas7bdat || error_exit "Failed to copy census parasitic SAS file"
+            echo "Created local copy of census parasitic file as: census_para.sas7bdat" >> ${pathogen}_trendy.log
+            CENSUS_P_ARG="--censusFileP=census_para.sas7bdat"
+        else
+            echo "Unknown census parasitic file extension, defaulting to CSV" >> ${pathogen}_trendy.log
+            cp -v "${censusFilePVal}" ./census_para.csv || error_exit "Failed to copy census parasitic file"
+            echo "Created local copy of census parasitic file as: census_para.csv" >> ${pathogen}_trendy.log
+            CENSUS_P_ARG="--censusFileP=census_para.csv"
+        fi
+    else
+        # Create empty placeholder
         echo "Census parasitic file missing or empty, creating placeholder" >> ${pathogen}_trendy.log
         echo "state,population,year,pathogentype" > empty_census_para.csv
         echo "CA,10000000,2020,Parasitic" >> empty_census_para.csv
@@ -126,22 +170,6 @@ process TRENDY {
         echo "OR,3000000,2020,Parasitic" >> empty_census_para.csv
         echo "TN,5000000,2020,Parasitic" >> empty_census_para.csv
         CENSUS_P_ARG="--censusFileP=empty_census_para.csv"
-    else
-        # Create local copy of census file with the correct extension
-        if [[ "${census_para_basename}" == *.csv ]]; then
-            cp -v "${censusFilePVal}" ./census_para.csv
-            echo "Created local copy of census parasitic file as: census_para.csv" >> ${pathogen}_trendy.log
-            CENSUS_P_ARG="--censusFileP=census_para.csv"
-        elif [[ "${census_para_basename}" == *.sas7bdat ]]; then
-            cp -v "${censusFilePVal}" ./census_para.sas7bdat
-            echo "Created local copy of census parasitic file as: census_para.sas7bdat" >> ${pathogen}_trendy.log
-            CENSUS_P_ARG="--censusFileP=census_para.sas7bdat"
-        else
-            # Default to csv format if extension is unknown
-            cp -v "${censusFilePVal}" ./census_para.csv
-            echo "Created local copy of census parasitic file as: census_para.csv" >> ${pathogen}_trendy.log
-            CENSUS_P_ARG="--censusFileP=census_para.csv"
-        fi
     fi
     
     # Show file information
@@ -157,30 +185,25 @@ process TRENDY {
     
     # Check that R script exists
     if [ ! -f "\${SCRIPT_PATH}" ]; then
-        echo "ERROR: R script not found at \${SCRIPT_PATH}" >> ${pathogen}_trendy.log
-        echo "Directory contents of ${scripts_path}:" >> ${pathogen}_trendy.log
-        ls -la "${scripts_path}" >> ${pathogen}_trendy.log
-        exit 1
+        error_exit "R script not found at \${SCRIPT_PATH}. Directory contents of ${scripts_path}: \$(ls -la ${scripts_path})"
     fi
     
     # Check that our local data file copy exists and is readable
     if [ ! -f "./input_data.${mmwrExt}" ] || [ ! -r "./input_data.${mmwrExt}" ]; then
-        echo "ERROR: Local MMWR data file copy not found or not readable" >> ${pathogen}_trendy.log
-        echo "Original file: ${mmwrFile}" >> ${pathogen}_trendy.log
-        echo "Local copy attempt: ./input_data.${mmwrExt}" >> ${pathogen}_trendy.log
-        echo "Current directory contents:" >> ${pathogen}_trendy.log
-        ls -la ./ >> ${pathogen}_trendy.log
-        exit 1
+        error_exit "Local MMWR data file copy not found or not readable. Original file: ${mmwrFile}, Local copy attempt: ./input_data.${mmwrExt}, Current directory contents: \$(ls -la ./)"
     fi
     
     # Add preprocessed flag based on file extension
-    if [ "${mmwrExt}" == "csv" ]; then
+    if [ "${mmwrExt}" = "csv" ]; then
         PREPROC_ARG="--preprocessed=TRUE --cleanFile=./input_data.csv"
         echo "Using preprocessed mode for CSV file" >> ${pathogen}_trendy.log
     else
         PREPROC_ARG="--preprocessed=FALSE"
         echo "Using raw data mode for SAS file" >> ${pathogen}_trendy.log
     fi
+    
+    # Echo command for debugging
+    echo "Running command: Rscript \${SCRIPT_PATH} --pathogen=${pathogen} --mmwrFile=./input_data.${mmwrExt} \${CENSUS_B_ARG} \${CENSUS_P_ARG} \${PREPROC_ARG} --projID=${projID} --travel=${filter_travel} --cidt=${filter_cidt} --outDir=./ --debug=TRUE" >> ${pathogen}_trendy.log
     
     # Execute with carefully quoted arguments
     Rscript "\${SCRIPT_PATH}" \\
@@ -198,8 +221,7 @@ process TRENDY {
     # Check return code from R script
     R_STATUS=\$?
     if [ \$R_STATUS -ne 0 ]; then
-        echo "ERROR: R script failed with exit code \$R_STATUS" >> ${pathogen}_trendy.log
-        exit \$R_STATUS
+        error_exit "R script failed with exit code \$R_STATUS"
     fi
     
     echo "Analysis completed successfully" >> ${pathogen}_trendy.log
