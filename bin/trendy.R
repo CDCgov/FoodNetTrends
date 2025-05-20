@@ -450,30 +450,6 @@ cat('DEBUG: Unique years in mmwrdata:', paste(unique(mmwrdata$year), collapse=',
 cat('DEBUG: Unique states in mmwrdata:', paste(unique(mmwrdata$state), collapse=', '), '\n')
 cat('DEBUG: Number of records in mmwrdata:', nrow(mmwrdata), '\n')
 
-# Debug information for census data (use existing census data from earlier import)
-cat('DEBUG: Unique states in census:', paste(unique(census$state), collapse=', '), '\n')
-cat('DEBUG: Unique years in census:', paste(unique(census$year), collapse=', '), '\n')
-cat('DEBUG: Number of records in census:', nrow(census), '\n')
-  
-# After importing mmwrdata and census, compare (state, year) pairs for coverage
-mmwr_pairs <- unique(mmwrdata[, c("state", "year")])
-census_pairs <- unique(census[, c("state", "year")])
-
-# Find (state, year) pairs in MMWR but not in census
-mmwr_not_in_census <- anti_join(mmwr_pairs, census_pairs, by = c("state", "year"))
-# Find (state, year) pairs in census but not in MMWR
-census_not_in_mmwr <- anti_join(census_pairs, mmwr_pairs, by = c("state", "year"))
-
-# Print summary to console
-cat('PREPROCESS CHECK: (state, year) pairs in MMWR but missing in census:', nrow(mmwr_not_in_census), '\n')
-if (nrow(mmwr_not_in_census) > 0) {
-  print(mmwr_not_in_census)
-}
-cat('PREPROCESS CHECK: (state, year) pairs in census but missing in MMWR:', nrow(census_not_in_mmwr), '\n')
-if (nrow(census_not_in_mmwr) > 0) {
-  print(census_not_in_mmwr)
-}
-
 # Load or create census data
 census <- NULL
 censusFileB_readable <- (!is.null(censusFileB) && censusFileB != "" && censusFileB != "''")
@@ -725,6 +701,30 @@ if (!census_p_loaded) {
 censusBact <- census[census$pathogentype == "Bacterial", ]
 censusParas <- census[census$pathogentype == "Parasitic", ]
 
+# Debug information for census data after it has been loaded
+cat('DEBUG: Unique states in census:', paste(unique(census$state), collapse=', '), '\n')
+cat('DEBUG: Unique years in census:', paste(unique(census$year), collapse=', '), '\n')
+cat('DEBUG: Number of records in census:', nrow(census), '\n')
+
+# After importing mmwrdata and census, compare (state, year) pairs for coverage
+mmwr_pairs <- unique(mmwrdata[, c("state", "year")])
+census_pairs <- unique(census[, c("state", "year")])
+
+# Find (state, year) pairs in MMWR but not in census
+mmwr_not_in_census <- anti_join(mmwr_pairs, census_pairs, by = c("state", "year"))
+# Find (state, year) pairs in census but not in MMWR
+census_not_in_mmwr <- anti_join(census_pairs, mmwr_pairs, by = c("state", "year"))
+
+# Print summary to console
+cat('PREPROCESS CHECK: (state, year) pairs in MMWR but missing in census:', nrow(mmwr_not_in_census), '\n')
+if (nrow(mmwr_not_in_census) > 0) {
+  print(mmwr_not_in_census)
+}
+cat('PREPROCESS CHECK: (state, year) pairs in census but missing in MMWR:', nrow(census_not_in_mmwr), '\n')
+if (nrow(census_not_in_mmwr) > 0) {
+  print(census_not_in_mmwr)
+}
+
 # Apply state filtering to census data if specified
 if (!is.null(opts$states)) {
   states_to_analyze <- clean_list(opts$states)
@@ -788,13 +788,11 @@ if (!is.null(opts$stec_serotypes)) {
 
 report_progress("DATA", message=paste("Processed", nrow(mmwrdata), "MMWR records"))
 
-# After importing mmwrdata
+# Debug information for census and mmwrdata
 cat('DEBUG: Unique pathogens in mmwrdata:', paste(unique(mmwrdata$pathogen), collapse=', '), '\n')
 cat('DEBUG: Unique years in mmwrdata:', paste(unique(mmwrdata$year), collapse=', '), '\n')
 cat('DEBUG: Unique states in mmwrdata:', paste(unique(mmwrdata$state), collapse=', '), '\n')
 cat('DEBUG: Number of records in mmwrdata:', nrow(mmwrdata), '\n')
-
-# Debug information for census data (use existing census data from earlier import)
 cat('DEBUG: Unique states in census:', paste(unique(census$state), collapse=', '), '\n')
 cat('DEBUG: Unique years in census:', paste(unique(census$year), collapse=', '), '\n')
 cat('DEBUG: Number of records in census:', nrow(census), '\n')
@@ -817,323 +815,3 @@ cat('PREPROCESS CHECK: (state, year) pairs in census but missing in MMWR:', nrow
 if (nrow(census_not_in_mmwr) > 0) {
   print(census_not_in_mmwr)
 }
-
-# ==========================================================================
-# Pathogen Analysis
-# ==========================================================================
-
-# Process pathogen data
-report_progress("ANALYSIS", message="Processing pathogen data")
-tryCatch({
-  pathDf <- path_analysis(mmwrdata, census)
-  report_progress("ANALYSIS", message=paste("Processed",
-                                          length(unique(pathDf$pathogen)),
-                                          "pathogens"))
-
-  # Process Cyclospora and Salmonella if CIDT+ is included
-  if("CIDT+" %in% cidt) {
-    report_progress("ANALYSIS", message="Processing Cyclospora data")
-    cyloDF <- cyclospora_analysis(mmwrdata, census)
-    
-    # Ensure consistent column types before combining
-    cyloDF$pathogen <- "CYCLOSPORA"  # Add missing pathogen column
-    cyloDF$count <- as.numeric(cyloDF$count)
-    cyloDF$population <- as.numeric(cyloDF$population)
-    cyloDF$year <- as.numeric(as.character(cyloDF$year))
-    
-    report_progress("ANALYSIS", message="Processing Salmonella data")
-    salDF <- salmonella_analysis(mmwrdata, census)
-    
-    # Ensure consistent column types before combining
-    salDF$pathogen <- "SALMONELLA"  # Add missing pathogen column
-    salDF$count <- as.numeric(salDF$count)
-    salDF$population <- as.numeric(salDF$population)
-    salDF$year <- as.numeric(as.character(salDF$year))
-    
-    # Ensure pathDf has correct types
-    pathDf$count <- as.numeric(pathDf$count)
-    pathDf$population <- as.numeric(pathDf$population)
-    pathDf$year <- as.numeric(as.character(pathDf$year))
-    
-    # Create combined data frame with proper column types maintained
-    # Instead of using smartbind which converts to character, use bind_rows
-    bact <- bind_rows(pathDf, cyloDF, salDF)
-  } else {
-    bact <- pathDf
-  }
-
-  # Post-processing
-  report_progress("ANALYSIS", message="Post-processing pathogen data")
-
-  # Clean up memory
-  remove(mmwrdata)
-
-  # Filter and prepare data for modeling
-  if (!is.null(opts$pathogen)) {
-    # If specific pathogens were requested, parse and filter for them
-    pathogens_to_analyze <- clean_list(opts$pathogen)
-    report_progress("ANALYSIS", message=paste("Filtering for requested pathogens:",
-                                              paste(pathogens_to_analyze, collapse=", ")))
-
-    # Ensure consistent case for pathogen filtering
-    bact$pathogen <- toupper(bact$pathogen)
-    pathogens_to_analyze <- toupper(pathogens_to_analyze)
-
-    # Filter for requested pathogens
-    bact <- subset(bact, pathogen %in% pathogens_to_analyze)
-
-    if (nrow(bact) == 0) {
-      # Create a minimal dataset if no data found
-      report_progress("WARNING", message=paste("No data found for requested pathogens - Creating minimal dataset"))
-
-      # Create a minimal dataset with the requested pathogen for all sites
-      states <- unique(census$state)
-      years <- unique(census$year)
-
-      # Create a minimal dataset for each requested pathogen
-      minimal_data_list <- list()
-
-      for (pathogen_name in pathogens_to_analyze) {
-        minimal_data <- expand.grid(
-          year = years,
-          state = states,
-          pathogen = pathogen_name,
-          stringsAsFactors = FALSE
-        )
-
-        # Add required columns
-        minimal_data$count <- 0
-
-        # Determine pathogen type
-        if (pathogen_name %in% c("CRYPTOSPORIDIUM", "CYCLOSPORA")) {
-          pathogen_type <- "Parasitic"
-        } else {
-          pathogen_type <- "Bacterial"
-        }
-
-        minimal_data$pathogentype <- pathogen_type
-        minimal_data <- left_join(minimal_data,
-                                census %>% filter(pathogentype == pathogen_type),
-                                by = c("year", "state"))
-
-        # Remove any NA rows that might have been created in the join
-        minimal_data <- minimal_data[!is.na(minimal_data$population), ]
-
-        minimal_data_list[[pathogen_name]] <- minimal_data
-      }
-
-      # Combine all minimal datasets
-      bact <- do.call(rbind, minimal_data_list)
-    }
-
-    # After filtering for requested pathogens (if block)
-    cat('DEBUG: Number of records in bact after pathogen filtering:', nrow(bact), '\n')
-    cat('DEBUG: Unique pathogens in bact:', paste(unique(bact$pathogen), collapse=', '), '\n')
-    cat('DEBUG: Unique years in bact:', paste(unique(bact$year), collapse=', '), '\n')
-    cat('DEBUG: Unique states in bact:', paste(unique(bact$state), collapse=', '), '\n')
-    cat('DEBUG: Number of NA populations in bact:', sum(is.na(bact$population)), '\n')
-    cat('DEBUG: Number of zero counts in bact:', sum(bact$count == 0), '\n')
-  } else {
-    # Otherwise use the default filtering from the original code
-    bact <- subset(bact, pathogen == "CAMPYLOBACTER" | pathogen == "CYCLOSPORA")
-
-    # Check if any data exists for the default pathogens
-    if (nrow(bact) == 0) {
-      stop("No data found for default pathogens (CAMPYLOBACTER or CYCLOSPORA)")
-    }
-  }
-
-  # Prepare year variables and split by pathogen
-  bact$yearn <- as.numeric(as.character(bact$year))
-  bact$year <- as.factor(bact$year)
-  bact_list <- split(bact, bact$pathogen)
-  target_pathogens <- names(bact_list)
-
-  report_progress("ANALYSIS", message=paste("Prepared data for modeling",
-                                          length(target_pathogens),
-                                          "pathogens:",
-                                          paste(target_pathogens, collapse=", ")))
-
-  # After aggregation and join (path_analysis)
-  cat('DEBUG: Head of pathDf after aggregation and join:\n')
-  print(head(pathDf))
-  cat('DEBUG: Unique pathogens in pathDf:', paste(unique(pathDf$pathogen), collapse=', '), '\n')
-  cat('DEBUG: Unique years in pathDf:', paste(unique(pathDf$year), collapse=', '), '\n')
-  cat('DEBUG: Unique states in pathDf:', paste(unique(pathDf$state), collapse=', '), '\n')
-  cat('DEBUG: Number of NA populations in pathDf:', sum(is.na(pathDf$population)), '\n')
-  cat('DEBUG: Number of zero counts in pathDf:', sum(pathDf$count == 0), '\n')
-  cat('DEBUG: Number of records in pathDf:', nrow(pathDf), '\n')
-}, error = function(e) {
-  stop("Error in pathogen analysis: ", e$message)
-})
-
-# --- Impute missing population values by (state, year) if possible, and report ---
-# Save original bact for reporting
-bact_original <- bact
-
-# Impute population by (state, year) if possible
-bact <- bact %>%
-  group_by(state, year) %>%
-  mutate(
-    imputed_population = ifelse(is.na(population) & any(!is.na(population)), TRUE, FALSE),
-    population = ifelse(is.na(population), unique(na.omit(population)), population)
-  ) %>%
-  ungroup()
-
-# Identify imputed and still-missing rows
-imputed_rows <- bact %>% filter(imputed_population)
-dropped_rows <- bact %>% filter(is.na(population))
-
-# Remove rows with unresolved NA population before modeling
-bact <- bact %>% filter(!is.na(population))
-
-# Force population to numeric after imputation and dropping
-bact$population <- as.numeric(bact$population)
-
-# Write imputation report
-impute_report_file <- file.path(outDir, "population_imputation_report.txt")
-cat("Population Imputation Report\n", file=impute_report_file)
-cat("==========================\n", file=impute_report_file, append=TRUE)
-cat("Imputed population for the following (state, year, pathogen) rows:\n", file=impute_report_file, append=TRUE)
-if (nrow(imputed_rows) > 0) {
-  write.table(imputed_rows[, c("state", "year", "pathogen")], file=impute_report_file, append=TRUE, row.names=FALSE, col.names=TRUE, sep="\t", quote=FALSE)
-} else {
-  cat("(None)\n", file=impute_report_file, append=TRUE)
-}
-cat("\nDropped rows with unresolved NA population:\n", file=impute_report_file, append=TRUE)
-if (nrow(dropped_rows) > 0) {
-  write.table(dropped_rows[, c("state", "year", "pathogen")], file=impute_report_file, append=TRUE, row.names=FALSE, col.names=TRUE, sep="\t", quote=FALSE)
-} else {
-  cat("(None)\n", file=impute_report_file, append=TRUE)
-}
-
-# Print summary to console for debugging
-cat('DEBUG: Number of rows after imputation and dropping:', nrow(bact), '\n')
-cat('DEBUG: Number of imputed rows:', nrow(imputed_rows), '\n')
-cat('DEBUG: Number of dropped rows:', nrow(dropped_rows), '\n')
-if (nrow(bact) == 0) {
-  cat('WARNING: All data has been dropped after population imputation! Check your census and MMWR data for mismatched (state, year) pairs.\n')
-}
-
-# ==========================================================================
-# Model Fitting
-# ==========================================================================
-
-# Process each pathogen
-for (pathogen_name in target_pathogens) {
-  report_progress("MODEL", message=paste("Fitting model for", pathogen_name))
-
-  # Get data for current pathogen
-  current_data <- bact_list[[pathogen_name]]
-
-  # Fit Bayesian model
-  tryCatch({
-    # Fit model with parameters from command line
-    proposed <- proposed_bm(
-      current_data,
-      cores = modelcores,
-      chains = chains,
-      iterations = iterations,
-      adapt_delta = adapt_delta,
-      max_treedepth = max_treedepth,
-      seed = seed
-    )
-
-    # Save model
-    saveFile <- file.path(outDir, get_output_filename(pathogen_name, "brm", "Rds"))
-    saveRDS(proposed, saveFile)
-    report_progress("MODEL", message=paste("Saved model to", saveFile))
-
-    # Save model summary
-    summaryFile <- file.path(outDir, get_output_filename(pathogen_name, "summary", "txt"))
-    sink(summaryFile)
-    print(summary(proposed))
-    sink()
-    report_progress("MODEL", message=paste("Saved model summary to", summaryFile))
-
-    # Draw untransformed (link-level) predictions
-    report_progress("POST-PROCESSING", message=paste("Generating predictions for", pathogen_name))
-    posteriorLinpred <- linpred_draw(
-      data = (current_data %>% group_by(state)),
-      model = proposed
-    )
-
-    # Site-level estimates
-    report_progress("POST-PROCESSING", message="Calculating site-level estimates")
-    site <- linpred_to_siteir(posteriorLinpred)
-
-    # Catchment-level draws
-    report_progress("POST-PROCESSING", message="Calculating catchment-level draws")
-    catch <- catchment(posteriorLinpred)
-
-    # Catchment-level estimates
-    report_progress("POST-PROCESSING", message="Calculating catchment-level estimates")
-    catchir.linpred <- linpred_to_catchir(catch)
-
-    # Add metadata
-    catchir.linpred$pathogen <- pathogen_name
-    catchir.linpred$travel <- travelLabel
-    catchir.linpred$culture <- culture
-
-    # Save estimates using safe_write
-    ir_file <- file.path(outDir, get_output_filename(pathogen_name, "IRCatch", "csv"))
-    safe_write(catchir.linpred, ir_file)
-    report_progress("OUTPUT", message=paste("Saved incidence rate estimates to", ir_file))
-
-    # Calculate relative risks and percent changes for different comparison periods
-    report_progress("ANALYSIS", message="Calculating relative risks and percent changes")
-
-    # Calculate for 2016-2018 (the Healthy People 2030 baseline period)
-    ir_comp(catchir.linpred, 2016, 2018,
-            file.path(outDir, get_output_filename(pathogen_name, "EstIRRCatch", "csv", "2016_2018")))
-
-    # Calculate for COVID-19
-    ir_comp(catchir.linpred, 2020, 2021,
-            file.path(outDir, get_output_filename(pathogen_name, "EstIRRCatch", "csv", "2020_2022")))
-
-    # Calculate for earliest years where the FoodNet catchment were stable
-    ir_comp(catchir.linpred, 2004, 2006,
-            file.path(outDir, get_output_filename(pathogen_name, "EstIRRCatch", "csv", "2004_2006")))
-
-    # Calculate for 2006-2008 baseline (the Healthy People 2020 baseline)
-    ir_comp(catchir.linpred, 2006, 2008,
-            file.path(outDir, get_output_filename(pathogen_name, "EstIRRCatch", "csv", "2006_2008")))
-
-    # Create visualizations if enabled
-    report_progress("VISUALIZATION", message=paste("Creating visualizations for", pathogen_name))
-    if (requireNamespace("ggplot2", quietly = TRUE)) {
-      # Site-specific trends plot
-      site_plot <- plot_site_trends(catchir.linpred, pathogen_name, outDir)
-
-      # Overall trend plot
-      overall_plot <- plot_overall_trend(catchir.linpred, pathogen_name, outDir)
-
-      # Combined visualization
-      if (requireNamespace("gridExtra", quietly = TRUE)) {
-        plot_combined(site_plot, overall_plot, pathogen_name, outDir)
-      }
-    }
-
-    report_progress("COMPLETE", message=paste("Completed analysis for", pathogen_name))
-  }, error = function(e) {
-    report_progress("ERROR", message=paste("Error in model fitting for", pathogen_name, ":", e$message))
-    # Create error file with details
-    error_file <- file.path(outDir, get_output_filename(pathogen_name, "error", "txt"))
-    sink(error_file)
-    cat(paste("Error processing", pathogen_name, "at", Sys.time(), "\n"))
-    cat(paste("Error message:", e$message, "\n"))
-    cat("Traceback:\n")
-    cat(paste(capture.output(traceback()), collapse = "\n"))
-    sink()
-
-    # Continue with next pathogen rather than stopping the entire pipeline
-    next
-  })
-}
-
-report_progress("PIPELINE", message="Analysis complete for all pathogens")
-report_progress("PIPELINE", message=paste("Results saved to", outDir))
-
-# Print session info for reproducibility
-report_progress("SESSION", message="Session information:")
-print(sessionInfo())
