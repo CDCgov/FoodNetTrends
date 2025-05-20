@@ -50,7 +50,8 @@ workflow SPLINE {
     // Set up census file handling with graceful fallbacks
     def censusFileBVal, censusFilePVal
     try {
-        if (params.censusFileB) {
+        // Check for empty string or null values explicitly
+        if (params.censusFileB && params.censusFileB.toString().trim()) {
             censusFileBVal = file(params.censusFileB, checkIfExists: false)
             if (!censusFileBVal.exists()) {
                 log.warn "Census bacterial file not found: ${params.censusFileB}, will use placeholder"
@@ -66,7 +67,7 @@ workflow SPLINE {
                 log.info "Census bacterial file found: ${censusFileBVal}"
             }
         } else {
-            log.warn "No census bacterial file specified, will use placeholder"
+            log.warn "No census bacterial file specified or empty value provided, will use placeholder"
             def placeholder = file("${workflow.launchDir}/placeholder_census_bact.csv")
             placeholder.text = "state,population,year,pathogentype\nCA,10000000,2020,Bacterial\n"
             censusFileBVal = placeholder
@@ -80,7 +81,8 @@ workflow SPLINE {
     }
     
     try {
-        if (params.censusFileP) {
+        // Check for empty string or null values explicitly
+        if (params.censusFileP && params.censusFileP.toString().trim()) {
             censusFilePVal = file(params.censusFileP, checkIfExists: false)
             if (!censusFilePVal.exists()) {
                 log.warn "Census parasitic file not found: ${params.censusFileP}, will use placeholder"
@@ -96,7 +98,7 @@ workflow SPLINE {
                 log.info "Census parasitic file found: ${censusFilePVal}"
             }
         } else {
-            log.warn "No census parasitic file specified, will use placeholder"
+            log.warn "No census parasitic file specified or empty value provided, will use placeholder"
             def placeholder = file("${workflow.launchDir}/placeholder_census_para.csv")
             placeholder.text = "state,population,year,pathogentype\nCA,10000000,2020,Parasitic\n"
             censusFilePVal = placeholder

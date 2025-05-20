@@ -50,33 +50,43 @@ def validateFilePaths() {
     
     // Census files are now optional with placeholders
     if (params.containsKey('censusFileB')) {
-        if (params.censusFileB == null || params.censusFileB == "") {
+        if (params.censusFileB == null || params.censusFileB.toString().trim() == "") {
             log.warn "Census bacterial file parameter is empty, will use placeholder"
+            // Explicitly set to empty string to prevent type coercion issues
+            params.censusFileB = ""
         } else {
             try {
                 def censusPath = params.censusFileB.toString()
                 log.info "Census bacterial file path: ${censusPath}"
             } catch (Exception e) {
                 log.warn "Invalid census bacterial file path format"
+                // Reset to empty string if invalid
+                params.censusFileB = ""
             }
         }
     } else {
         log.warn "Census bacterial file parameter not provided, will use placeholder"
+        params.censusFileB = ""
     }
     
     if (params.containsKey('censusFileP')) {
-        if (params.censusFileP == null || params.censusFileP == "") {
+        if (params.censusFileP == null || params.censusFileP.toString().trim() == "") {
             log.warn "Census parasitic file parameter is empty, will use placeholder"
+            // Explicitly set to empty string to prevent type coercion issues
+            params.censusFileP = ""
         } else {
             try {
                 def censusPath = params.censusFileP.toString()
                 log.info "Census parasitic file path: ${censusPath}"
             } catch (Exception e) {
                 log.warn "Invalid census parasitic file path format"
+                // Reset to empty string if invalid
+                params.censusFileP = ""
             }
         }
     } else {
         log.warn "Census parasitic file parameter not provided, will use placeholder"
+        params.censusFileP = ""
     }
 }
 
