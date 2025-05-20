@@ -76,6 +76,11 @@ process TRENDY {
         exit 1
     }
     
+    # Initialize variable defaults to ensure they're always defined
+    CENSUS_B_ARG="--censusFileB=empty_census_bact.csv"
+    CENSUS_P_ARG="--censusFileP=empty_census_para.csv"
+    PREPROC_ARG=""
+    
     # Log start of analysis
     echo "Starting analysis for pathogen: ${pathogen}" > ${pathogen}_trendy.log
     echo "Using MMWR data file: ${mmwrFile} (${mmwrExt} format)" >> ${pathogen}_trendy.log
@@ -83,10 +88,6 @@ process TRENDY {
     # Make a local copy of the MMWR file to handle path issues
     cp -v "${mmwrFile}" ./input_data.${mmwrExt} || error_exit "Failed to copy MMWR file"
     echo "Created local copy of MMWR file as: input_data.${mmwrExt}" >> ${pathogen}_trendy.log
-    
-    # Default to using placeholders
-    CENSUS_B_ARG="--censusFileB=empty_census_bact.csv" 
-    CENSUS_P_ARG="--censusFileP=empty_census_para.csv"
     
     # Handle census bacterial file
     if [ -f "${censusFileBVal}" ] && [ -s "${censusFileBVal}" ]; then
@@ -202,6 +203,11 @@ process TRENDY {
         echo "Using raw data mode for SAS file" >> ${pathogen}_trendy.log
     fi
     
+    # Make sure the census variables are fully initialized first
+    echo "Census bacterial arg: \${CENSUS_B_ARG}" >> ${pathogen}_trendy.log
+    echo "Census parasitic arg: \${CENSUS_P_ARG}" >> ${pathogen}_trendy.log
+    echo "Preprocessing arg: \${PREPROC_ARG}" >> ${pathogen}_trendy.log
+    
     # Special handling for Cyclospora - use dedicated script
     if [ "${pathogen}" = "CYCLOSPORA" ]; then
         echo "CYCLOSPORA detected - using specialized Cyclospora model script" >> ${pathogen}_trendy.log
@@ -213,10 +219,16 @@ process TRENDY {
         if [ -f "\${CYCLO_SCRIPT}" ]; then
             echo "Found specialized Cyclospora script at \${CYCLO_SCRIPT}" >> ${pathogen}_trendy.log
             
+            # Explicitly check if CENSUS_P_ARG is set correctly
+            if [ -z "\${CENSUS_P_ARG}" ]; then
+                echo "Warning: CENSUS_P_ARG not set, using default" >> ${pathogen}_trendy.log
+                CENSUS_P_ARG="--censusFileP=empty_census_para.csv"
+            fi
+            
             # Execute the specialized script
             Rscript "\${CYCLO_SCRIPT}" \
                 --mmwrFile="./input_data.${mmwrExt}" \
-                ${CENSUS_P_ARG} \
+                \${CENSUS_P_ARG} \
                 --outputDir="./" \
                 --cores=${params.cores} \
                 --chains=${params.chains} \
