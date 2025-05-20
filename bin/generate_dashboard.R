@@ -690,13 +690,257 @@ generate_dashboard <- function() {
            '</div>')
   })
   
-  html_template <- gsub('<div id="dashboard-container"></div>', widget_html, html_template, fixed = TRUE)
-  
-  # Use custom template if provided
-  if (!is.null(args$templateFile) && file.exists(args$templateFile)) {
-    cat("Using custom template:", args$templateFile, "\n")
+  # Check for template file in different locations
+  if (args$templateFile != "" && file.exists(args$templateFile)) {
+    message("Using template file: ", args$templateFile)
     html_template <- readLines(args$templateFile, warn = FALSE)
     html_template <- paste(html_template, collapse = "\n")
+    
+    # Replace dashboard container with content
+    html_template <- gsub('<div id="dashboard-container"></div>', widget_html, html_template, fixed = TRUE)
+  } else {
+    # Check other common locations
+    template_paths <- c(
+      args$templateFile,
+      file.path(dirname(args$outDir), "dashboard_template.html"),
+      file.path(Sys.getenv("SCRIPTS_PATH", "."), "dashboard_template.html"),
+      file.path(args$resultDir, "dashboard_template.html")
+    )
+    
+    template_found <- FALSE
+    for (path in template_paths) {
+      if (file.exists(path)) {
+        message("Found template file at: ", path)
+        html_template <- readLines(path, warn = FALSE)
+        html_template <- paste(html_template, collapse = "\n")
+        template_found <- TRUE
+        break
+      }
+    }
+    
+    # If no template found, use the built-in template
+    if (!template_found) {
+      message("Using built-in HTML template")
+      # Define built-in HTML template
+      html_template <- '
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{title}}</title>
+  <style>
+    /* Dashboard styles */
+    :root {
+      --primary-color: #0054ad;
+      --secondary-color: #88c4f3;
+      --accent-color: #005e00;
+      --background-color: #f5f7fa;
+      --card-background: #fff;
+      --text-color: #333;
+      --border-color: #ddd;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      line-height: 1.6;
+      color: var(--text-color);
+      background-color: var(--background-color);
+      margin: 0;
+      padding: 0;
+    }
+    
+    .dashboard {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    
+    .dashboard-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 30px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid var(--border-color);
+    }
+    
+    .dashboard-header h1 {
+      margin: 0;
+      color: var(--primary-color);
+      font-size: 28px;
+    }
+    
+    .dashboard-header p {
+      margin: 0;
+      color: #666;
+      font-size: 14px;
+    }
+    
+    .logo {
+      max-height: 60px;
+    }
+    
+    .dashboard-controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 20px;
+      margin-bottom: 30px;
+      padding: 15px;
+      background-color: var(--card-background);
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      min-width: 200px;
+    }
+    
+    .control-group label {
+      margin-bottom: 5px;
+      font-weight: 500;
+      font-size: 14px;
+    }
+    
+    select, input {
+      padding: 8px 12px;
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      font-size: 14px;
+    }
+    
+    select[multiple] {
+      height: 120px;
+    }
+    
+    .dashboard-widget {
+      margin-bottom: 30px;
+      padding: 20px;
+      background-color: var(--card-background);
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    
+    .dashboard-widget h2 {
+      margin-top: 0;
+      margin-bottom: 20px;
+      color: var(--primary-color);
+      font-size: 20px;
+      font-weight: 500;
+    }
+    
+    .tab-container {
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .tab-headers {
+      display: flex;
+      border-bottom: 1px solid var(--border-color);
+      margin-bottom: 15px;
+    }
+    
+    .tab-header {
+      padding: 10px 15px;
+      cursor: pointer;
+      font-weight: 500;
+    }
+    
+    .tab-header.active {
+      border-bottom: 3px solid var(--primary-color);
+      color: var(--primary-color);
+    }
+    
+    .tab-content {
+      display: none;
+    }
+    
+    .tab-content.active {
+      display: block;
+    }
+    
+    .error-message {
+      padding: 15px;
+      background-color: #fff3cd;
+      color: #856404;
+      border-radius: 4px;
+      text-align: center;
+    }
+    
+    .dashboard-footer {
+      margin-top: 40px;
+      padding-top: 20px;
+      border-top: 1px solid var(--border-color);
+      text-align: center;
+      font-size: 14px;
+      color: #666;
+    }
+    
+    /* Responsive adjustments */
+    @media (max-width: 768px) {
+      .dashboard {
+        padding: 10px;
+      }
+      
+      .dashboard-header {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+      
+      .dashboard-controls {
+        flex-direction: column;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="dashboard">
+    <!-- Dashboard content will be inserted here -->
+    <div id="dashboard-container"></div>
+  </div>
+  
+  <script>
+    // Dashboard data
+    const dashboardData = {
+      pathogens: {{pathogens}},
+      states: {{states}},
+      years: {{years}},
+      comparisonPeriods: {{comparison_periods}},
+      irData: {{ir_data}},
+      rrData: {{rr_data}},
+      summaryData: {{summary_data}},
+      generationDate: "{{generation_date}}"
+    };
+    
+    // Initialization code would go here
+    document.addEventListener("DOMContentLoaded", function() {
+      console.log("Dashboard initialized with data:", dashboardData);
+      
+      // Set up tab switching
+      const tabHeaders = document.querySelectorAll(".tab-header");
+      tabHeaders.forEach(header => {
+        header.addEventListener("click", function() {
+          // Remove active class from all headers and contents
+          document.querySelectorAll(".tab-header").forEach(h => h.classList.remove("active"));
+          document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
+          
+          // Add active class to clicked header and corresponding content
+          const tabId = this.getAttribute("data-tab");
+          this.classList.add("active");
+          document.querySelector(`.tab-content[data-tab="${tabId}"]`).classList.add("active");
+        });
+      });
+    });
+  </script>
+</body>
+</html>
+'
+    }
+    
+    # Replace dashboard container with content
+    html_template <- gsub('<div id="dashboard-container"></div>', widget_html, html_template, fixed = TRUE)
   }
   
   # Replace template variables (always, even if NULL)
