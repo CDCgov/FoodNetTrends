@@ -169,24 +169,87 @@ read_summary_files <- function(summary_files) {
 #' @param pathogens Vector of pathogens to include (NULL for all)
 #' @return A plotly object
 create_ir_plot <- function(ir_data, pathogens = NULL) {
-  if (is.null(ir_data)) {
-    return(NULL)
+  if (is.null(ir_data) || nrow(ir_data) == 0) {
+    # Return a simple empty plot with a message
+    empty_df <- data.frame(x = 1, y = 1, label = "No data available")
+    p <- ggplot(empty_df, aes(x = x, y = y, label = label)) +
+      geom_text() +
+      theme_void() +
+      labs(title = "No Data Available")
+    return(ggplotly(p))
+  }
+  
+  # Check if we have the required columns
+  required_cols <- c("year", "state", "pathogen")
+  if (!all(required_cols %in% colnames(ir_data))) {
+    # Create a message about missing columns
+    missing_cols <- required_cols[!required_cols %in% colnames(ir_data)]
+    empty_df <- data.frame(x = 1, y = 1, 
+                         label = paste("Missing required columns:", 
+                                     paste(missing_cols, collapse = ", ")))
+    p <- ggplot(empty_df, aes(x = x, y = y, label = label)) +
+      geom_text() +
+      theme_void() +
+      labs(title = "Data Format Error")
+    return(ggplotly(p))
+  }
+  
+  # Determine which column to use for y-axis (incidence rate)
+  y_col <- NULL
+  if ("median_incidence" %in% colnames(ir_data)) {
+    y_col <- "median_incidence"
+    lower_col <- if ("lower_hdi" %in% colnames(ir_data)) "lower_hdi" else NULL
+    upper_col <- if ("upper_hdi" %in% colnames(ir_data)) "upper_hdi" else NULL
+  } else if ("ir" %in% colnames(ir_data)) {
+    y_col <- "ir"
+    lower_col <- if ("ir_lower" %in% colnames(ir_data)) "ir_lower" else NULL
+    upper_col <- if ("ir_upper" %in% colnames(ir_data)) "ir_upper" else NULL
+  } else {
+    # No recognizable incidence rate column
+    empty_df <- data.frame(x = 1, y = 1, 
+                         label = "No recognized incidence rate column found")
+    p <- ggplot(empty_df, aes(x = x, y = y, label = label)) +
+      geom_text() +
+      theme_void() +
+      labs(title = "Data Format Error")
+    return(ggplotly(p))
   }
   
   # Filter by pathogens if provided
-  if (!is.null(pathogens)) {
+  if (!is.null(pathogens) && length(pathogens) > 0) {
     ir_data <- ir_data[ir_data$pathogen %in% pathogens, ]
+  }
+  
+  # If after filtering we have no data, return empty plot
+  if (nrow(ir_data) == 0) {
+    empty_df <- data.frame(x = 1, y = 1, label = "No data available for selected pathogens")
+    p <- ggplot(empty_df, aes(x = x, y = y, label = label)) +
+      geom_text() +
+      theme_void() +
+      labs(title = "No Data Available")
+    return(ggplotly(p))
   }
   
   # Get unique pathogens for color scale
   unique_pathogens <- unique(ir_data$pathogen)
   
+  # Create tooltip text based on available columns
+  if (!is.null(lower_col) && !is.null(upper_col)) {
+    tooltip_text <- paste0("State: ", ir_data$state, 
+                          "<br>Year: ", ir_data$year,
+                          "<br>Pathogen: ", ir_data$pathogen,
+                          "<br>Incidence: ", round(ir_data[[y_col]], 2),
+                          "<br>95% CI: ", round(ir_data[[lower_col]], 2), " - ", 
+                          round(ir_data[[upper_col]], 2))
+  } else {
+    tooltip_text <- paste0("State: ", ir_data$state, 
+                          "<br>Year: ", ir_data$year,
+                          "<br>Pathogen: ", ir_data$pathogen,
+                          "<br>Incidence: ", round(ir_data[[y_col]], 2))
+  }
+  
   # Create base plot with ggplot2
-  p <- ggplot(ir_data, aes(x = year, y = median_incidence, color = pathogen, 
-                          text = paste("State:", state, 
-                                      "<br>Year:", year,
-                                      "<br>Incidence:", round(median_incidence, 2),
-                                      "<br>95% CI:", round(lower_hdi, 2), "-", round(upper_hdi, 2)))) +
+  p <- ggplot(ir_data, aes_string(x = "year", y = y_col, color = "pathogen", text = "tooltip_text")) +
     geom_line(aes(group = interaction(pathogen, state)), alpha = 0.5) +
     geom_point(size = 1) +
     facet_wrap(~ state, scales = "free_y") +
@@ -378,10 +441,57 @@ generate_dashboard <- function() {
   summary_data <- read_summary_files(summary_files)
   
   # Extract metadata for dashboard configuration
-  pathogens <- unique(ir_data$pathogen)
-  states <- unique(ir_data$state)
-  years <- sort(unique(ir_data$year))
-  comparison_periods <- unique(rr_data$comparison_period)
+  pathogens <- c() # Initialize as empty vector
+  
+  # Get pathogens from data if available
+  if (!is.null(ir_data) && nrow(ir_data) > 0 && "pathogen" %in% colnames(ir_data)) {
+    pathogens <- unique(ir_data$pathogen)
+  } 
+  # Fallback: get pathogens from file names
+  else if (!is.null(ir_files) && nrow(ir_files) > 0) {
+    pathogens <- unique(ir_files$pathogen)
+  }
+  # Final fallback: check if summary files have pathogen info
+  else if (!is.null(summary_files) && nrow(summary_files) > 0) {
+    pathogens <- unique(summary_files$pathogen)
+  }
+  # Last resort: use a default
+  else {
+    # Check if data directory contains any pathogen-named files to guess from
+    potential_pathogen_files <- list.files(args$resultDir, pattern="^[A-Z]+_.*", full.names=FALSE)
+    if (length(potential_pathogen_files) > 0) {
+      extracted_pathogens <- unique(sub("^([A-Z]+)_.*$", "\\1", potential_pathogen_files))
+      if (length(extracted_pathogens) > 0) {
+        pathogens <- extracted_pathogens
+      } else {
+        pathogens <- c("UNKNOWN")  # Default if nothing else works
+      }
+    } else {
+      pathogens <- c("UNKNOWN")  # Default if nothing else works
+    }
+  }
+  
+  # Get states from data if available, or provide defaults
+  states <- c()
+  if (!is.null(ir_data) && nrow(ir_data) > 0 && "state" %in% colnames(ir_data)) {
+    states <- unique(ir_data$state)
+  } else {
+    states <- c("CA", "CO", "CT", "GA", "NY")  # FoodNet default states
+  }
+  
+  # Get years from data if available, or provide defaults
+  years <- c()
+  if (!is.null(ir_data) && nrow(ir_data) > 0 && "year" %in% colnames(ir_data)) {
+    years <- sort(unique(ir_data$year))
+  } else {
+    years <- 2020:2022  # Default year range
+  }
+  
+  # Get comparison periods from data if available
+  comparison_periods <- c()
+  if (!is.null(rr_data) && nrow(rr_data) > 0 && "comparison_period" %in% colnames(rr_data)) {
+    comparison_periods <- unique(rr_data$comparison_period)
+  }
   
   cat("Dashboard will include:\n")
   cat("  Pathogens:", paste(pathogens, collapse=", "), "\n")
@@ -441,292 +551,146 @@ generate_dashboard <- function() {
   }
   
   # Embed plots in HTML widgets
-  dashboard_widgets <- tagList(
-    # Add title and header
-    tags$div(class = "dashboard-header",
-            tags$h1(args$title),
-            tags$p(paste("Generated:", format(Sys.time(), "%Y-%m-%d %H:%M:%S")))),
-    
-    # Add filters and controls
-    tags$div(class = "dashboard-controls",
-            tags$div(class = "control-group",
-                    tags$label("Select Pathogens:"),
-                    tags$select(id = "pathogen-select", multiple = TRUE,
-                              lapply(pathogens, function(p) tags$option(value = p, p)))),
-            tags$div(class = "control-group",
-                    tags$label("Select States:"),
-                    tags$select(id = "state-select", multiple = TRUE,
-                              lapply(states, function(s) tags$option(value = s, s))))),
-    
-    # Add time series visualization
-    tags$div(class = "dashboard-widget",
-            tags$h2("Incidence Rate Trends"),
-            if (!is.null(time_series_plot)) {
-              as_widget(time_series_plot)
-            } else {
-              tags$div(class = "error-message", "No incidence rate data available")
-            }),
-    
-    # Add map visualization
-    tags$div(class = "dashboard-widget",
-            tags$h2("Geographic Distribution"),
-            if (!is.null(map_plot)) {
-              as_widget(map_plot)
-            } else {
-              tags$div(class = "error-message", "No geographic data available")
-            }),
-    
-    # Add relative risk comparison
-    tags$div(class = "dashboard-widget",
-            tags$h2("Relative Risk Comparison"),
-            if (!is.null(rr_plot)) {
-              as_widget(rr_plot)
-            } else {
-              tags$div(class = "error-message", "No relative risk data available")
-            }),
-    
-    # Add data tables
-    tags$div(class = "dashboard-widget",
-            tags$h2("Data Tables"),
-            tags$div(class = "tab-container",
-                    tags$div(class = "tab-headers",
-                            tags$div(class = "tab-header active", "data-tab" = "incidence", "Incidence Rates"),
-                            tags$div(class = "tab-header", "data-tab" = "relative-risk", "Relative Risks")),
-                    tags$div(class = "tab-content active", "data-tab" = "incidence",
-                            if (!is.null(ir_data)) {
-                              DT::datatable(ir_data)
-                            } else {
-                              tags$div(class = "error-message", "No incidence rate data available")
-                            }),
-                    tags$div(class = "tab-content", "data-tab" = "relative-risk",
-                            if (!is.null(rr_data)) {
-                              DT::datatable(rr_data)
-                            } else {
-                              tags$div(class = "error-message", "No relative risk data available")
-                            }))),
-    
-    # Add footer
-    tags$div(class = "dashboard-footer",
-            tags$p("FoodNet Trends Analysis Pipeline v1.0"),
-            tags$p("Centers for Disease Control and Prevention"))
-  )
-
-  # HTML template (basic)
-  html_template <- '
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{{title}}</title>
-  <style>
-    /* Dashboard styles */
-    :root {
-      --primary-color: #0054ad;
-      --secondary-color: #88c4f3;
-      --accent-color: #005e00;
-      --background-color: #f5f7fa;
-      --card-background: #fff;
-      --text-color: #333;
-      --border-color: #ddd;
-    }
-    
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      line-height: 1.6;
-      color: var(--text-color);
-      background-color: var(--background-color);
-      margin: 0;
-      padding: 0;
-    }
-    
-    .dashboard {
-      max-width: 1200px;
-      margin: 0 auto;
-      padding: 20px;
-    }
-    
-    .dashboard-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 30px;
-      padding-bottom: 20px;
-      border-bottom: 1px solid var(--border-color);
-    }
-    
-    .dashboard-header h1 {
-      margin: 0;
-      color: var(--primary-color);
-      font-size: 28px;
-    }
-    
-    .dashboard-header p {
-      margin: 0;
-      color: #666;
-      font-size: 14px;
-    }
-    
-    .logo {
-      max-height: 60px;
-    }
-    
-    .dashboard-controls {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 20px;
-      margin-bottom: 30px;
-      padding: 15px;
-      background-color: var(--card-background);
-      border-radius: 8px;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-    }
-    
-    .control-group {
-      display: flex;
-      flex-direction: column;
-      min-width: 200px;
-    }
-    
-    .control-group label {
-      margin-bottom: 5px;
-      font-weight: 500;
-      font-size: 14px;
-    }
-    
-    select, input {
-      padding: 8px 12px;
-      border: 1px solid var(--border-color);
-      border-radius: 4px;
-      font-size: 14px;
-    }
-    
-    select[multiple] {
-      height: 120px;
-    }
-    
-    .dashboard-widget {
-      margin-bottom: 30px;
-      padding: 20px;
-      background-color: var(--card-background);
-      border-radius: 8px;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-    }
-    
-    .dashboard-widget h2 {
-      margin-top: 0;
-      margin-bottom: 20px;
-      color: var(--primary-color);
-      font-size: 20px;
-      font-weight: 500;
-    }
-    
-    .tab-container {
-      display: flex;
-      flex-direction: column;
-    }
-    
-    .tab-headers {
-      display: flex;
-      border-bottom: 1px solid var(--border-color);
-      margin-bottom: 15px;
-    }
-    
-    .tab-header {
-      padding: 10px 15px;
-      cursor: pointer;
-      font-weight: 500;
-    }
-    
-    .tab-header.active {
-      border-bottom: 3px solid var(--primary-color);
-      color: var(--primary-color);
-    }
-    
-    .tab-content {
-      display: none;
-    }
-    
-    .tab-content.active {
-      display: block;
-    }
-    
-    .error-message {
-      padding: 15px;
-      background-color: #fff3cd;
-      color: #856404;
-      border-radius: 4px;
-      text-align: center;
-    }
-    
-    .dashboard-footer {
-      margin-top: 40px;
-      padding-top: 20px;
-      border-top: 1px solid var(--border-color);
-      text-align: center;
-      font-size: 14px;
-      color: #666;
-    }
-    
-    /* Responsive adjustments */
-    @media (max-width: 768px) {
-      .dashboard {
-        padding: 10px;
-      }
+  dashboard_widgets <- tryCatch({
+    tagList(
+      # Add title and header
+      tags$div(class = "dashboard-header",
+              tags$h1(args$title),
+              tags$p(paste("Generated:", format(Sys.time(), "%Y-%m-%d %H:%M:%S")))),
       
-      .dashboard-header {
-        flex-direction: column;
-        align-items: flex-start;
-      }
+      # Add filters and controls
+      tags$div(class = "dashboard-controls",
+              tags$div(class = "control-group",
+                      tags$label("Select Pathogens:"),
+                      tags$select(id = "pathogen-select", multiple = TRUE,
+                                if (length(pathogens) > 0) {
+                                  lapply(pathogens, function(p) tags$option(value = p, p))
+                                } else {
+                                  tags$option(value = "NONE", "No pathogens detected")
+                                })),
+              tags$div(class = "control-group",
+                      tags$label("Select States:"),
+                      tags$select(id = "state-select", multiple = TRUE,
+                                if (length(states) > 0) {
+                                  lapply(states, function(s) tags$option(value = s, s))
+                                } else {
+                                  tags$option(value = "NONE", "No states detected")
+                                }))),
       
-      .dashboard-controls {
-        flex-direction: column;
-      }
-    }
-  </style>
-</head>
-<body>
-  <div class="dashboard">
-    <!-- Dashboard content will be inserted here -->
-    <div id="dashboard-container"></div>
-  </div>
+      # Add time series visualization
+      tags$div(class = "dashboard-widget",
+              tags$h2("Incidence Rate Trends"),
+              if (!is.null(time_series_plot)) {
+                tryCatch({
+                  as_widget(time_series_plot)
+                }, error = function(e) {
+                  tags$div(class = "error-message", 
+                          paste("Error rendering time series plot:", e$message))
+                })
+              } else {
+                tags$div(class = "error-message", "No incidence rate data available")
+              }),
+      
+      # Add map visualization
+      tags$div(class = "dashboard-widget",
+              tags$h2("Geographic Distribution"),
+              if (!is.null(map_plot)) {
+                tryCatch({
+                  as_widget(map_plot)
+                }, error = function(e) {
+                  tags$div(class = "error-message", 
+                          paste("Error rendering map plot:", e$message))
+                })
+              } else {
+                tags$div(class = "error-message", "No geographic data available")
+              }),
+      
+      # Add relative risk comparison
+      tags$div(class = "dashboard-widget",
+              tags$h2("Relative Risk Comparison"),
+              if (!is.null(rr_plot)) {
+                tryCatch({
+                  as_widget(rr_plot)
+                }, error = function(e) {
+                  tags$div(class = "error-message", 
+                          paste("Error rendering relative risk plot:", e$message))
+                })
+              } else {
+                tags$div(class = "error-message", "No relative risk data available")
+              }),
+      
+      # Add data tables
+      tags$div(class = "dashboard-widget",
+              tags$h2("Data Tables"),
+              tags$div(class = "tab-container",
+                      tags$div(class = "tab-headers",
+                              tags$div(class = "tab-header active", "data-tab" = "incidence", "Incidence Rates"),
+                              tags$div(class = "tab-header", "data-tab" = "relative-risk", "Relative Risks")),
+                      tags$div(class = "tab-content active", "data-tab" = "incidence",
+                              if (!is.null(ir_data) && nrow(ir_data) > 0) {
+                                tryCatch({
+                                  DT::datatable(ir_data)
+                                }, error = function(e) {
+                                  tags$div(class = "error-message", 
+                                          paste("Error rendering data table:", e$message))
+                                })
+                              } else {
+                                tags$div(class = "error-message", "No incidence rate data available")
+                              }),
+                      tags$div(class = "tab-content", "data-tab" = "relative-risk",
+                              if (!is.null(rr_data) && nrow(rr_data) > 0) {
+                                tryCatch({
+                                  DT::datatable(rr_data)
+                                }, error = function(e) {
+                                  tags$div(class = "error-message", 
+                                          paste("Error rendering data table:", e$message))
+                                })
+                              } else {
+                                tags$div(class = "error-message", "No relative risk data available")
+                              }))),
+      
+      # Add footer
+      tags$div(class = "dashboard-footer",
+              tags$p("FoodNet Trends Analysis Pipeline v1.0"),
+              tags$p("Centers for Disease Control and Prevention"))
+    )
+  }, error = function(e) {
+    # Return a simple error message if there's any issue with widget creation
+    tagList(
+      tags$div(class = "dashboard-header",
+              tags$h1(args$title),
+              tags$p(paste("Generated (with errors):", format(Sys.time(), "%Y-%m-%d %H:%M:%S")))),
+      tags$div(class = "dashboard-widget error-message",
+              tags$h2("Dashboard Generation Error"),
+              tags$p(paste("Error creating dashboard widgets:", e$message)),
+              tags$p("Try running the pipeline again with complete data.")),
+      tags$div(class = "dashboard-footer",
+              tags$p("FoodNet Trends Analysis Pipeline v1.0"),
+              tags$p("Centers for Disease Control and Prevention"))
+    )
+  })
   
-  <script>
-    // Dashboard data
-    const dashboardData = {
-      pathogens: {{pathogens}},
-      states: {{states}},
-      years: {{years}},
-      comparisonPeriods: {{comparison_periods}},
-      irData: {{ir_data}},
-      rrData: {{rr_data}},
-      summaryData: {{summary_data}},
-      generationDate: "{{generation_date}}"
-    };
-    
-    // Initialization code would go here
-    document.addEventListener("DOMContentLoaded", function() {
-      console.log("Dashboard initialized with data:", dashboardData);
-      
-      // Set up tab switching
-      const tabHeaders = document.querySelectorAll(".tab-header");
-      tabHeaders.forEach(header => {
-        header.addEventListener("click", function() {
-          // Remove active class from all headers and contents
-          document.querySelectorAll(".tab-header").forEach(h => h.classList.remove("active"));
-          document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
-          
-          // Add active class to clicked header and corresponding content
-          const tabId = this.getAttribute("data-tab");
-          this.classList.add("active");
-          document.querySelector(`.tab-content[data-tab="${tabId}"]`).classList.add("active");
-        });
-      });
-    });
-  </script>
-</body>
-</html>
-'
+  # Create HTML widgets - with error trapping
+  widget_html <- tryCatch({
+    htmltools::renderTags(dashboard_widgets)$html
+  }, error = function(e) {
+    # Return a simple HTML error message
+    paste0('<div class="dashboard-header">',
+           '<h1>', args$title, '</h1>',
+           '<p>Generated (with errors): ', format(Sys.time(), "%Y-%m-%d %H:%M:%S"), '</p>',
+           '</div>',
+           '<div class="dashboard-widget error-message">',
+           '<h2>Dashboard Rendering Error</h2>',
+           '<p>Error rendering HTML: ', e$message, '</p>',
+           '<p>Try running the pipeline again with complete data.</p>',
+           '</div>',
+           '<div class="dashboard-footer">',
+           '<p>FoodNet Trends Analysis Pipeline v1.0</p>',
+           '<p>Centers for Disease Control and Prevention</p>',
+           '</div>')
+  })
+  
+  html_template <- gsub('<div id="dashboard-container"></div>', widget_html, html_template, fixed = TRUE)
   
   # Use custom template if provided
   if (!is.null(args$templateFile) && file.exists(args$templateFile)) {
