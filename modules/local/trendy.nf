@@ -147,10 +147,10 @@ process TRENDY {
         --outDir="./"
     
     # Check return code from R script
-    R_STATUS=$?
-    if [ $R_STATUS -ne 0 ]; then
-        echo "ERROR: R script failed with exit code $R_STATUS" >> ${pathogen}_trendy.log
-        exit $R_STATUS
+    R_STATUS=\$?
+    if [ \$R_STATUS -ne 0 ]; then
+        echo "ERROR: R script failed with exit code \$R_STATUS" >> ${pathogen}_trendy.log
+        exit \$R_STATUS
     fi
     
     echo "Analysis completed successfully" >> ${pathogen}_trendy.log
