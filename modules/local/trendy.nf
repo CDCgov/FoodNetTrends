@@ -257,10 +257,10 @@ process TRENDY {
                 # Create placeholder EstIRRCatch files for different time periods
                 echo "Creating placeholder EstIRRCatch files" >> ${pathogen}_trendy.log
                 for period in "2016_2020" "2018_2022" "2020_2022"; do
-                    echo "state,year,comparison_period,current_incidence,period_incidence,relative_risk,percent_change" > ${pathogen}_EstIRRCatch_${period}.csv
-                    echo "CA,2022,${period},0.5,0.4,1.25,25.0" >> ${pathogen}_EstIRRCatch_${period}.csv
-                    echo "NY,2022,${period},0.6,0.5,1.2,20.0" >> ${pathogen}_EstIRRCatch_${period}.csv
-                    echo "CO,2022,${period},0.3,0.4,0.75,-25.0" >> ${pathogen}_EstIRRCatch_${period}.csv
+                    echo "state,year,comparison_period,current_incidence,period_incidence,relative_risk,percent_change" > ${pathogen}_EstIRRCatch_\${period}.csv
+                    echo "CA,2022,\${period},0.5,0.4,1.25,25.0" >> ${pathogen}_EstIRRCatch_\${period}.csv
+                    echo "NY,2022,\${period},0.6,0.5,1.2,20.0" >> ${pathogen}_EstIRRCatch_\${period}.csv
+                    echo "CO,2022,\${period},0.3,0.4,0.75,-25.0" >> ${pathogen}_EstIRRCatch_\${period}.csv
                 done
                 
                 # Generate required placeholder PNG files
@@ -335,10 +335,10 @@ EOF
             # Create placeholder EstIRRCatch files for different time periods
             echo "Creating placeholder EstIRRCatch files" >> ${pathogen}_trendy.log
             for period in "2016_2020" "2018_2022" "2020_2022"; do
-                echo "state,year,comparison_period,current_incidence,period_incidence,relative_risk,percent_change" > ${pathogen}_EstIRRCatch_${period}.csv
-                echo "CA,2022,${period},0.5,0.4,1.25,25.0" >> ${pathogen}_EstIRRCatch_${period}.csv
-                echo "NY,2022,${period},0.6,0.5,1.2,20.0" >> ${pathogen}_EstIRRCatch_${period}.csv
-                echo "CO,2022,${period},0.3,0.4,0.75,-25.0" >> ${pathogen}_EstIRRCatch_${period}.csv
+                echo "state,year,comparison_period,current_incidence,period_incidence,relative_risk,percent_change" > ${pathogen}_EstIRRCatch_\${period}.csv
+                echo "CA,2022,\${period},0.5,0.4,1.25,25.0" >> ${pathogen}_EstIRRCatch_\${period}.csv
+                echo "NY,2022,\${period},0.6,0.5,1.2,20.0" >> ${pathogen}_EstIRRCatch_\${period}.csv
+                echo "CO,2022,\${period},0.3,0.4,0.75,-25.0" >> ${pathogen}_EstIRRCatch_\${period}.csv
             done
             
             # Generate required placeholder PNG files
