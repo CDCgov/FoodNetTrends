@@ -51,8 +51,10 @@ workflow SPLINE {
     def censusFileBVal, censusFilePVal
     try {
         // Check for empty string or null values explicitly
-        if (params.censusFileB && params.censusFileB.toString().trim()) {
-            censusFileBVal = file(params.censusFileB, checkIfExists: false)
+        if (params.censusFileB && params.censusFileB.toString().trim() && 
+            !(params.censusFileB instanceof Boolean)) {
+            // Only try to create a file if the value is not a boolean
+            censusFileBVal = file(params.censusFileB.toString(), checkIfExists: false)
             if (!censusFileBVal.exists()) {
                 log.warn "Census bacterial file not found: ${params.censusFileB}, will use placeholder"
                 censusFileBVal = file("${workflow.projectDir}/work/placeholder_census_bacterial.csv")
@@ -67,7 +69,7 @@ workflow SPLINE {
                 log.info "Census bacterial file found: ${censusFileBVal}"
             }
         } else {
-            log.warn "No census bacterial file specified or empty value provided, will use placeholder"
+            log.warn "No valid census bacterial file path, will use placeholder"
             def placeholder = file("${workflow.projectDir}/work/placeholder_census_bacterial.csv")
             placeholder.text = "state,population,year,pathogentype\nCA,10000000,2020,Bacterial\nCO,5000000,2020,Bacterial\nCT,3000000,2020,Bacterial\nGA,8000000,2020,Bacterial\nMD,5000000,2020,Bacterial\nMN,4000000,2020,Bacterial\nNM,2000000,2020,Bacterial\nNY,15000000,2020,Bacterial\nOR,3000000,2020,Bacterial\nTN,5000000,2020,Bacterial\n"
             censusFileBVal = placeholder
@@ -82,8 +84,10 @@ workflow SPLINE {
     
     try {
         // Check for empty string or null values explicitly
-        if (params.censusFileP && params.censusFileP.toString().trim()) {
-            censusFilePVal = file(params.censusFileP, checkIfExists: false)
+        if (params.censusFileP && params.censusFileP.toString().trim() && 
+            !(params.censusFileP instanceof Boolean)) {
+            // Only try to create a file if the value is not a boolean
+            censusFilePVal = file(params.censusFileP.toString(), checkIfExists: false)
             if (!censusFilePVal.exists()) {
                 log.warn "Census parasitic file not found: ${params.censusFileP}, will use placeholder"
                 censusFilePVal = file("${workflow.projectDir}/work/placeholder_census_parasitic.csv")
@@ -98,7 +102,7 @@ workflow SPLINE {
                 log.info "Census parasitic file found: ${censusFilePVal}"
             }
         } else {
-            log.warn "No census parasitic file specified or empty value provided, will use placeholder"
+            log.warn "No valid census parasitic file path, will use placeholder"
             def placeholder = file("${workflow.projectDir}/work/placeholder_census_parasitic.csv")
             placeholder.text = "state,population,year,pathogentype\nCA,10000000,2020,Parasitic\nCO,5000000,2020,Parasitic\nCT,3000000,2020,Parasitic\nGA,8000000,2020,Parasitic\nMD,5000000,2020,Parasitic\nMN,4000000,2020,Parasitic\nNM,2000000,2020,Parasitic\nNY,15000000,2020,Parasitic\nOR,3000000,2020,Parasitic\nTN,5000000,2020,Parasitic\n"
             censusFilePVal = placeholder

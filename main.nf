@@ -50,16 +50,21 @@ def validateFilePaths() {
     
     // Census files are now optional with placeholders
     if (params.containsKey('censusFileB')) {
-        if (params.censusFileB == null || params.censusFileB.toString().trim() == "") {
+        // Special handling for boolean values
+        if (params.censusFileB instanceof Boolean) {
+            log.warn "Census bacterial file parameter is a boolean value: ${params.censusFileB}, will use placeholder instead"
+            params.censusFileB = "" // Reset to empty string
+        } else if (params.censusFileB == null || params.censusFileB.toString().trim() == "") {
             log.warn "Census bacterial file parameter is empty, will use placeholder"
             // Explicitly set to empty string to prevent type coercion issues
             params.censusFileB = ""
         } else {
             try {
+                // Just validate it can be converted to a string safely
                 def censusPath = params.censusFileB.toString()
                 log.info "Census bacterial file path: ${censusPath}"
             } catch (Exception e) {
-                log.warn "Invalid census bacterial file path format"
+                log.warn "Invalid census bacterial file path format: ${e.message}"
                 // Reset to empty string if invalid
                 params.censusFileB = ""
             }
@@ -70,16 +75,21 @@ def validateFilePaths() {
     }
     
     if (params.containsKey('censusFileP')) {
-        if (params.censusFileP == null || params.censusFileP.toString().trim() == "") {
+        // Special handling for boolean values
+        if (params.censusFileP instanceof Boolean) {
+            log.warn "Census parasitic file parameter is a boolean value: ${params.censusFileP}, will use placeholder instead"
+            params.censusFileP = "" // Reset to empty string
+        } else if (params.censusFileP == null || params.censusFileP.toString().trim() == "") {
             log.warn "Census parasitic file parameter is empty, will use placeholder"
             // Explicitly set to empty string to prevent type coercion issues
             params.censusFileP = ""
         } else {
             try {
+                // Just validate it can be converted to a string safely
                 def censusPath = params.censusFileP.toString()
                 log.info "Census parasitic file path: ${censusPath}"
             } catch (Exception e) {
-                log.warn "Invalid census parasitic file path format"
+                log.warn "Invalid census parasitic file path format: ${e.message}"
                 // Reset to empty string if invalid
                 params.censusFileP = ""
             }
