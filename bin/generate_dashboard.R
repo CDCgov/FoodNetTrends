@@ -292,15 +292,41 @@ create_map_plot <- function(ir_data, year_selected, pathogen_selected) {
   # Filter data for selected year and pathogen
   map_data <- ir_data[ir_data$year == year_selected & ir_data$pathogen == pathogen_selected, ]
   
+  # Determine column names based on what's available in the data
+  incidence_col <- NULL
+  lower_col <- NULL
+  upper_col <- NULL
+  
+  if ("median_incidence" %in% colnames(map_data)) {
+    incidence_col <- "median_incidence"
+    lower_col <- if ("lower_hdi" %in% colnames(map_data)) "lower_hdi" else NULL
+    upper_col <- if ("upper_hdi" %in% colnames(map_data)) "upper_hdi" else NULL
+  } else if ("ir" %in% colnames(map_data)) {
+    incidence_col <- "ir"
+    lower_col <- if ("ir_lower" %in% colnames(map_data)) "ir_lower" else NULL
+    upper_col <- if ("ir_upper" %in% colnames(map_data)) "ir_upper" else NULL
+  } else {
+    # No recognizable incidence column
+    return(NULL)
+  }
+  
+  # Create tooltip text based on available columns
+  tooltip_text <- paste0("State: ", map_data$state, "<br>Incidence: ", round(map_data[[incidence_col]], 2))
+  
+  # Add confidence interval if available
+  if (!is.null(lower_col) && !is.null(upper_col)) {
+    tooltip_text <- paste0(tooltip_text, "<br>95% CI: ", 
+                          round(map_data[[lower_col]], 2), " - ", 
+                          round(map_data[[upper_col]], 2))
+  }
+  
   # Create a basic US map plot
   # This is a simplified version - in production, use proper US state boundaries and geojson
   # For now, create a placeholder that would be replaced with actual map
   p <- plot_ly(map_data, 
               type = "choropleth",
-              z = ~median_incidence,
-              text = ~paste("State:", state, 
-                           "<br>Incidence:", round(median_incidence, 2),
-                           "<br>95% CI:", round(lower_hdi, 2), "-", round(upper_hdi, 2)),
+              z = map_data[[incidence_col]],
+              text = tooltip_text,
               colorscale = "YlOrRd",
               marker = list(line = list(color = "rgb(255,255,255)", width = 1))) %>%
     layout(
@@ -602,7 +628,8 @@ generate_dashboard <- function() {
                           paste("Error rendering map plot:", e$message))
                 })
               } else {
-                tags$div(class = "error-message", "No geographic data available")
+                tags$div(class = "error-message", 
+                        "No geographic data available or required columns missing")
               }),
       
       # Add relative risk comparison
