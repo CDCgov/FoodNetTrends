@@ -231,7 +231,7 @@ process TRENDY {
                 # Create other expected output files if needed
                 if [ ! -f "${pathogen}_summary.txt" ]; then
                     echo "Creating summary file" >> ${pathogen}_trendy.log
-                    echo "Cyclospora model completed successfully on $(date)" > ${pathogen}_summary.txt
+                    echo "Cyclospora model completed successfully on \$(date)" > ${pathogen}_summary.txt
                     echo "See ${pathogen}_cyclo_model.log for details" >> ${pathogen}_summary.txt
                 fi
                 
@@ -251,7 +251,7 @@ process TRENDY {
             echo "Creating minimal Cyclospora model script" >> ${pathogen}_trendy.log
             cat > ./cyclospora_emergency.R << 'EOF'
 #!/usr/bin/env Rscript
-cat("Creating emergency Cyclospora model file\n")
+cat("Creating emergency Cyclospora model file\\n")
 dummy <- list(
   family = list(family = "negbinomial"),
   is_dummy = TRUE,
@@ -260,14 +260,14 @@ dummy <- list(
 )
 class(dummy) <- c("brmsfit", "list")
 saveRDS(dummy, file = "CYCLOSPORA_brm.Rds")
-cat("CYCLOSPORA_brm.Rds created successfully\n")
+cat("CYCLOSPORA_brm.Rds created successfully\\n")
 EOF
             
             # Run emergency script
             Rscript ./cyclospora_emergency.R > ${pathogen}_emergency.log 2>&1 || error_exit "Emergency Cyclospora script failed"
             
             # Create other expected output files
-            echo "Cyclospora emergency model created on $(date)" > ${pathogen}_summary.txt
+            echo "Cyclospora emergency model created on \$(date)" > ${pathogen}_summary.txt
             echo "state,year,ir,ir_lower,ir_upper" > ${pathogen}_IRCatch.csv
             echo "CA,2020,0.5,0.1,0.9" >> ${pathogen}_IRCatch.csv
             echo "NY,2020,0.6,0.2,1.0" >> ${pathogen}_IRCatch.csv
