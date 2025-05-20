@@ -47,73 +47,9 @@ workflow SPLINE {
         error "Error accessing MMWR file (${params.mmwrFile}): ${e.message}\nCheck path and permissions"
     }
     
-    // Set up census file handling with graceful fallbacks
-    def censusFileBVal, censusFilePVal
-    try {
-        // Check for empty string or null values explicitly
-        if (params.censusFileB && params.censusFileB.toString().trim() && 
-            !(params.censusFileB instanceof Boolean)) {
-            // Only try to create a file if the value is not a boolean
-            censusFileBVal = file(params.censusFileB.toString(), checkIfExists: false)
-            if (!censusFileBVal.exists()) {
-                log.warn "Census bacterial file not found: ${params.censusFileB}, will use placeholder"
-                censusFileBVal = file("${workflow.projectDir}/work/placeholder_census_bacterial.csv")
-                if (!censusFileBVal.exists()) {
-                    // Create minimal placeholder file if it doesn't exist
-                    def placeholder = file("${workflow.projectDir}/work/placeholder_census_bacterial.csv")
-                    placeholder.text = "state,population,year,pathogentype\nCA,10000000,2020,Bacterial\nCO,5000000,2020,Bacterial\nCT,3000000,2020,Bacterial\nGA,8000000,2020,Bacterial\nMD,5000000,2020,Bacterial\nMN,4000000,2020,Bacterial\nNM,2000000,2020,Bacterial\nNY,15000000,2020,Bacterial\nOR,3000000,2020,Bacterial\nTN,5000000,2020,Bacterial\n"
-                    censusFileBVal = placeholder
-                    log.info "Created census bacterial placeholder: ${censusFileBVal}"
-                }
-            } else {
-                log.info "Census bacterial file found: ${censusFileBVal}"
-            }
-        } else {
-            log.warn "No valid census bacterial file path, will use placeholder"
-            def placeholder = file("${workflow.projectDir}/work/placeholder_census_bacterial.csv")
-            placeholder.text = "state,population,year,pathogentype\nCA,10000000,2020,Bacterial\nCO,5000000,2020,Bacterial\nCT,3000000,2020,Bacterial\nGA,8000000,2020,Bacterial\nMD,5000000,2020,Bacterial\nMN,4000000,2020,Bacterial\nNM,2000000,2020,Bacterial\nNY,15000000,2020,Bacterial\nOR,3000000,2020,Bacterial\nTN,5000000,2020,Bacterial\n"
-            censusFileBVal = placeholder
-            log.info "Created census bacterial placeholder: ${censusFileBVal}"
-        }
-    } catch (Exception e) {
-        log.warn "Error handling census bacterial file: ${e.message}, using placeholder"
-        def placeholder = file("${workflow.projectDir}/work/placeholder_census_bacterial.csv")
-        placeholder.text = "state,population,year,pathogentype\nCA,10000000,2020,Bacterial\nCO,5000000,2020,Bacterial\nCT,3000000,2020,Bacterial\nGA,8000000,2020,Bacterial\nMD,5000000,2020,Bacterial\nMN,4000000,2020,Bacterial\nNM,2000000,2020,Bacterial\nNY,15000000,2020,Bacterial\nOR,3000000,2020,Bacterial\nTN,5000000,2020,Bacterial\n"
-        censusFileBVal = placeholder
-    }
+        // Set up census file handling with graceful fallbacks    def censusFileBVal, censusFilePVal    def placeholderContent = "state,population,year,pathogentype\nCA,10000000,2020,Bacterial\nCO,5000000,2020,Bacterial\nCT,3000000,2020,Bacterial\nGA,8000000,2020,Bacterial\nMD,5000000,2020,Bacterial\nMN,4000000,2020,Bacterial\nNM,2000000,2020,Bacterial\nNY,15000000,2020,Bacterial\nOR,3000000,2020,Bacterial\nTN,5000000,2020,Bacterial\n"        try {        // Create a temporary file in the work directory for placeholder data        def tempDir = new File("${workflow.launchDir}/work")        if (!tempDir.exists()) {            tempDir.mkdirs()        }                def placeholderFile = new File(tempDir, "placeholder_census_bacterial.csv")        placeholderFile.text = placeholderContent                // Now handle the parameter - use the file path only if it's a valid string path        if (params.censusFileB instanceof Boolean) {            log.warn "Census bacterial file parameter is boolean (${params.censusFileB}), using placeholder"            censusFileBVal = file(placeholderFile.absolutePath)        } else if (params.censusFileB && params.censusFileB.toString().trim()) {            // Valid string path provided            censusFileBVal = file(params.censusFileB.toString(), checkIfExists: false)            if (!censusFileBVal.exists()) {                log.warn "Census bacterial file not found: ${params.censusFileB}, using placeholder"                censusFileBVal = file(placeholderFile.absolutePath)            } else {                log.info "Census bacterial file found: ${censusFileBVal}"            }        } else {            log.warn "No valid census bacterial file path, using placeholder"            censusFileBVal = file(placeholderFile.absolutePath)        }                log.info "Using census file (bacterial): ${censusFileBVal}"    } catch (Exception e) {        log.warn "Error handling census bacterial file: ${e.message}, using in-memory placeholder"        // Use a relative path in the current working directory as last resort        def tempFile = new File("placeholder_census_bacterial.csv")        tempFile.text = placeholderContent        censusFileBVal = file(tempFile.absolutePath)        log.info "Created emergency placeholder: ${censusFileBVal}"    }
     
-    try {
-        // Check for empty string or null values explicitly
-        if (params.censusFileP && params.censusFileP.toString().trim() && 
-            !(params.censusFileP instanceof Boolean)) {
-            // Only try to create a file if the value is not a boolean
-            censusFilePVal = file(params.censusFileP.toString(), checkIfExists: false)
-            if (!censusFilePVal.exists()) {
-                log.warn "Census parasitic file not found: ${params.censusFileP}, will use placeholder"
-                censusFilePVal = file("${workflow.projectDir}/work/placeholder_census_parasitic.csv")
-                if (!censusFilePVal.exists()) {
-                    // Create minimal placeholder file if it doesn't exist
-                    def placeholder = file("${workflow.projectDir}/work/placeholder_census_parasitic.csv")
-                    placeholder.text = "state,population,year,pathogentype\nCA,10000000,2020,Parasitic\nCO,5000000,2020,Parasitic\nCT,3000000,2020,Parasitic\nGA,8000000,2020,Parasitic\nMD,5000000,2020,Parasitic\nMN,4000000,2020,Parasitic\nNM,2000000,2020,Parasitic\nNY,15000000,2020,Parasitic\nOR,3000000,2020,Parasitic\nTN,5000000,2020,Parasitic\n"
-                    censusFilePVal = placeholder
-                    log.info "Created census parasitic placeholder: ${censusFilePVal}"
-                }
-            } else {
-                log.info "Census parasitic file found: ${censusFilePVal}"
-            }
-        } else {
-            log.warn "No valid census parasitic file path, will use placeholder"
-            def placeholder = file("${workflow.projectDir}/work/placeholder_census_parasitic.csv")
-            placeholder.text = "state,population,year,pathogentype\nCA,10000000,2020,Parasitic\nCO,5000000,2020,Parasitic\nCT,3000000,2020,Parasitic\nGA,8000000,2020,Parasitic\nMD,5000000,2020,Parasitic\nMN,4000000,2020,Parasitic\nNM,2000000,2020,Parasitic\nNY,15000000,2020,Parasitic\nOR,3000000,2020,Parasitic\nTN,5000000,2020,Parasitic\n"
-            censusFilePVal = placeholder
-            log.info "Created census parasitic placeholder: ${censusFilePVal}"
-        }
-    } catch (Exception e) {
-        log.warn "Error handling census parasitic file: ${e.message}, using placeholder"
-        def placeholder = file("${workflow.projectDir}/work/placeholder_census_parasitic.csv")
-        placeholder.text = "state,population,year,pathogentype\nCA,10000000,2020,Parasitic\nCO,5000000,2020,Parasitic\nCT,3000000,2020,Parasitic\nGA,8000000,2020,Parasitic\nMD,5000000,2020,Parasitic\nMN,4000000,2020,Parasitic\nNM,2000000,2020,Parasitic\nNY,15000000,2020,Parasitic\nOR,3000000,2020,Parasitic\nTN,5000000,2020,Parasitic\n"
-        censusFilePVal = placeholder
-    }
+        // Handle parasitic census file    def parasiticPlaceholderContent = "state,population,year,pathogentype\nCA,10000000,2020,Parasitic\nCO,5000000,2020,Parasitic\nCT,3000000,2020,Parasitic\nGA,8000000,2020,Parasitic\nMD,5000000,2020,Parasitic\nMN,4000000,2020,Parasitic\nNM,2000000,2020,Parasitic\nNY,15000000,2020,Parasitic\nOR,3000000,2020,Parasitic\nTN,5000000,2020,Parasitic\n"        try {        // Create a temporary file in the work directory for placeholder data        def tempDir = new File("${workflow.launchDir}/work")        if (!tempDir.exists()) {            tempDir.mkdirs()        }                def placeholderFile = new File(tempDir, "placeholder_census_parasitic.csv")        placeholderFile.text = parasiticPlaceholderContent                // Now handle the parameter - use the file path only if it's a valid string path        if (params.censusFileP instanceof Boolean) {            log.warn "Census parasitic file parameter is boolean (${params.censusFileP}), using placeholder"            censusFilePVal = file(placeholderFile.absolutePath)        } else if (params.censusFileP && params.censusFileP.toString().trim()) {            // Valid string path provided            censusFilePVal = file(params.censusFileP.toString(), checkIfExists: false)            if (!censusFilePVal.exists()) {                log.warn "Census parasitic file not found: ${params.censusFileP}, using placeholder"                censusFilePVal = file(placeholderFile.absolutePath)            } else {                log.info "Census parasitic file found: ${censusFilePVal}"            }        } else {            log.warn "No valid census parasitic file path, using placeholder"            censusFilePVal = file(placeholderFile.absolutePath)        }                log.info "Using census file (parasitic): ${censusFilePVal}"    } catch (Exception e) {        log.warn "Error handling census parasitic file: ${e.message}, using in-memory placeholder"        // Use a relative path in the current working directory as last resort        def tempFile = new File("placeholder_census_parasitic.csv")        tempFile.text = parasiticPlaceholderContent        censusFilePVal = file(tempFile.absolutePath)        log.info "Created emergency placeholder: ${censusFilePVal}"    }
     
     // Dashboard templates - handle with placeholders if missing
     def dashboardTemplateVal, dashboardScriptVal
