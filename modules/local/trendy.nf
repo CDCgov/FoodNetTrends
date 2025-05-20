@@ -26,7 +26,7 @@
  *   - Retries on memory/resource errors
  *   - Detailed logging for diagnostics
  *
- * Last updated: 2025-05-18
+ * Last updated: 2025-05-20
  * ==================================================================
  */
 
@@ -64,10 +64,16 @@ process TRENDY {
     task.ext.when == null || task.ext.when
     
     script:
+    // Get file extension to handle CSV vs SAS files properly
+    def mmwrExt = mmwrFile.toString().toLowerCase().endsWith('.csv') ? 'csv' : 'sas7bdat'
     """
     set -e
     echo "Starting analysis for pathogen: ${pathogen}" > ${pathogen}_trendy.log
-    echo "Using MMWR data file: ${mmwrFile}" >> ${pathogen}_trendy.log
+    echo "Using MMWR data file: ${mmwrFile} (${mmwrExt} format)" >> ${pathogen}_trendy.log
+    
+    # Make a local copy of the MMWR file to handle path issues
+    cp -v "${mmwrFile}" ./input_data.${mmwrExt}
+    echo "Created local copy of MMWR file as: input_data.${mmwrExt}" >> ${pathogen}_trendy.log
     
     # Create empty placeholder files if needed
     if [ ! -f "${censusFileBact}" ] || [ ! -s "${censusFileBact}" ]; then
@@ -76,8 +82,10 @@ process TRENDY {
         echo "CA,10000000,2020,Bacterial" >> empty_census_bact.csv
         CENSUS_B_ARG="--censusFileB=empty_census_bact.csv"
     else
-        echo "Census bacterial file exists: ${censusFileBact}" >> ${pathogen}_trendy.log
-        CENSUS_B_ARG="--censusFileB=\"${censusFileBact}\""
+        # Create local copy of census file for consistent handling
+        cp -v "${censusFileBact}" ./census_bact.sas7bdat
+        echo "Created local copy of census bacterial file as: census_bact.sas7bdat" >> ${pathogen}_trendy.log
+        CENSUS_B_ARG="--censusFileB=census_bact.sas7bdat"
     fi
     
     if [ ! -f "${censusFileParas}" ] || [ ! -s "${censusFileParas}" ]; then
@@ -86,8 +94,10 @@ process TRENDY {
         echo "CA,10000000,2020,Parasitic" >> empty_census_para.csv
         CENSUS_P_ARG="--censusFileP=empty_census_para.csv"
     else
-        echo "Census parasitic file exists: ${censusFileParas}" >> ${pathogen}_trendy.log
-        CENSUS_P_ARG="--censusFileP=\"${censusFileParas}\""
+        # Create local copy of census file for consistent handling
+        cp -v "${censusFileParas}" ./census_para.sas7bdat
+        echo "Created local copy of census parasitic file as: census_para.sas7bdat" >> ${pathogen}_trendy.log
+        CENSUS_P_ARG="--censusFileP=census_para.sas7bdat"
     fi
     
     # Run the main trend analysis with explicit path handling for everything
@@ -105,16 +115,43 @@ process TRENDY {
         exit 1
     fi
     
+    # Check that our local data file copy exists and is readable
+    if [ ! -f "./input_data.${mmwrExt}" ] || [ ! -r "./input_data.${mmwrExt}" ]; then
+        echo "ERROR: Local MMWR data file copy not found or not readable" >> ${pathogen}_trendy.log
+        echo "Original file: ${mmwrFile}" >> ${pathogen}_trendy.log
+        echo "Local copy attempt: ./input_data.${mmwrExt}" >> ${pathogen}_trendy.log
+        echo "Current directory contents:" >> ${pathogen}_trendy.log
+        ls -la ./ >> ${pathogen}_trendy.log
+        exit 1
+    fi
+    
+    # Add preprocessed flag based on file extension
+    if [ "${mmwrExt}" == "csv" ]; then
+        PREPROC_ARG="--preprocessed=TRUE --cleanFile=./input_data.csv"
+        echo "Using preprocessed mode for CSV file" >> ${pathogen}_trendy.log
+    else
+        PREPROC_ARG="--preprocessed=FALSE"
+        echo "Using raw data mode for SAS file" >> ${pathogen}_trendy.log
+    fi
+    
     # Execute with carefully quoted arguments
     Rscript "\${SCRIPT_PATH}" \\
         --pathogen="${pathogen}" \\
-        --mmwrFile="${mmwrFile}" \\
+        --mmwrFile="./input_data.${mmwrExt}" \\
         \${CENSUS_B_ARG} \\
         \${CENSUS_P_ARG} \\
+        \${PREPROC_ARG} \\
         --projID="${projID}" \\
         --travel="${filter_travel}" \\
         --cidt="${filter_cidt}" \\
         --outDir="./"
+    
+    # Check return code from R script
+    R_STATUS=$?
+    if [ $R_STATUS -ne 0 ]; then
+        echo "ERROR: R script failed with exit code $R_STATUS" >> ${pathogen}_trendy.log
+        exit $R_STATUS
+    fi
     
     echo "Analysis completed successfully" >> ${pathogen}_trendy.log
     """

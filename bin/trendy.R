@@ -386,10 +386,62 @@ report_progress("DATA", message="Loading data files")
 # Load MMWR data
 if (preprocessed) {
   report_progress("DATA", message=paste("Using preprocessed data:", cleanFile))
-  mmwrdata <- read.csv(cleanFile, stringsAsFactors = FALSE)
+  # Enhanced CSV reading with detailed error handling
+  tryCatch({
+    # First check if the file exists
+    if (!file.exists(cleanFile)) {
+      stop(paste("Preprocessed CSV file does not exist:", cleanFile))
+    }
+    
+    # Check if file is empty
+    if (file.info(cleanFile)$size == 0) {
+      stop(paste("Preprocessed CSV file is empty:", cleanFile))
+    }
+    
+    # Try to read with more robust settings
+    report_progress("DATA", message=paste("Reading CSV file:", cleanFile))
+    mmwrdata <- read.csv(cleanFile, stringsAsFactors = FALSE, 
+                         check.names = FALSE,  # Preserve column names
+                         fileEncoding = "UTF-8", # Handle encoding issues
+                         na.strings = c("NA", "", "NULL")) # Handle missing values
+    
+    # Verify we actually got data
+    if (nrow(mmwrdata) == 0) {
+      report_progress("WARNING", message=paste("CSV file contained no rows:", cleanFile))
+    } else {
+      report_progress("DATA", message=paste("Successfully read", nrow(mmwrdata), "rows from CSV file"))
+    }
+    
+  }, error = function(e) {
+    # Detailed error logging
+    report_progress("ERROR", message=paste("Failed to read CSV file:", cleanFile))
+    report_progress("ERROR", message=paste("Error message:", e$message))
+    report_progress("ERROR", message="Attempting to check file format...")
+    
+    # Additional diagnostics - check first few lines of the file
+    tryCatch({
+      report_progress("DIAG", message="File preview:")
+      con <- file(cleanFile, "r")
+      header_line <- readLines(con, n=1)
+      report_progress("DIAG", message=paste("Header:", header_line))
+      close(con)
+    }, error = function(e2) {
+      report_progress("ERROR", message=paste("Could not read file header:", e2$message))
+    })
+    
+    # Re-throw the error
+    stop(paste("Cannot read CSV file:", e$message))
+  })
 } else {
   report_progress("DATA", message=paste("Loading raw MMWR data:", mmwrFile))
-  mmwrdata <- haven::read_sas(mmwrFile)
+  # Attempt to read SAS file with robust error handling
+  tryCatch({
+    mmwrdata <- haven::read_sas(mmwrFile)
+  }, error = function(e) {
+    report_progress("ERROR", message=paste("Failed to read SAS file:", mmwrFile))
+    report_progress("ERROR", message=paste("Error message:", e$message))
+    stop(paste("Cannot read SAS file:", e$message))
+  })
 }
 
 # Load or create census data
