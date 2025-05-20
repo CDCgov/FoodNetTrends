@@ -103,15 +103,18 @@ process TRENDY {
         if [ "\${CENSUS_B_EXT}" = "csv" ]; then
             cp -v "${censusFileBVal}" ./census_bact.csv || error_exit "Failed to copy census bacterial CSV file"
             echo "Created local copy of census bacterial file as: census_bact.csv" >> ${pathogen}_trendy.log
+            chmod 644 ./census_bact.csv
             CENSUS_B_ARG="--censusFileB=census_bact.csv"
         elif [ "\${CENSUS_B_EXT}" = "sas7bdat" ]; then
             cp -v "${censusFileBVal}" ./census_bact.sas7bdat || error_exit "Failed to copy census bacterial SAS file"
             echo "Created local copy of census bacterial file as: census_bact.sas7bdat" >> ${pathogen}_trendy.log
+            chmod 644 ./census_bact.sas7bdat
             CENSUS_B_ARG="--censusFileB=census_bact.sas7bdat"
         else
             echo "Unknown census bacterial file extension, defaulting to CSV" >> ${pathogen}_trendy.log
             cp -v "${censusFileBVal}" ./census_bact.csv || error_exit "Failed to copy census bacterial file"
             echo "Created local copy of census bacterial file as: census_bact.csv" >> ${pathogen}_trendy.log
+            chmod 644 ./census_bact.csv
             CENSUS_B_ARG="--censusFileB=census_bact.csv"
         fi
     else
@@ -128,6 +131,7 @@ process TRENDY {
         echo "NY,15000000,2020,Bacterial" >> empty_census_bact.csv
         echo "OR,3000000,2020,Bacterial" >> empty_census_bact.csv
         echo "TN,5000000,2020,Bacterial" >> empty_census_bact.csv
+        chmod 644 empty_census_bact.csv
         CENSUS_B_ARG="--censusFileB=empty_census_bact.csv"
     fi
     
@@ -145,15 +149,18 @@ process TRENDY {
         if [ "\${CENSUS_P_EXT}" = "csv" ]; then
             cp -v "${censusFilePVal}" ./census_para.csv || error_exit "Failed to copy census parasitic CSV file"
             echo "Created local copy of census parasitic file as: census_para.csv" >> ${pathogen}_trendy.log
+            chmod 644 ./census_para.csv
             CENSUS_P_ARG="--censusFileP=census_para.csv"
         elif [ "\${CENSUS_P_EXT}" = "sas7bdat" ]; then
             cp -v "${censusFilePVal}" ./census_para.sas7bdat || error_exit "Failed to copy census parasitic SAS file"
             echo "Created local copy of census parasitic file as: census_para.sas7bdat" >> ${pathogen}_trendy.log
+            chmod 644 ./census_para.sas7bdat
             CENSUS_P_ARG="--censusFileP=census_para.sas7bdat"
         else
             echo "Unknown census parasitic file extension, defaulting to CSV" >> ${pathogen}_trendy.log
             cp -v "${censusFilePVal}" ./census_para.csv || error_exit "Failed to copy census parasitic file"
             echo "Created local copy of census parasitic file as: census_para.csv" >> ${pathogen}_trendy.log
+            chmod 644 ./census_para.csv
             CENSUS_P_ARG="--censusFileP=census_para.csv"
         fi
     else
@@ -170,6 +177,7 @@ process TRENDY {
         echo "NY,15000000,2020,Parasitic" >> empty_census_para.csv
         echo "OR,3000000,2020,Parasitic" >> empty_census_para.csv
         echo "TN,5000000,2020,Parasitic" >> empty_census_para.csv
+        chmod 644 empty_census_para.csv
         CENSUS_P_ARG="--censusFileP=empty_census_para.csv"
     fi
     
