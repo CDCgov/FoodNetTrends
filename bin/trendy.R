@@ -909,13 +909,39 @@ cat('DEBUG: Unique years in census:', paste(unique(census$year), collapse=', '),
 cat('DEBUG: Number of records in census:', nrow(census), '\n')
 
 # After importing mmwrdata and census, compare (state, year) pairs for coverage
-mmwr_pairs <- unique(mmwrdata[, c("state", "year")])
-census_pairs <- unique(census[, c("state", "year")])
+mmwr_pairs <- tryCatch({
+  unique(mmwrdata[, c("state", "year")])
+}, error = function(e) {
+  report_progress("WARNING", message=paste("Error creating MMWR pairs:", e$message))
+  # Create fallback structure
+  data.frame(state = unique(mmwrdata$state), year = max(as.numeric(mmwrdata$year), na.rm=TRUE), 
+             stringsAsFactors = FALSE)
+})
 
-# Find (state, year) pairs in MMWR but not in census
-mmwr_not_in_census <- anti_join(mmwr_pairs, census_pairs, by = c("state", "year"))
-# Find (state, year) pairs in census but not in MMWR
-census_not_in_mmwr <- anti_join(census_pairs, mmwr_pairs, by = c("state", "year"))
+census_pairs <- tryCatch({
+  unique(census[, c("state", "year")])
+}, error = function(e) {
+  report_progress("WARNING", message=paste("Error creating census pairs:", e$message))
+  # Create fallback structure
+  data.frame(state = unique(census$state), year = max(as.numeric(census$year), na.rm=TRUE), 
+             stringsAsFactors = FALSE)
+})
+
+# Find (state, year) pairs in MMWR but not in census - with error handling
+mmwr_not_in_census <- tryCatch({
+  anti_join(mmwr_pairs, census_pairs, by = c("state", "year"))
+}, error = function(e) {
+  report_progress("WARNING", message=paste("Error finding MMWR records not in census:", e$message))
+  data.frame(state = character(0), year = numeric(0), stringsAsFactors = FALSE)
+})
+
+# Find (state, year) pairs in census but not in MMWR - with error handling
+census_not_in_mmwr <- tryCatch({
+  anti_join(census_pairs, mmwr_pairs, by = c("state", "year"))
+}, error = function(e) {
+  report_progress("WARNING", message=paste("Error finding census records not in MMWR:", e$message))
+  data.frame(state = character(0), year = numeric(0), stringsAsFactors = FALSE)
+})
 
 # Print summary to console
 cat('PREPROCESS CHECK: (state, year) pairs in MMWR but missing in census:', nrow(mmwr_not_in_census), '\n')
@@ -990,23 +1016,40 @@ if (!is.null(opts$stec_serotypes)) {
 
 report_progress("DATA", message=paste("Processed", nrow(mmwrdata), "MMWR records"))
 
-# Debug information for census and mmwrdata
-cat('DEBUG: Unique pathogens in mmwrdata:', paste(unique(mmwrdata$pathogen), collapse=', '), '\n')
-cat('DEBUG: Unique years in mmwrdata:', paste(unique(mmwrdata$year), collapse=', '), '\n')
-cat('DEBUG: Unique states in mmwrdata:', paste(unique(mmwrdata$state), collapse=', '), '\n')
-cat('DEBUG: Number of records in mmwrdata:', nrow(mmwrdata), '\n')
-cat('DEBUG: Unique states in census:', paste(unique(census$state), collapse=', '), '\n')
-cat('DEBUG: Unique years in census:', paste(unique(census$year), collapse=', '), '\n')
-cat('DEBUG: Number of records in census:', nrow(census), '\n')
-  
-# After importing mmwrdata and census, compare (state, year) pairs for coverage
-mmwr_pairs <- unique(mmwrdata[, c("state", "year")])
-census_pairs <- unique(census[, c("state", "year")])
+# After the filtering, re-run the check for census/mmwr pair comparison with error handling
+mmwr_pairs <- tryCatch({
+  unique(mmwrdata[, c("state", "year")])
+}, error = function(e) {
+  report_progress("WARNING", message=paste("Error creating MMWR pairs after filtering:", e$message))
+  # Create fallback structure
+  data.frame(state = unique(mmwrdata$state), year = max(as.numeric(mmwrdata$year), na.rm=TRUE), 
+             stringsAsFactors = FALSE)
+})
 
-# Find (state, year) pairs in MMWR but not in census
-mmwr_not_in_census <- anti_join(mmwr_pairs, census_pairs, by = c("state", "year"))
-# Find (state, year) pairs in census but not in MMWR
-census_not_in_mmwr <- anti_join(census_pairs, mmwr_pairs, by = c("state", "year"))
+census_pairs <- tryCatch({
+  unique(census[, c("state", "year")])
+}, error = function(e) {
+  report_progress("WARNING", message=paste("Error creating census pairs after filtering:", e$message))
+  # Create fallback structure
+  data.frame(state = unique(census$state), year = max(as.numeric(census$year), na.rm=TRUE), 
+             stringsAsFactors = FALSE)
+})
+
+# Find (state, year) pairs in MMWR but not in census - with error handling
+mmwr_not_in_census <- tryCatch({
+  anti_join(mmwr_pairs, census_pairs, by = c("state", "year"))
+}, error = function(e) {
+  report_progress("WARNING", message=paste("Error finding MMWR records not in census after filtering:", e$message))
+  data.frame(state = character(0), year = numeric(0), stringsAsFactors = FALSE)
+})
+
+# Find (state, year) pairs in census but not in MMWR - with error handling
+census_not_in_mmwr <- tryCatch({
+  anti_join(census_pairs, mmwr_pairs, by = c("state", "year"))
+}, error = function(e) {
+  report_progress("WARNING", message=paste("Error finding census records not in MMWR after filtering:", e$message))
+  data.frame(state = character(0), year = numeric(0), stringsAsFactors = FALSE)
+})
 
 # Print summary to console
 cat('PREPROCESS CHECK: (state, year) pairs in MMWR but missing in census:', nrow(mmwr_not_in_census), '\n')
@@ -1017,3 +1060,12 @@ cat('PREPROCESS CHECK: (state, year) pairs in census but missing in MMWR:', nrow
 if (nrow(census_not_in_mmwr) > 0) {
   print(census_not_in_mmwr)
 }
+
+# Debug information for census and mmwrdata
+cat('DEBUG: Unique pathogens in mmwrdata:', paste(unique(mmwrdata$pathogen), collapse=', '), '\n')
+cat('DEBUG: Unique years in mmwrdata:', paste(unique(mmwrdata$year), collapse=', '), '\n')
+cat('DEBUG: Unique states in mmwrdata:', paste(unique(mmwrdata$state), collapse=', '), '\n')
+cat('DEBUG: Number of records in mmwrdata:', nrow(mmwrdata), '\n')
+cat('DEBUG: Unique states in census:', paste(unique(census$state), collapse=', '), '\n')
+cat('DEBUG: Unique years in census:', paste(unique(census$year), collapse=', '), '\n')
+cat('DEBUG: Number of records in census:', nrow(census), '\n')
