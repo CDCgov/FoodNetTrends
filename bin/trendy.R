@@ -914,7 +914,20 @@ mmwr_pairs <- tryCatch({
 }, error = function(e) {
   report_progress("WARNING", message=paste("Error creating MMWR pairs:", e$message))
   # Create fallback structure
-  data.frame(state = unique(mmwrdata$state), year = max(as.numeric(mmwrdata$year), na.rm=TRUE), 
+  unique_states <- unique(mmwrdata$state)
+  max_year <- tryCatch({
+    max_year_val <- max(as.numeric(mmwrdata$year), na.rm=TRUE)
+    # Handle -Inf case
+    if(is.finite(max_year_val)) {
+      max_year_val
+    } else {
+      2020  # Default year if max returns -Inf
+    }
+  }, error = function(e) {
+    2020  # Default year if error
+  })
+  
+  data.frame(state = unique_states, year = max_year, 
              stringsAsFactors = FALSE)
 })
 
@@ -922,8 +935,44 @@ census_pairs <- tryCatch({
   unique(census[, c("state", "year")])
 }, error = function(e) {
   report_progress("WARNING", message=paste("Error creating census pairs:", e$message))
-  # Create fallback structure
-  data.frame(state = unique(census$state), year = max(as.numeric(census$year), na.rm=TRUE), 
+  # Create fallback structure with more robust handling
+  unique_states <- tryCatch({
+    unique_states_val <- unique(census$state)
+    if(length(unique_states_val) > 0) {
+      unique_states_val
+    } else {
+      # Use MMWR states as fallback, or default if that's empty too
+      mmwr_states <- unique(mmwrdata$state)
+      if(length(mmwr_states) > 0) {
+        mmwr_states
+      } else {
+        c("CA", "CO", "CT", "GA", "MD", "MN", "NM", "NY", "OR", "TN")
+      }
+    }
+  }, error = function(e) {
+    # Default states if error
+    c("CA", "CO", "CT", "GA", "MD", "MN", "NM", "NY", "OR", "TN")
+  })
+  
+  max_year <- tryCatch({
+    max_year_val <- max(as.numeric(census$year), na.rm=TRUE)
+    # Handle -Inf case
+    if(is.finite(max_year_val)) {
+      max_year_val
+    } else {
+      # Use MMWR max year as fallback, or default if that's invalid too
+      mmwr_max_year <- max(as.numeric(mmwrdata$year), na.rm=TRUE)
+      if(is.finite(mmwr_max_year)) {
+        mmwr_max_year
+      } else {
+        2020  # Default year
+      }
+    }
+  }, error = function(e) {
+    2020  # Default year if error
+  })
+  
+  data.frame(state = unique_states, year = max_year, 
              stringsAsFactors = FALSE)
 })
 
@@ -1019,8 +1068,8 @@ report_progress("DATA", message=paste("Processed", nrow(mmwrdata), "MMWR records
 # After the filtering, re-run the check for census/mmwr pair comparison with error handling
 
 # Check if state or year columns are missing or empty after filtering
-if (!(\"state\" %in% names(census)) || !(\"year\" %in% names(census)) || length(unique(census$state)) == 0) {
-  report_progress(\"WARNING\", message=\"Missing or empty required columns (state, year) in census data after filtering, rebuilding structure\")
+if (!("state" %in% names(census)) || !("year" %in% names(census)) || length(unique(census$state)) == 0) {
+  report_progress("WARNING", message="Missing or empty required columns (state, year) in census data after filtering, rebuilding structure")
   
   # Create a completely new census dataframe with proper structure
   # Extract unique states and years from MMWR data
@@ -1037,23 +1086,23 @@ if (!(\"state\" %in% names(census)) || !(\"year\" %in% names(census)) || length(
       2020
     }
   }, error = function(e) {
-    report_progress(\"WARNING\", message=paste(\"Error extracting years, using default: \", e$message))
+    report_progress("WARNING", message=paste("Error extracting years, using default: ", e$message))
     2020
   })
   
   # If we don't have states or years, use defaults
-  if (length(all_states) == 0) all_states <- c(\"CA\", \"CO\", \"CT\", \"GA\", \"MD\", \"MN\", \"NM\", \"NY\", \"OR\", \"TN\")
+  if (length(all_states) == 0) all_states <- c("CA", "CO", "CT", "GA", "MD", "MN", "NM", "NY", "OR", "TN")
   if (length(all_years) == 0) all_years <- 2020
   
   # Create comprehensive census dataframe with all state-year combinations
-  report_progress(\"WARNING\", message=\"Creating new census dataframe with proper structure after filtering\")
+  report_progress("WARNING", message="Creating new census dataframe with proper structure after filtering")
   census_new <- expand.grid(
     state = all_states,
     year = all_years,
     stringsAsFactors = FALSE
   )
   census_new$population <- 5000000  # Default population
-  census_new$pathogentype <- \"Bacterial\"  # Default type
+  census_new$pathogentype <- "Bacterial"  # Default type
   
   # Generate parasitic entries too
   census_para_new <- expand.grid(
@@ -1062,30 +1111,44 @@ if (!(\"state\" %in% names(census)) || !(\"year\" %in% names(census)) || length(
     stringsAsFactors = FALSE
   )
   census_para_new$population <- 5000000  # Default population
-  census_para_new$pathogentype <- \"Parasitic\"  # Parasitic type
+  census_para_new$pathogentype <- "Parasitic"  # Parasitic type
   
   # Combine bacterial and parasitic census data
   census <- rbind(census_new, census_para_new)
   
   # Update the separate census data
-  censusBact <- census[census$pathogentype == \"Bacterial\", ]
-  censusParas <- census[census$pathogentype == \"Parasitic\", ]
+  censusBact <- census[census$pathogentype == "Bacterial", ]
+  censusParas <- census[census$pathogentype == "Parasitic", ]
   
-  report_progress(\"WARNING\", message=paste(\"Created new census dataframe with\", nrow(census), \"records after filtering\"))
+  report_progress("WARNING", message=paste("Created new census dataframe with", nrow(census), "records after filtering"))
   
   # Print debug information for the new census data
-  cat('DEBUG: Rebuilt census data from scratch after filtering\\n')
-  cat('DEBUG: Unique states in census:', paste(unique(census$state), collapse=', '), '\\n')
-  cat('DEBUG: Unique years in census:', paste(unique(census$year), collapse=', '), '\\n')
-  cat('DEBUG: Number of records in census:', nrow(census), '\\n')
+  cat('DEBUG: Rebuilt census data from scratch after filtering\n')
+  cat('DEBUG: Unique states in census:', paste(unique(census$state), collapse=', '), '\n')
+  cat('DEBUG: Unique years in census:', paste(unique(census$year), collapse=', '), '\n')
+  cat('DEBUG: Number of records in census:', nrow(census), '\n')
 }
 
+# After the filtering, re-run the check for census/mmwr pair comparison with error handling
 mmwr_pairs <- tryCatch({
   unique(mmwrdata[, c("state", "year")])
 }, error = function(e) {
   report_progress("WARNING", message=paste("Error creating MMWR pairs after filtering:", e$message))
-  # Create fallback structure
-  data.frame(state = unique(mmwrdata$state), year = max(as.numeric(mmwrdata$year), na.rm=TRUE), 
+  # Create fallback structure with robust error handling
+  unique_states <- unique(mmwrdata$state)
+  max_year <- tryCatch({
+    max_year_val <- max(as.numeric(mmwrdata$year), na.rm=TRUE)
+    # Handle -Inf case
+    if(is.finite(max_year_val)) {
+      max_year_val
+    } else {
+      2020  # Default year if max returns -Inf
+    }
+  }, error = function(e) {
+    2020  # Default year if error
+  })
+  
+  data.frame(state = unique_states, year = max_year, 
              stringsAsFactors = FALSE)
 })
 
@@ -1093,8 +1156,44 @@ census_pairs <- tryCatch({
   unique(census[, c("state", "year")])
 }, error = function(e) {
   report_progress("WARNING", message=paste("Error creating census pairs after filtering:", e$message))
-  # Create fallback structure
-  data.frame(state = unique(census$state), year = max(as.numeric(census$year), na.rm=TRUE), 
+  # Create fallback structure with robust handling
+  unique_states <- tryCatch({
+    unique_states_val <- unique(census$state)
+    if(length(unique_states_val) > 0) {
+      unique_states_val
+    } else {
+      # Use MMWR states as fallback, or default if that's empty too
+      mmwr_states <- unique(mmwrdata$state)
+      if(length(mmwr_states) > 0) {
+        mmwr_states
+      } else {
+        c("CA", "CO", "CT", "GA", "MD", "MN", "NM", "NY", "OR", "TN")
+      }
+    }
+  }, error = function(e) {
+    # Default states if error
+    c("CA", "CO", "CT", "GA", "MD", "MN", "NM", "NY", "OR", "TN")
+  })
+  
+  max_year <- tryCatch({
+    max_year_val <- max(as.numeric(census$year), na.rm=TRUE)
+    # Handle -Inf case
+    if(is.finite(max_year_val)) {
+      max_year_val
+    } else {
+      # Use MMWR max year as fallback, or default if that's invalid too
+      mmwr_max_year <- max(as.numeric(mmwrdata$year), na.rm=TRUE)
+      if(is.finite(mmwr_max_year)) {
+        mmwr_max_year
+      } else {
+        2020  # Default year
+      }
+    }
+  }, error = function(e) {
+    2020  # Default year if error
+  })
+  
+  data.frame(state = unique_states, year = max_year, 
              stringsAsFactors = FALSE)
 })
 
@@ -1125,18 +1224,18 @@ if (nrow(census_not_in_mmwr) > 0) {
 }
 
 # Final verification check to ensure census data is valid and complete
-if (nrow(census) == 0 || !(\"state\" %in% names(census)) || !(\"year\" %in% names(census)) || 
-    !(\"population\" %in% names(census)) || !(\"pathogentype\" %in% names(census)) ||
+if (nrow(census) == 0 || !("state" %in% names(census)) || !("year" %in% names(census)) || 
+    !("population" %in% names(census)) || !("pathogentype" %in% names(census)) ||
     length(unique(census$state)) == 0) {
   
-  report_progress(\"WARNING\", message=\"Final verification: Census data is incomplete or invalid, rebuilding from scratch\")
+  report_progress("WARNING", message="Final verification: Census data is incomplete or invalid, rebuilding from scratch")
   
   # Extract states and years from MMWR data
   all_states <- unique(as.character(mmwrdata$state))
   all_years <- unique(as.numeric(as.character(mmwrdata$year)))
   
   # Use defaults if needed
-  if (length(all_states) == 0) all_states <- c(\"CA\", \"CO\", \"CT\", \"GA\", \"MD\", \"MN\", \"NM\", \"NY\", \"OR\", \"TN\")
+  if (length(all_states) == 0) all_states <- c("CA", "CO", "CT", "GA", "MD", "MN", "NM", "NY", "OR", "TN")
   if (length(all_years) == 0 || all(is.na(all_years))) all_years <- 2020
   
   # Build bacterial census
@@ -1146,7 +1245,7 @@ if (nrow(census) == 0 || !(\"state\" %in% names(census)) || !(\"year\" %in% name
     stringsAsFactors = FALSE
   )
   census_bact$population <- 5000000
-  census_bact$pathogentype <- \"Bacterial\"
+  census_bact$pathogentype <- "Bacterial"
   
   # Build parasitic census
   census_para <- expand.grid(
@@ -1155,17 +1254,17 @@ if (nrow(census) == 0 || !(\"state\" %in% names(census)) || !(\"year\" %in% name
     stringsAsFactors = FALSE
   )
   census_para$population <- 5000000
-  census_para$pathogentype <- \"Parasitic\"
+  census_para$pathogentype <- "Parasitic"
   
   # Combine them
   census <- rbind(census_bact, census_para)
   censusBact <- census_bact
   censusParas <- census_para
   
-  report_progress(\"WARNING\", message=paste(\"Final verification: Created new census with\", 
-                                           nrow(census), \"records covering\", 
-                                           length(all_states), \"states and\",
-                                           length(all_years), \"years\"))
+  report_progress("WARNING", message=paste("Final verification: Created new census with", 
+                                           nrow(census), "records covering", 
+                                           length(all_states), "states and",
+                                           length(all_years), "years"))
 }
 
 # Debug information for census and mmwrdata
@@ -1178,8 +1277,8 @@ cat('DEBUG: Unique years in census:', paste(unique(census$year), collapse=', '),
 cat('DEBUG: Number of records in census:', nrow(census), '\n')
 
 # Check if we couldn't access or create columns properly
-if (!(\"state\" %in% names(census)) || !(\"year\" %in% names(census)) || length(unique(census$state)) == 0) {
-  report_progress(\"WARNING\", message=\"Missing or empty required columns (state, year) in census data, rebuilding structure\")
+if (!("state" %in% names(census)) || !("year" %in% names(census)) || length(unique(census$state)) == 0) {
+  report_progress("WARNING", message="Missing or empty required columns (state, year) in census data, rebuilding structure")
   
   # Create a completely new census dataframe with proper structure
   # Extract unique states and years from MMWR data
@@ -1196,23 +1295,23 @@ if (!(\"state\" %in% names(census)) || !(\"year\" %in% names(census)) || length(
       2020
     }
   }, error = function(e) {
-    report_progress(\"WARNING\", message=paste(\"Error extracting years, using default: \", e$message))
+    report_progress("WARNING", message=paste("Error extracting years, using default: ", e$message))
     2020
   })
   
   # If we don't have states or years, use defaults
-  if (length(all_states) == 0) all_states <- c(\"CA\", \"CO\", \"CT\", \"GA\", \"MD\", \"MN\", \"NM\", \"NY\", \"OR\", \"TN\")
+  if (length(all_states) == 0) all_states <- c("CA", "CO", "CT", "GA", "MD", "MN", "NM", "NY", "OR", "TN")
   if (length(all_years) == 0) all_years <- 2020
   
   # Create comprehensive census dataframe with all state-year combinations
-  report_progress(\"WARNING\", message=\"Creating new census dataframe with proper structure\")
+  report_progress("WARNING", message="Creating new census dataframe with proper structure")
   census_new <- expand.grid(
     state = all_states,
     year = all_years,
     stringsAsFactors = FALSE
   )
   census_new$population <- 5000000  # Default population
-  census_new$pathogentype <- \"Bacterial\"  # Default type
+  census_new$pathogentype <- "Bacterial"  # Default type
   
   # Generate parasitic entries too
   census_para_new <- expand.grid(
@@ -1221,20 +1320,20 @@ if (!(\"state\" %in% names(census)) || !(\"year\" %in% names(census)) || length(
     stringsAsFactors = FALSE
   )
   census_para_new$population <- 5000000  # Default population
-  census_para_new$pathogentype <- \"Parasitic\"  # Parasitic type
+  census_para_new$pathogentype <- "Parasitic"  # Parasitic type
   
   # Combine bacterial and parasitic census data
   census <- rbind(census_new, census_para_new)
   
   # Update the separate census data
-  censusBact <- census[census$pathogentype == \"Bacterial\", ]
-  censusParas <- census[census$pathogentype == \"Parasitic\", ]
+  censusBact <- census[census$pathogentype == "Bacterial", ]
+  censusParas <- census[census$pathogentype == "Parasitic", ]
   
-  report_progress(\"WARNING\", message=paste(\"Created new census dataframe with\", nrow(census), \"records\"))
+  report_progress("WARNING", message=paste("Created new census dataframe with", nrow(census), "records"))
   
   # Print debug information for the new census data
-  cat('DEBUG: Rebuilt census data from scratch\\n')
-  cat('DEBUG: Unique states in census:', paste(unique(census$state), collapse=', '), '\\n')
-  cat('DEBUG: Unique years in census:', paste(unique(census$year), collapse=', '), '\\n')
-  cat('DEBUG: Number of records in census:', nrow(census), '\\n')
+  cat('DEBUG: Rebuilt census data from scratch\n')
+  cat('DEBUG: Unique states in census:', paste(unique(census$state), collapse=', '), '\n')
+  cat('DEBUG: Unique years in census:', paste(unique(census$year), collapse=', '), '\n')
+  cat('DEBUG: Number of records in census:', nrow(census), '\n')
 }
