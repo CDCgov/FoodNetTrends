@@ -412,6 +412,49 @@ if (preprocessed) {
       report_progress("DATA", message=paste("Successfully read", nrow(mmwrdata), "rows from CSV file"))
     }
     
+    # Standardize column names - create mappings for common variants
+    col_name_map <- list(
+      "State" = "state", "STATE" = "state", "St" = "state", 
+      "Year" = "year", "YEAR" = "year", "YR" = "year",
+      "Pathogen" = "pathogen", "PATHOGEN" = "pathogen", "Path" = "pathogen", "PATH" = "pathogen",
+      "Population" = "population", "POPULATION" = "population", "Pop" = "population", "POP" = "population"
+    )
+    
+    # Check for and rename columns according to mapping
+    for (old_name in names(col_name_map)) {
+      if (old_name %in% names(mmwrdata)) {
+        names(mmwrdata)[names(mmwrdata) == old_name] <- col_name_map[[old_name]]
+        report_progress("DATA", message=paste("Renamed column", old_name, "to", col_name_map[[old_name]]))
+      }
+    }
+    
+    # Ensure required columns exist
+    required_cols <- c("state", "year", "pathogen")
+    missing_cols <- required_cols[!required_cols %in% names(mmwrdata)]
+    
+    if (length(missing_cols) > 0) {
+      # Try looking for columns case-insensitively
+      for (col in missing_cols) {
+        # Check if column exists with different case
+        col_matches <- grep(paste0("^", col, "$"), names(mmwrdata), ignore.case = TRUE)
+        if (length(col_matches) > 0) {
+          # Rename to standardized name
+          names(mmwrdata)[col_matches[1]] <- col
+          report_progress("DATA", message=paste("Renamed column", names(mmwrdata)[col_matches[1]], "to", col))
+        } else {
+          # Create empty column as last resort
+          report_progress("WARNING", message=paste("Required column", col, "not found, creating placeholder"))
+          if (col == "state") {
+            mmwrdata$state <- "UNKNOWN"
+          } else if (col == "year") {
+            mmwrdata$year <- 2020
+          } else if (col == "pathogen") {
+            mmwrdata$pathogen <- "UNKNOWN"
+          }
+        }
+      }
+    }
+    
   }, error = function(e) {
     # Detailed error logging
     report_progress("ERROR", message=paste("Failed to read CSV file:", cleanFile))
@@ -437,6 +480,49 @@ if (preprocessed) {
   # Attempt to read SAS file with robust error handling
   tryCatch({
     mmwrdata <- haven::read_sas(mmwrFile)
+    
+    # Standardize column names after reading SAS file
+    col_name_map <- list(
+      "State" = "state", "STATE" = "state", "St" = "state", 
+      "Year" = "year", "YEAR" = "year", "YR" = "year",
+      "Pathogen" = "pathogen", "PATHOGEN" = "pathogen", "Path" = "pathogen", "PATH" = "pathogen",
+      "Population" = "population", "POPULATION" = "population", "Pop" = "population", "POP" = "population"
+    )
+    
+    # Check for and rename columns according to mapping
+    for (old_name in names(col_name_map)) {
+      if (old_name %in% names(mmwrdata)) {
+        names(mmwrdata)[names(mmwrdata) == old_name] <- col_name_map[[old_name]]
+        report_progress("DATA", message=paste("Renamed column", old_name, "to", col_name_map[[old_name]]))
+      }
+    }
+    
+    # Ensure required columns exist
+    required_cols <- c("state", "year", "pathogen")
+    missing_cols <- required_cols[!required_cols %in% names(mmwrdata)]
+    
+    if (length(missing_cols) > 0) {
+      # Try looking for columns case-insensitively
+      for (col in missing_cols) {
+        # Check if column exists with different case
+        col_matches <- grep(paste0("^", col, "$"), names(mmwrdata), ignore.case = TRUE)
+        if (length(col_matches) > 0) {
+          # Rename to standardized name
+          names(mmwrdata)[col_matches[1]] <- col
+          report_progress("DATA", message=paste("Renamed column", names(mmwrdata)[col_matches[1]], "to", col))
+        } else {
+          # Create empty column as last resort
+          report_progress("WARNING", message=paste("Required column", col, "not found, creating placeholder"))
+          if (col == "state") {
+            mmwrdata$state <- "UNKNOWN"
+          } else if (col == "year") {
+            mmwrdata$year <- 2020
+          } else if (col == "pathogen") {
+            mmwrdata$pathogen <- "UNKNOWN"
+          }
+        }
+      }
+    }
   }, error = function(e) {
     report_progress("ERROR", message=paste("Failed to read SAS file:", mmwrFile))
     report_progress("ERROR", message=paste("Error message:", e$message))

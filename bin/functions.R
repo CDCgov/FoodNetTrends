@@ -136,6 +136,83 @@ path_analysis <- function(mmwrdata, census) {
   # Define standard pathogens
   pathogens <- c("CAMPYLOBACTER", "CYCLOSPORA", "SALMONELLA", "SHIGELLA", "STEC", "VIBRIO", "YERSINIA")
   
+  # Ensure required columns exist in mmwrdata
+  required_cols <- c("state", "year", "pathogen")
+  missing_cols <- required_cols[!required_cols %in% names(mmwrdata)]
+  
+  if (length(missing_cols) > 0) {
+    # Try looking for alternative column names
+    for (col in missing_cols) {
+      col_variations <- list(
+        "state" = c("State", "STATE", "St", "ST", "state_name", "STATE_NAME"),
+        "year" = c("Year", "YEAR", "YR", "yr", "MMWR_YEAR", "mmwr_year"),
+        "pathogen" = c("Pathogen", "PATHOGEN", "Path", "PATH", "pathogen_name", "PATHOGEN_NAME", "organism", "ORGANISM")
+      )
+      
+      # Check for alternative names
+      for (alt_name in col_variations[[col]]) {
+        if (alt_name %in% names(mmwrdata)) {
+          # Rename to standard name
+          names(mmwrdata)[names(mmwrdata) == alt_name] <- col
+          warning(paste("Renamed column", alt_name, "to", col, "in path_analysis"))
+          break
+        }
+      }
+      
+      # If still missing, create placeholder
+      if (!col %in% names(mmwrdata)) {
+        warning(paste("Required column", col, "not found in mmwrdata, creating placeholder"))
+        if (col == "state") {
+          mmwrdata$state <- "UNKNOWN"
+        } else if (col == "year") {
+          mmwrdata$year <- 2020
+        } else if (col == "pathogen") {
+          mmwrdata$pathogen <- "UNKNOWN"
+        }
+      }
+    }
+  }
+  
+  # Ensure required columns exist in census data
+  required_cols <- c("state", "year", "population", "pathogentype")
+  missing_cols <- required_cols[!required_cols %in% names(census)]
+  
+  if (length(missing_cols) > 0) {
+    # Try looking for alternative column names
+    for (col in missing_cols) {
+      col_variations <- list(
+        "state" = c("State", "STATE", "St", "ST", "state_name", "STATE_NAME"),
+        "year" = c("Year", "YEAR", "YR", "yr", "MMWR_YEAR", "mmwr_year"),
+        "population" = c("Population", "POPULATION", "Pop", "POP", "pop"),
+        "pathogentype" = c("PathogenType", "PATHOGENTYPE", "pathogen_type", "PATHOGEN_TYPE", "type", "TYPE")
+      )
+      
+      # Check for alternative names
+      for (alt_name in col_variations[[col]]) {
+        if (alt_name %in% names(census)) {
+          # Rename to standard name
+          names(census)[names(census) == alt_name] <- col
+          warning(paste("Renamed column", alt_name, "to", col, "in census data"))
+          break
+        }
+      }
+      
+      # If still missing, create placeholder
+      if (!col %in% names(census)) {
+        warning(paste("Required column", col, "not found in census, creating placeholder"))
+        if (col == "state") {
+          census$state <- "UNKNOWN"
+        } else if (col == "year") {
+          census$year <- 2020
+        } else if (col == "population") {
+          census$population <- 5000000
+        } else if (col == "pathogentype") {
+          census$pathogentype <- "Bacterial"
+        }
+      }
+    }
+  }
+  
   # Coerce state and year to same type/case
   mmwrdata$state <- toupper(as.character(mmwrdata$state))
   mmwrdata$year <- as.numeric(as.character(mmwrdata$year))
@@ -169,6 +246,83 @@ path_analysis <- function(mmwrdata, census) {
 #' @param census Census data frame
 #' @return Aggregated data frame with counts and population by year and state for Cyclospora
 cyclospora_analysis <- function(mmwrdata, census) {
+  # Ensure required columns exist in mmwrdata
+  required_cols <- c("state", "year", "pathogen")
+  missing_cols <- required_cols[!required_cols %in% names(mmwrdata)]
+  
+  if (length(missing_cols) > 0) {
+    # Try looking for alternative column names
+    for (col in missing_cols) {
+      col_variations <- list(
+        "state" = c("State", "STATE", "St", "ST", "state_name", "STATE_NAME"),
+        "year" = c("Year", "YEAR", "YR", "yr", "MMWR_YEAR", "mmwr_year"),
+        "pathogen" = c("Pathogen", "PATHOGEN", "Path", "PATH", "pathogen_name", "PATHOGEN_NAME", "organism", "ORGANISM")
+      )
+      
+      # Check for alternative names
+      for (alt_name in col_variations[[col]]) {
+        if (alt_name %in% names(mmwrdata)) {
+          # Rename to standard name
+          names(mmwrdata)[names(mmwrdata) == alt_name] <- col
+          warning(paste("Renamed column", alt_name, "to", col, "in cyclospora_analysis"))
+          break
+        }
+      }
+      
+      # If still missing, create placeholder
+      if (!col %in% names(mmwrdata)) {
+        warning(paste("Required column", col, "not found in mmwrdata, creating placeholder"))
+        if (col == "state") {
+          mmwrdata$state <- "UNKNOWN"
+        } else if (col == "year") {
+          mmwrdata$year <- 2020
+        } else if (col == "pathogen") {
+          mmwrdata$pathogen <- "UNKNOWN"
+        }
+      }
+    }
+  }
+  
+  # Ensure required columns exist in census data
+  required_cols <- c("state", "year", "population", "pathogentype")
+  missing_cols <- required_cols[!required_cols %in% names(census)]
+  
+  if (length(missing_cols) > 0) {
+    # Try looking for alternative column names
+    for (col in missing_cols) {
+      col_variations <- list(
+        "state" = c("State", "STATE", "St", "ST", "state_name", "STATE_NAME"),
+        "year" = c("Year", "YEAR", "YR", "yr", "MMWR_YEAR", "mmwr_year"),
+        "population" = c("Population", "POPULATION", "Pop", "POP", "pop"),
+        "pathogentype" = c("PathogenType", "PATHOGENTYPE", "pathogen_type", "PATHOGEN_TYPE", "type", "TYPE")
+      )
+      
+      # Check for alternative names
+      for (alt_name in col_variations[[col]]) {
+        if (alt_name %in% names(census)) {
+          # Rename to standard name
+          names(census)[names(census) == alt_name] <- col
+          warning(paste("Renamed column", alt_name, "to", col, "in census data"))
+          break
+        }
+      }
+      
+      # If still missing, create placeholder
+      if (!col %in% names(census)) {
+        warning(paste("Required column", col, "not found in census, creating placeholder"))
+        if (col == "state") {
+          census$state <- "UNKNOWN"
+        } else if (col == "year") {
+          census$year <- 2020
+        } else if (col == "population") {
+          census$population <- 5000000
+        } else if (col == "pathogentype") {
+          census$pathogentype <- "Parasitic"  # Default to Parasitic for Cyclospora
+        }
+      }
+    }
+  }
+
   mmwrdata$state <- toupper(as.character(mmwrdata$state))
   mmwrdata$year <- as.numeric(as.character(mmwrdata$year))
   census$state <- toupper(as.character(census$state))
@@ -196,6 +350,83 @@ cyclospora_analysis <- function(mmwrdata, census) {
 #' @param census Census data frame
 #' @return Aggregated data frame with counts and population by year and state for Salmonella
 salmonella_analysis <- function(mmwrdata, census) {
+  # Ensure required columns exist in mmwrdata
+  required_cols <- c("state", "year", "pathogen")
+  missing_cols <- required_cols[!required_cols %in% names(mmwrdata)]
+  
+  if (length(missing_cols) > 0) {
+    # Try looking for alternative column names
+    for (col in missing_cols) {
+      col_variations <- list(
+        "state" = c("State", "STATE", "St", "ST", "state_name", "STATE_NAME"),
+        "year" = c("Year", "YEAR", "YR", "yr", "MMWR_YEAR", "mmwr_year"),
+        "pathogen" = c("Pathogen", "PATHOGEN", "Path", "PATH", "pathogen_name", "PATHOGEN_NAME", "organism", "ORGANISM")
+      )
+      
+      # Check for alternative names
+      for (alt_name in col_variations[[col]]) {
+        if (alt_name %in% names(mmwrdata)) {
+          # Rename to standard name
+          names(mmwrdata)[names(mmwrdata) == alt_name] <- col
+          warning(paste("Renamed column", alt_name, "to", col, "in salmonella_analysis"))
+          break
+        }
+      }
+      
+      # If still missing, create placeholder
+      if (!col %in% names(mmwrdata)) {
+        warning(paste("Required column", col, "not found in mmwrdata, creating placeholder"))
+        if (col == "state") {
+          mmwrdata$state <- "UNKNOWN"
+        } else if (col == "year") {
+          mmwrdata$year <- 2020
+        } else if (col == "pathogen") {
+          mmwrdata$pathogen <- "UNKNOWN"
+        }
+      }
+    }
+  }
+  
+  # Ensure required columns exist in census data
+  required_cols <- c("state", "year", "population", "pathogentype")
+  missing_cols <- required_cols[!required_cols %in% names(census)]
+  
+  if (length(missing_cols) > 0) {
+    # Try looking for alternative column names
+    for (col in missing_cols) {
+      col_variations <- list(
+        "state" = c("State", "STATE", "St", "ST", "state_name", "STATE_NAME"),
+        "year" = c("Year", "YEAR", "YR", "yr", "MMWR_YEAR", "mmwr_year"),
+        "population" = c("Population", "POPULATION", "Pop", "POP", "pop"),
+        "pathogentype" = c("PathogenType", "PATHOGENTYPE", "pathogen_type", "PATHOGEN_TYPE", "type", "TYPE")
+      )
+      
+      # Check for alternative names
+      for (alt_name in col_variations[[col]]) {
+        if (alt_name %in% names(census)) {
+          # Rename to standard name
+          names(census)[names(census) == alt_name] <- col
+          warning(paste("Renamed column", alt_name, "to", col, "in census data"))
+          break
+        }
+      }
+      
+      # If still missing, create placeholder
+      if (!col %in% names(census)) {
+        warning(paste("Required column", col, "not found in census, creating placeholder"))
+        if (col == "state") {
+          census$state <- "UNKNOWN"
+        } else if (col == "year") {
+          census$year <- 2020
+        } else if (col == "population") {
+          census$population <- 5000000
+        } else if (col == "pathogentype") {
+          census$pathogentype <- "Bacterial"  # Default to Bacterial for Salmonella
+        }
+      }
+    }
+  }
+
   mmwrdata$state <- toupper(as.character(mmwrdata$state))
   mmwrdata$year <- as.numeric(as.character(mmwrdata$year))
   census$state <- toupper(as.character(census$state))
