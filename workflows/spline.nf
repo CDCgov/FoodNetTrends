@@ -55,11 +55,11 @@ workflow SPLINE {
             censusFileBVal = file(params.censusFileB, checkIfExists: false)
             if (!censusFileBVal.exists()) {
                 log.warn "Census bacterial file not found: ${params.censusFileB}, will use placeholder"
-                censusFileBVal = file("${workflow.projectDir}/work/placeholder_census_bact.csv")
+                censusFileBVal = file("${workflow.projectDir}/work/placeholder_census_bacterial.csv")
                 if (!censusFileBVal.exists()) {
                     // Create minimal placeholder file if it doesn't exist
-                    def placeholder = file("${workflow.launchDir}/placeholder_census_bact.csv")
-                    placeholder.text = "state,population,year,pathogentype\nCA,10000000,2020,Bacterial\n"
+                    def placeholder = file("${workflow.projectDir}/work/placeholder_census_bacterial.csv")
+                    placeholder.text = "state,population,year,pathogentype\nCA,10000000,2020,Bacterial\nCO,5000000,2020,Bacterial\nCT,3000000,2020,Bacterial\nGA,8000000,2020,Bacterial\nMD,5000000,2020,Bacterial\nMN,4000000,2020,Bacterial\nNM,2000000,2020,Bacterial\nNY,15000000,2020,Bacterial\nOR,3000000,2020,Bacterial\nTN,5000000,2020,Bacterial\n"
                     censusFileBVal = placeholder
                     log.info "Created census bacterial placeholder: ${censusFileBVal}"
                 }
@@ -68,15 +68,15 @@ workflow SPLINE {
             }
         } else {
             log.warn "No census bacterial file specified or empty value provided, will use placeholder"
-            def placeholder = file("${workflow.launchDir}/placeholder_census_bact.csv")
-            placeholder.text = "state,population,year,pathogentype\nCA,10000000,2020,Bacterial\n"
+            def placeholder = file("${workflow.projectDir}/work/placeholder_census_bacterial.csv")
+            placeholder.text = "state,population,year,pathogentype\nCA,10000000,2020,Bacterial\nCO,5000000,2020,Bacterial\nCT,3000000,2020,Bacterial\nGA,8000000,2020,Bacterial\nMD,5000000,2020,Bacterial\nMN,4000000,2020,Bacterial\nNM,2000000,2020,Bacterial\nNY,15000000,2020,Bacterial\nOR,3000000,2020,Bacterial\nTN,5000000,2020,Bacterial\n"
             censusFileBVal = placeholder
             log.info "Created census bacterial placeholder: ${censusFileBVal}"
         }
     } catch (Exception e) {
         log.warn "Error handling census bacterial file: ${e.message}, using placeholder"
-        def placeholder = file("${workflow.launchDir}/placeholder_census_bact.csv")
-        placeholder.text = "state,population,year,pathogentype\nCA,10000000,2020,Bacterial\n"
+        def placeholder = file("${workflow.projectDir}/work/placeholder_census_bacterial.csv")
+        placeholder.text = "state,population,year,pathogentype\nCA,10000000,2020,Bacterial\nCO,5000000,2020,Bacterial\nCT,3000000,2020,Bacterial\nGA,8000000,2020,Bacterial\nMD,5000000,2020,Bacterial\nMN,4000000,2020,Bacterial\nNM,2000000,2020,Bacterial\nNY,15000000,2020,Bacterial\nOR,3000000,2020,Bacterial\nTN,5000000,2020,Bacterial\n"
         censusFileBVal = placeholder
     }
     
@@ -86,11 +86,11 @@ workflow SPLINE {
             censusFilePVal = file(params.censusFileP, checkIfExists: false)
             if (!censusFilePVal.exists()) {
                 log.warn "Census parasitic file not found: ${params.censusFileP}, will use placeholder"
-                censusFilePVal = file("${workflow.projectDir}/work/placeholder_census_para.csv")
+                censusFilePVal = file("${workflow.projectDir}/work/placeholder_census_parasitic.csv")
                 if (!censusFilePVal.exists()) {
                     // Create minimal placeholder file if it doesn't exist
-                    def placeholder = file("${workflow.launchDir}/placeholder_census_para.csv")
-                    placeholder.text = "state,population,year,pathogentype\nCA,10000000,2020,Parasitic\n"
+                    def placeholder = file("${workflow.projectDir}/work/placeholder_census_parasitic.csv")
+                    placeholder.text = "state,population,year,pathogentype\nCA,10000000,2020,Parasitic\nCO,5000000,2020,Parasitic\nCT,3000000,2020,Parasitic\nGA,8000000,2020,Parasitic\nMD,5000000,2020,Parasitic\nMN,4000000,2020,Parasitic\nNM,2000000,2020,Parasitic\nNY,15000000,2020,Parasitic\nOR,3000000,2020,Parasitic\nTN,5000000,2020,Parasitic\n"
                     censusFilePVal = placeholder
                     log.info "Created census parasitic placeholder: ${censusFilePVal}"
                 }
@@ -99,15 +99,15 @@ workflow SPLINE {
             }
         } else {
             log.warn "No census parasitic file specified or empty value provided, will use placeholder"
-            def placeholder = file("${workflow.launchDir}/placeholder_census_para.csv")
-            placeholder.text = "state,population,year,pathogentype\nCA,10000000,2020,Parasitic\n"
+            def placeholder = file("${workflow.projectDir}/work/placeholder_census_parasitic.csv")
+            placeholder.text = "state,population,year,pathogentype\nCA,10000000,2020,Parasitic\nCO,5000000,2020,Parasitic\nCT,3000000,2020,Parasitic\nGA,8000000,2020,Parasitic\nMD,5000000,2020,Parasitic\nMN,4000000,2020,Parasitic\nNM,2000000,2020,Parasitic\nNY,15000000,2020,Parasitic\nOR,3000000,2020,Parasitic\nTN,5000000,2020,Parasitic\n"
             censusFilePVal = placeholder
             log.info "Created census parasitic placeholder: ${censusFilePVal}"
         }
     } catch (Exception e) {
         log.warn "Error handling census parasitic file: ${e.message}, using placeholder"
-        def placeholder = file("${workflow.launchDir}/placeholder_census_para.csv")
-        placeholder.text = "state,population,year,pathogentype\nCA,10000000,2020,Parasitic\n"
+        def placeholder = file("${workflow.projectDir}/work/placeholder_census_parasitic.csv")
+        placeholder.text = "state,population,year,pathogentype\nCA,10000000,2020,Parasitic\nCO,5000000,2020,Parasitic\nCT,3000000,2020,Parasitic\nGA,8000000,2020,Parasitic\nMD,5000000,2020,Parasitic\nMN,4000000,2020,Parasitic\nNM,2000000,2020,Parasitic\nNY,15000000,2020,Parasitic\nOR,3000000,2020,Parasitic\nTN,5000000,2020,Parasitic\n"
         censusFilePVal = placeholder
     }
     

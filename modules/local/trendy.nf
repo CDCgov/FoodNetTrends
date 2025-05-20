@@ -80,24 +80,66 @@ process TRENDY {
         echo "Census bacterial file missing or empty, creating placeholder" >> ${pathogen}_trendy.log
         echo "state,population,year,pathogentype" > empty_census_bact.csv
         echo "CA,10000000,2020,Bacterial" >> empty_census_bact.csv
+        echo "CO,5000000,2020,Bacterial" >> empty_census_bact.csv
+        echo "CT,3000000,2020,Bacterial" >> empty_census_bact.csv
+        echo "GA,8000000,2020,Bacterial" >> empty_census_bact.csv
+        echo "MD,5000000,2020,Bacterial" >> empty_census_bact.csv
+        echo "MN,4000000,2020,Bacterial" >> empty_census_bact.csv
+        echo "NM,2000000,2020,Bacterial" >> empty_census_bact.csv
+        echo "NY,15000000,2020,Bacterial" >> empty_census_bact.csv
+        echo "OR,3000000,2020,Bacterial" >> empty_census_bact.csv
+        echo "TN,5000000,2020,Bacterial" >> empty_census_bact.csv
         CENSUS_B_ARG="--censusFileB=empty_census_bact.csv"
     else
         # Create local copy of census file for consistent handling
-        cp -v "${censusFileBact}" ./census_bact.sas7bdat
-        echo "Created local copy of census bacterial file as: census_bact.sas7bdat" >> ${pathogen}_trendy.log
-        CENSUS_B_ARG="--censusFileB=census_bact.sas7bdat"
+        # Determine file extension and copy with appropriate name
+        if [[ "${censusFileBact}" == *.csv ]]; then
+            cp -v "${censusFileBact}" ./census_bact.csv
+            echo "Created local copy of census bacterial file as: census_bact.csv" >> ${pathogen}_trendy.log
+            CENSUS_B_ARG="--censusFileB=census_bact.csv"
+        elif [[ "${censusFileBact}" == *.sas7bdat ]]; then
+            cp -v "${censusFileBact}" ./census_bact.sas7bdat
+            echo "Created local copy of census bacterial file as: census_bact.sas7bdat" >> ${pathogen}_trendy.log
+            CENSUS_B_ARG="--censusFileB=census_bact.sas7bdat"
+        else
+            # Default to csv format
+            cp -v "${censusFileBact}" ./census_bact.csv
+            echo "Created local copy of census bacterial file as: census_bact.csv" >> ${pathogen}_trendy.log
+            CENSUS_B_ARG="--censusFileB=census_bact.csv"
+        fi
     fi
     
     if [ ! -f "${censusFileParas}" ] || [ ! -s "${censusFileParas}" ]; then
         echo "Census parasitic file missing or empty, creating placeholder" >> ${pathogen}_trendy.log
         echo "state,population,year,pathogentype" > empty_census_para.csv
         echo "CA,10000000,2020,Parasitic" >> empty_census_para.csv
+        echo "CO,5000000,2020,Parasitic" >> empty_census_para.csv
+        echo "CT,3000000,2020,Parasitic" >> empty_census_para.csv
+        echo "GA,8000000,2020,Parasitic" >> empty_census_para.csv
+        echo "MD,5000000,2020,Parasitic" >> empty_census_para.csv
+        echo "MN,4000000,2020,Parasitic" >> empty_census_para.csv
+        echo "NM,2000000,2020,Parasitic" >> empty_census_para.csv
+        echo "NY,15000000,2020,Parasitic" >> empty_census_para.csv
+        echo "OR,3000000,2020,Parasitic" >> empty_census_para.csv
+        echo "TN,5000000,2020,Parasitic" >> empty_census_para.csv
         CENSUS_P_ARG="--censusFileP=empty_census_para.csv"
     else
         # Create local copy of census file for consistent handling
-        cp -v "${censusFileParas}" ./census_para.sas7bdat
-        echo "Created local copy of census parasitic file as: census_para.sas7bdat" >> ${pathogen}_trendy.log
-        CENSUS_P_ARG="--censusFileP=census_para.sas7bdat"
+        # Determine file extension and copy with appropriate name
+        if [[ "${censusFileParas}" == *.csv ]]; then
+            cp -v "${censusFileParas}" ./census_para.csv
+            echo "Created local copy of census parasitic file as: census_para.csv" >> ${pathogen}_trendy.log
+            CENSUS_P_ARG="--censusFileP=census_para.csv"
+        elif [[ "${censusFileParas}" == *.sas7bdat ]]; then
+            cp -v "${censusFileParas}" ./census_para.sas7bdat
+            echo "Created local copy of census parasitic file as: census_para.sas7bdat" >> ${pathogen}_trendy.log
+            CENSUS_P_ARG="--censusFileP=census_para.sas7bdat"
+        else
+            # Default to csv format
+            cp -v "${censusFileParas}" ./census_para.csv
+            echo "Created local copy of census parasitic file as: census_para.csv" >> ${pathogen}_trendy.log
+            CENSUS_P_ARG="--censusFileP=census_para.csv"
+        fi
     fi
     
     # Run the main trend analysis with explicit path handling for everything

@@ -533,7 +533,24 @@ if (!census_b_loaded) {
   
   # Extract states and years from MMWR data
   all_states <- unique(mmwrdata$state)
-  all_years <- unique(as.numeric(as.character(mmwrdata$year)))
+  
+  # Safely handle years conversion
+  all_years <- tryCatch({
+    # First convert to character and then to numeric
+    years_char <- as.character(mmwrdata$year)
+    years_num <- suppressWarnings(as.numeric(years_char))
+    # Filter out NA values
+    years_clean <- years_num[!is.na(years_num)]
+    if(length(years_clean) > 0) {
+      unique(years_clean)
+    } else {
+      # Default if no valid years found
+      2020
+    }
+  }, error = function(e) {
+    report_progress("WARNING", message=paste("Error extracting years, using default: ", e$message))
+    2020
+  })
   
   # If we don't have states or years, use defaults
   if (length(all_states) == 0) all_states <- c("CA", "CO", "CT", "GA", "MD", "MN", "NM", "NY", "OR", "TN")
@@ -635,7 +652,24 @@ if (!census_p_loaded) {
   
   # Extract states and years from MMWR data
   all_states <- unique(mmwrdata$state)
-  all_years <- unique(as.numeric(as.character(mmwrdata$year)))
+  
+  # Safely handle years conversion
+  all_years <- tryCatch({
+    # First convert to character and then to numeric
+    years_char <- as.character(mmwrdata$year)
+    years_num <- suppressWarnings(as.numeric(years_char))
+    # Filter out NA values
+    years_clean <- years_num[!is.na(years_num)]
+    if(length(years_clean) > 0) {
+      unique(years_clean)
+    } else {
+      # Default if no valid years found
+      2020
+    }
+  }, error = function(e) {
+    report_progress("WARNING", message=paste("Error extracting years, using default: ", e$message))
+    2020
+  })
   
   # If we don't have states or years, use defaults
   if (length(all_states) == 0) all_states <- c("CA", "CO", "CT", "GA", "MD", "MN", "NM", "NY", "OR", "TN")
@@ -888,8 +922,24 @@ tryCatch({
   if (!census_b_loaded || !census_p_loaded) {
     # Extract states and years from MMWR data
     all_states <- unique(mmwrdata$state)
-    all_years <- unique(as.numeric(as.character(mmwrdata$year)))
-    all_years <- all_years[!is.na(all_years)]  # Remove NA values
+    
+    # Safely handle years conversion
+    all_years <- tryCatch({
+      # First convert to character and then to numeric
+      years_char <- as.character(mmwrdata$year)
+      years_num <- suppressWarnings(as.numeric(years_char))
+      # Filter out NA values
+      years_clean <- years_num[!is.na(years_num)]
+      if(length(years_clean) > 0) {
+        unique(years_clean)
+      } else {
+        # Default if no valid years found
+        2020
+      }
+    }, error = function(e) {
+      report_progress("WARNING", message=paste("Error extracting years, using default: ", e$message))
+      2020
+    })
     
     # If we don't have states or years, use defaults
     if (length(all_states) == 0) all_states <- c("CA", "CO", "CT", "GA", "MD", "MN", "NM", "NY", "OR", "TN")
