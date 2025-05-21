@@ -71,11 +71,12 @@ process TRENDY {
     
     # Enhanced error handling with logging
     error_exit() {
+        local error_time=$(date)
         echo "ERROR: \$1" | tee -a "${pathogen}_trendy.log"
-        echo "\\\$(date): Error in TRENDY process for ${pathogen}: \$1" >> "${pathogen}_error_summary.txt"
+        echo "$error_time: Error in TRENDY process for ${pathogen}: \$1" >> "${pathogen}_error_summary.txt"
         # Create a basic summary file to prevent "missing output" errors in the workflow
         echo "Error processing ${pathogen}" > "${pathogen}_summary.txt"
-        echo "Error occurred at \\\$(date)" >> "${pathogen}_summary.txt"
+        echo "Error occurred at $error_time" >> "${pathogen}_summary.txt"
         echo "Error message: \$1" >> "${pathogen}_summary.txt"
         exit 1
     }
@@ -83,7 +84,8 @@ process TRENDY {
     trap 'error_exit "Command failed with exit code \$?: \$BASH_COMMAND"' ERR
     
     # Log start time and resource information
-    echo "Starting TRENDY analysis for ${pathogen} at \\\$(date)" | tee -a "${pathogen}_trendy.log"
+    start_time=$(date)
+    echo "Starting TRENDY analysis for ${pathogen} at $start_time" | tee -a "${pathogen}_trendy.log"
     echo "CPU cores: ${task.cpus}, Memory: ${task.memory}" | tee -a "${pathogen}_trendy.log"
     
     # Initialize variable defaults to ensure they're always defined
@@ -258,7 +260,9 @@ process TRENDY {
     
     # Check that our local data file copy exists and is readable
     if [ ! -f "./input_data.${mmwrFile.extension}" ] || [ ! -r "./input_data.${mmwrFile.extension}" ]; then
-        error_exit "Local MMWR data file copy not found or not readable. Original file: ${mmwrFile}, Local copy attempt: ./input_data.${mmwrFile.extension}, Current directory contents: \\\$(ls -la ./)"
+        # Get directory contents for error message
+        dir_contents=$(ls -la ./)
+        error_exit "Local MMWR data file copy not found or not readable. Original file: ${mmwrFile}, Local copy attempt: ./input_data.${mmwrFile.extension}, Current directory contents: $dir_contents"
     fi
     
     # Add preprocessed flag based on file extension
@@ -379,8 +383,8 @@ process TRENDY {
         echo "WARNING: No model file was generated!" >> ${pathogen}_data_summary.txt
     fi
     
-    # Check for figures
-    png_count=\\\$(ls -1 ${pathogen}_*.png 2>/dev/null | wc -l)
+    # Check for figures - capture count directly
+    png_count=$(ls -1 ${pathogen}_*.png 2>/dev/null | wc -l)
     if [ \$png_count -gt 0 ]; then
         echo "SUCCESS: Generated \$png_count visualization files" >> ${pathogen}_data_summary.txt
         ls -la ${pathogen}_*.png >> ${pathogen}_data_summary.txt

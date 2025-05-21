@@ -19,11 +19,15 @@ process GENERATE_DASHBOARD {
 
     script:
     """
+    # Get current date for logs
+    current_date=$(date)
+    iso_date=$(date -Iseconds)
+    
     # Create a data quality assessment log
     echo "=========================================" > ${projID}_data_quality.log
     echo "  FoodNet Trends Data Quality Assessment" >> ${projID}_data_quality.log
     echo "  Project ID: ${projID}" >> ${projID}_data_quality.log
-    echo "  Generated: \\\$(date)" >> ${projID}_data_quality.log
+    echo "  Generated: $current_date" >> ${projID}_data_quality.log
     echo "=========================================" >> ${projID}_data_quality.log
     echo "" >> ${projID}_data_quality.log
     
@@ -31,7 +35,7 @@ process GENERATE_DASHBOARD {
     cat > ${projID}_data_quality.json << EOF
     {
       "projectId": "${projID}",
-      "generationDate": "\\\$(date -Iseconds)",
+      "generationDate": "$iso_date",
       "dataQuality": {
         "usesPlaceholderData": false,
         "affectedPathogens": [],
@@ -50,7 +54,7 @@ process GENERATE_DASHBOARD {
         find . -maxdepth 1 -name "*.$ext" -type f -exec grep -l "PLACEHOLDER DATA\\|placeholder data\\|SYNTHETIC DATA" {} \\; >> placeholder_files.txt 2>/dev/null || true
     done
     if [ -s placeholder_files.txt ]; then
-        placeholder_files=\\\$(cat placeholder_files.txt)
+        placeholder_files=$(cat placeholder_files.txt)
     fi
     data_quality_warnings=0
     
@@ -61,7 +65,9 @@ process GENERATE_DASHBOARD {
     find . -maxdepth 1 -name "*_data_summary.txt" > summary_files.txt
     while IFS= read -r summary_file; do
         if [ -f "\$summary_file" ]; then
-            pathogen=\\\$(echo "\$summary_file" | sed 's/_data_summary.txt//')
+            # Get pathogen name from summary file name
+            summary_basename=\$(basename "\$summary_file")
+            pathogen=\$(echo "\$summary_basename" | sed 's/_data_summary.txt//')
             if grep -q "PLACEHOLDER DATA\\|placeholder data\\|SYNTHETIC DATA" "\$summary_file"; then
                 if [ -z "\$affected_pathogens" ]; then
                     affected_pathogens="\\\"\$pathogen\\\""
@@ -115,7 +121,7 @@ process GENERATE_DASHBOARD {
             done
             echo "</ul>" >> warnings.html
             # Read the formatted HTML
-            warning_details=\\\$(cat warnings.html)
+            warning_details=$(cat warnings.html)
         else
             warning_details=""
         fi
@@ -167,7 +173,7 @@ EOF
     echo "Checking data consistency..." >> ${projID}_data_quality.log
     
     # Count IR files
-    ir_files=\\\$(ls -1 *_IRCatch.csv 2>/dev/null | wc -l)
+    ir_files=$(ls -1 *_IRCatch.csv 2>/dev/null | wc -l)
     echo "Found \$ir_files incidence rate files." >> ${projID}_data_quality.log
     
     # Add to JSON
@@ -189,7 +195,7 @@ EOF
 <h1>FoodNet Trends Analysis Dashboard</h1>
 <h2>Error: Script Not Found</h2>
 <p>The dashboard generation script was not found. This is a simplified fallback dashboard.</p>
-<p>Analysis completed at: \\\$(date)</p>
+<p>Analysis completed at: $current_date</p>
 <p>Project ID: ${projID}</p>
 </body>
 </html>
@@ -225,7 +231,7 @@ EOF
 <h1>FoodNet Trends Analysis Dashboard</h1>
 <h2>Error: Script Failed</h2>
 <p>The dashboard generation script failed with exit code \$r_exit_code.</p>
-<p>Analysis completed at: \\\$(date)</p>
+<p>Analysis completed at: $current_date</p>
 <p>Project ID: ${projID}</p>
 </body>
 </html>
@@ -248,7 +254,7 @@ EOF
 <h1>FoodNet Trends Analysis Dashboard</h1>
 <h2>Error: Missing Output</h2>
 <p>The dashboard output file was not created properly.</p>
-<p>Analysis completed at: \\\$(date)</p>
+<p>Analysis completed at: $current_date</p>
 <p>Project ID: ${projID}</p>
 </body>
 </html>
@@ -258,6 +264,7 @@ EOF
     
     # Add note to quality log
     echo "" >> ${projID}_data_quality.log
-    echo "Dashboard generation completed at \\\$(date)" >> ${projID}_data_quality.log
+    end_date=$(date)
+    echo "Dashboard generation completed at $end_date" >> ${projID}_data_quality.log
     """
 }
