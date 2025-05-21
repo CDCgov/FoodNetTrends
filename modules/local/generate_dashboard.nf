@@ -105,7 +105,8 @@ process GENERATE_DASHBOARD {
         # Create a warning banner for HTML
         WARNING_BANNER="<div style='background-color: #f8d7da; color: #721c24; padding: 15px; margin: 20px 0; border: 1px solid #f5c6cb; border-radius: 5px;'><h3 style='margin-top:0'>⚠️ WARNING: Placeholder Data Detected</h3><p>This analysis contains placeholder data which may not represent real-world conditions.</p><p><strong>Results are NOT suitable for production or public health decision-making!</strong></p></div>"
         
-        # Insert warning into template
+        # Insert warning into template - flattened the conditional for better syntax
+        TEMPLATE_TO_USE="fallback_template.html"
         if [ -f "${dashboardTemplate}" ]; then
             cp "${dashboardTemplate}" modified_template.html
             sed -i "s|<body>|<body>\\n\$WARNING_BANNER|" modified_template.html
@@ -120,8 +121,9 @@ process GENERATE_DASHBOARD {
 \$WARNING_BANNER
 <h1>FoodNet Trends Analysis</h1>
 <p>This is a fallback template due to missing template file.</p>
+</body>
+</html>
 EOF
-            TEMPLATE_TO_USE="fallback_template.html"
         fi
     else
         # No placeholder warnings
@@ -162,7 +164,7 @@ EOF
     # Verify dashboard script exists and run it
     if [ ! -f "${dashboardScript}" ]; then
         echo "ERROR: Dashboard script not found: ${dashboardScript}" >> ${projID}_data_quality.log
-        # Create fallback dashboard
+        # Create fallback dashboard with proper closing tags
         cat > ${projID}_dashboard.html << EOF
 <!DOCTYPE html>
 <html>
@@ -212,7 +214,7 @@ EOF
             # Save the log file for debugging
             cp dashboard_generation.log debuginfo/
             
-            # Create a more informative fallback dashboard
+            # Create a more informative fallback dashboard - using simpler commands
             cat > ${projID}_dashboard.html << EOF
 <!DOCTYPE html>
 <html>
@@ -235,16 +237,7 @@ EOF
   
   <div class="debug-info">
     <h3>Debug Information</h3>
-    <p><strong>Analysis completed at:</strong> \$(date)</p>
     <p><strong>Project ID:</strong> ${projID}</p>
-    
-    <h4>Script Errors (Last 10 lines):</h4>
-    <pre>\$(tail -n 10 dashboard_generation.log 2>/dev/null || echo "No log file available")</pre>
-    
-    <h4>Available Result Files:</h4>
-    <pre>\$(find . -name "*_IRCatch.csv" | sort 2>/dev/null || echo "No IR files found")</pre>
-    
-    <p>Full log information is available in the 'debuginfo' directory.</p>
     
     <h4>Possible solutions:</h4>
     <ul>
@@ -256,6 +249,13 @@ EOF
 </body>
 </html>
 EOF
+
+            # Add runtime information separately to avoid potential issues with command substitution
+            echo "<script>document.getElementsByClassName('debug-info')[0].insertAdjacentHTML('afterbegin', '<p><strong>Analysis time:</strong> $(date)</p>');</script>" >> ${projID}_dashboard.html
+            
+            # Add error log information
+            ERROR_LOG=\$(tail -n 10 dashboard_generation.log 2>/dev/null || echo "No log file available")
+            echo "<script>document.getElementsByClassName('debug-info')[0].insertAdjacentHTML('beforeend', '<h4>Script Errors:</h4><pre>$ERROR_LOG</pre>');</script>" >> ${projID}_dashboard.html
         fi
     fi
     

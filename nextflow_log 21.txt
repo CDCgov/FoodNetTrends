@@ -1,0 +1,189 @@
+May-21 11:17:46.627 [main] DEBUG nextflow.cli.Launcher - $> nextflow run main.nf -profile singularity,production -process.memory 64.GB -process.cpus 32 -executor.queueSize 100 -executor.submitRateLimit 10/1min --censusFileB /scicomp/groups-pure/OID/NCEZID/DFWED/EDEB/foodnet/trends/data//cen9624.sas7bdat --censusFileP /scicomp/groups-pure/OID/NCEZID/DFWED/EDEB/foodnet/trends/data//cen9624_para.sas7bdat --travel NO,UNKNOWN,YES --cidt CIDT+,CX+,PARASITIC --iterations 5000 --chains 16 --adapt_delta 0.99 --max_treedepth 15 --cores 32 --seed 123 --outdir output --pathogen CAMPYLOBACTER,CYCLOSPORA,SALMONELLA,SHIGELLA,STEC,VIBRIO,YERSINIA --states CA,CO,CT,GA,MD,MN,NM,NY,OR,TN --mmwrFile preprocessed_20250521_111248/preprocessed/foodnet_data_mmwr9624_May2025.csv --preprocessed true --cleanFile preprocessed_20250521_111248/preprocessed/foodnet_data_mmwr9624_May2025.csv --metadata preprocessed_20250521_111248/preprocessed/foodnet_data_mmwr9624_May2025_metadata.json --enable_dashboard true --dashboard_title 'FoodNet Trends Analysis - Run 20250521_111245'
+May-21 11:17:47.011 [main] DEBUG nextflow.cli.CmdRun - N E X T F L O W  ~  version 24.10.4
+May-21 11:17:47.045 [main] DEBUG nextflow.plugin.PluginsFacade - Setting up plugin manager > mode=prod; embedded=false; plugins-dir=/scicomp/home-pure/smn9/.nextflow/plugins; core-plugins: nf-amazon@2.9.2,nf-azure@1.10.2,nf-cloudcache@0.4.2,nf-codecommit@0.2.2,nf-console@1.1.4,nf-google@1.15.3,nf-tower@1.9.3,nf-wave@1.7.4
+May-21 11:17:47.082 [main] INFO  o.pf4j.DefaultPluginStatusProvider - Enabled plugins: []
+May-21 11:17:47.084 [main] INFO  o.pf4j.DefaultPluginStatusProvider - Disabled plugins: []
+May-21 11:17:47.089 [main] INFO  org.pf4j.DefaultPluginManager - PF4J version 3.12.0 in 'deployment' mode
+May-21 11:17:47.109 [main] INFO  org.pf4j.AbstractPluginManager - No plugins
+May-21 11:17:47.141 [main] DEBUG nextflow.config.ConfigBuilder - Found config local: /scicomp/home-pure/smn9/foodnettrends/FoodNetTrends/nextflow.config
+May-21 11:17:47.144 [main] DEBUG nextflow.config.ConfigBuilder - Parsing config file: /scicomp/home-pure/smn9/foodnettrends/FoodNetTrends/nextflow.config
+May-21 11:17:47.212 [main] DEBUG n.secret.LocalSecretsProvider - Secrets store: /scicomp/home-pure/smn9/.nextflow/secrets/store.json
+May-21 11:17:47.217 [main] DEBUG nextflow.secret.SecretsLoader - Discovered secrets providers: [nextflow.secret.LocalSecretsProvider@66d57c1b] - activable => nextflow.secret.LocalSecretsProvider@66d57c1b
+May-21 11:17:47.256 [main] DEBUG nextflow.config.ConfigBuilder - Applying config profile: `singularity,production`
+May-21 11:17:50.066 [main] DEBUG nextflow.config.ConfigBuilder - Applying config profile: `singularity,production`
+May-21 11:17:50.086 [main] DEBUG nextflow.config.ConfigBuilder - Available config profiles: [bih, cfc_dev, uzl_omics, ifb_core, embl_hd, denbi_qbic, alice, mjolnir_globe, uppmax, giga, incliva, ilifu, ki_luria, uge, icr_alma, rosalind_uge, lugh, mccleary, unibe_ibu, vai, czbiohub_aws, jax, roslin, ccga_med, tes, scw, unc_longleaf, tigem, tubingen_apg, google, apollo, ipop_up, vsc_calcua, pdc_kth, googlels, ceci_nic5, humantechnopole, stjude, daisybio, eddie, medair, biowulf, bi, bigpurple, adcra, cedars, local, pawsey_setonix, vsc_kul_uhasselt, pawsey_nimbus, ucl_myriad, utd_ganymede, seattlechildrens, icr_davros, ceres, munin, rosalind, hasta, cfc, uzh, shu_bmrc, ebi_codon_slurm, ebc, ccga_dx, crick, ku_sund_danhead, marvin, biohpc_gen, mana, york_viking, unc_lccc, wehi, awsbatch, wustl_htcf, arcc, ceci_dragon2, imperial, maestro, software_license, cannon, genotoul, nci_gadi, abims, janelia, nu_genomics, googlebatch, oist, sahmri, kaust, alliance_canada, mpcdf, leicester, vsc_ugent, create, sage, cambridge, jex, ebi_codon, cheaha, xanadu, nyu_hpc, test, marjorie, computerome, ucd_sonic, gpu, seg_globe, mssm, sanger, dkfz, bluebear, pasteur, einstein, ethz_euler, m3c, imb, ucl_cscluster, tuos_stanage, production, azurebatch, hki, training, seadragon, crukmi, csiro_petrichor, qmul_apocrita, engaging, gis, hypatia, psmn, eva, unity, cropdiversityhpc, nygc, fgcz, conda, crg, singularity, mpcdf_viper, pe2, no_dashboard, self_hosted_runner, tufts, uw_hyak_pedslabs, binac2, debug, genouest, cbe, unsw_katana, phoenix, seawulf, uod_hpc, fub_curta, uct_hpc, aws_tower, binac, fsu_draco]
+May-21 11:17:50.142 [main] DEBUG nextflow.cli.CmdRun - Applied DSL=2 from script declaration
+May-21 11:17:50.171 [main] DEBUG nextflow.cli.CmdRun - Launching `main.nf` [sad_baekeland] DSL2 - revision: 3bc9d971e1
+May-21 11:17:50.173 [main] DEBUG nextflow.plugin.PluginsFacade - Plugins default=[]
+May-21 11:17:50.174 [main] DEBUG nextflow.plugin.PluginsFacade - Plugins resolved requirement=[]
+May-21 11:17:50.261 [main] DEBUG nextflow.Session - Session UUID: 72c2a502-1b4d-40ee-be00-a73aed2037fe
+May-21 11:17:50.262 [main] DEBUG nextflow.Session - Run name: sad_baekeland
+May-21 11:17:50.262 [main] DEBUG nextflow.Session - Executor pool size: 4
+May-21 11:17:50.277 [main] DEBUG nextflow.file.FilePorter - File porter settings maxRetries=3; maxTransfers=50; pollTimeout=null
+May-21 11:17:50.288 [main] DEBUG nextflow.util.ThreadPoolBuilder - Creating thread pool 'FileTransfer' minSize=10; maxSize=12; workQueue=LinkedBlockingQueue[10000]; allowCoreThreadTimeout=false
+May-21 11:17:50.340 [main] DEBUG nextflow.cli.CmdRun - 
+  Version: 24.10.4 build 5934
+  Created: 20-01-2025 16:47 UTC (11:47 EDT)
+  System: Linux 4.18.0-553.45.1.el8_10.x86_64
+  Runtime: Groovy 4.0.23 on OpenJDK 64-Bit Server VM 17.0.6+10
+  Encoding: UTF-8 (UTF-8)
+  Process: 3868877@rosalind02 [10.128.41.96]
+  CPUs: 4 - Mem: 4 GB (1.9 GB) - Swap: 8 GB (265.4 MB)
+May-21 11:17:50.383 [main] DEBUG nextflow.Session - Work-dir: /scicomp/scratch/smn9/nextflow/work [nfs]
+May-21 11:17:50.450 [main] DEBUG nextflow.executor.ExecutorFactory - Extension executors providers=[]
+May-21 11:17:50.464 [main] DEBUG nextflow.Session - Observer factory: DefaultObserverFactory
+May-21 11:17:50.535 [main] DEBUG nextflow.cache.CacheFactory - Using Nextflow cache factory: nextflow.cache.DefaultCacheFactory
+May-21 11:17:50.549 [main] DEBUG nextflow.util.CustomThreadPool - Creating default thread pool > poolSize: 5; maxThreads: 1000
+May-21 11:17:50.682 [main] DEBUG nextflow.Session - Session start
+May-21 11:17:50.685 [main] DEBUG nextflow.trace.TraceFileObserver - Workflow started -- trace file: /scicomp/home-pure/smn9/foodnettrends/FoodNetTrends/output/20250521_111748/pipeline_info/execution_trace_2025-05-21_11-17-49.txt
+May-21 11:17:50.707 [main] DEBUG nextflow.Session - Using default localLib path: /scicomp/home-pure/smn9/foodnettrends/FoodNetTrends/lib
+May-21 11:17:50.716 [main] DEBUG nextflow.Session - Adding to the classpath library: /scicomp/home-pure/smn9/foodnettrends/FoodNetTrends/lib
+May-21 11:17:51.048 [main] DEBUG nextflow.script.ScriptRunner - > Launching execution
+May-21 11:17:53.074 [main] INFO  nextflow.Nextflow - MMWR file path appears valid: preprocessed_20250521_111248/preprocessed/foodnet_data_mmwr9624_May2025.csv
+May-21 11:17:53.078 [main] INFO  nextflow.Nextflow - Census bacterial file path: /scicomp/groups-pure/OID/NCEZID/DFWED/EDEB/foodnet/trends/data//cen9624.sas7bdat
+May-21 11:17:53.079 [main] INFO  nextflow.Nextflow - Census parasitic file path: /scicomp/groups-pure/OID/NCEZID/DFWED/EDEB/foodnet/trends/data//cen9624_para.sas7bdat
+May-21 11:17:53.081 [main] INFO  nextflow.Nextflow - Running FoodNet Trends Spline Analysis Workflow v1.0
+May-21 11:17:53.083 [main] INFO  nextflow.Nextflow - Analyzing 7 pathogens: CAMPYLOBACTER, CYCLOSPORA, SALMONELLA, SHIGELLA, STEC, VIBRIO, YERSINIA
+May-21 11:17:53.092 [main] INFO  nextflow.Nextflow - MMWR file found: /scicomp/home-pure/smn9/foodnettrends/FoodNetTrends/preprocessed_20250521_111248/preprocessed/foodnet_data_mmwr9624_May2025.csv
+May-21 11:17:53.093 [main] INFO  nextflow.Nextflow - Checking for census bacterial file
+May-21 11:17:53.093 [main] INFO  nextflow.Nextflow - Checking for census bacterial file from command line parameters
+May-21 11:17:53.095 [main] INFO  nextflow.Nextflow -   Command line params: [mmwrFile:preprocessed_20250521_111248/preprocessed/foodnet_data_mmwr9624_May2025.csv, censusFileB:/scicomp/groups-pure/OID/NCEZID/DFWED/EDEB/foodnet/trends/data//cen9624.sas7bdat, censusFileP:/scicomp/groups-pure/OID/NCEZID/DFWED/EDEB/foodnet/trends/data//cen9624_para.sas7bdat, travel:NO,UNKNOWN,YES, cidt:CIDT+,CX+,PARASITIC, projID:20250521_111748, whichScript:/scicomp/home-pure/smn9/foodnettrends/FoodNetTrends/bin/trendy.R, trendyScript:/scicomp/home-pure/smn9/foodnettrends/FoodNetTrends/bin/trendy.R, pathogen:CAMPYLOBACTER,CYCLOSPORA,SALMONELLA,SHIGELLA,STEC,VIBRIO,YERSINIA, cpus:16, debug:false, preprocessed:true, cleanFile:preprocessed_20250521_111248/preprocessed/foodnet_data_mmwr9624_May2025.csv, skip_preprocessing:false, chains:16, iterations:5000, adapt_delta:0.99, max_treedepth:15, seed:123, cores:32, enable_dashboard:true, dashboard_title:FoodNet Trends Analysis - Run 20250521_111245, dashboard_logo:null, output_suffix:brm, outdir:output, publish_dir_mode:copy, email:null, email_on_fail:null, plaintext_email:false, monochrome_logs:false, hook_url:null, help:false, version:false, config_profile_name:null, config_profile_description:Rosalind HPC @ CDC, custom_config_version:master, states:CA,CO,CT,GA,MD,MN,NM,NY,OR,TN, metadata:preprocessed_20250521_111248/preprocessed/foodnet_data_mmwr9624_May2025_metadata.json, custom_config_base:https://raw.githubusercontent.com/nf-core/configs/master, config_profile_contact:OAMD, config_profile_url:https://info.biotech.cdc.gov/info/, max_memory:128.GB, max_cpus:16, max_time:240.h, validationFailUnrecognisedParams:false, validationLenientMode:false, validationSchemaIgnoreParams:genomes,igenomes_base, validationShowHiddenParams:false, validate_params:true]
+May-21 11:17:53.096 [main] INFO  nextflow.Nextflow -   Found parameter censusFileB: /scicomp/groups-pure/OID/NCEZID/DFWED/EDEB/foodnet/trends/data//cen9624.sas7bdat
+May-21 11:17:53.098 [main] INFO  nextflow.Nextflow -   Checking file path: /scicomp/groups-pure/OID/NCEZID/DFWED/EDEB/foodnet/trends/data//cen9624.sas7bdat
+May-21 11:17:53.104 [main] INFO  nextflow.Nextflow - Using user-provided bacterial census file: /scicomp/groups-pure/OID/NCEZID/DFWED/EDEB/foodnet/trends/data/cen9624.sas7bdat (exists: true)
+May-21 11:17:53.105 [main] INFO  nextflow.Nextflow - Checking for census parasitic file
+May-21 11:17:53.105 [main] INFO  nextflow.Nextflow - Checking for census parasitic file from command line parameters
+May-21 11:17:53.106 [main] INFO  nextflow.Nextflow -   Found parameter censusFileP: /scicomp/groups-pure/OID/NCEZID/DFWED/EDEB/foodnet/trends/data//cen9624_para.sas7bdat
+May-21 11:17:53.107 [main] INFO  nextflow.Nextflow -   Checking file path: /scicomp/groups-pure/OID/NCEZID/DFWED/EDEB/foodnet/trends/data//cen9624_para.sas7bdat
+May-21 11:17:53.108 [main] INFO  nextflow.Nextflow - Using user-provided parasitic census file: /scicomp/groups-pure/OID/NCEZID/DFWED/EDEB/foodnet/trends/data/cen9624_para.sas7bdat (exists: true)
+May-21 11:17:53.196 [main] INFO  nextflow.Nextflow - Using scripts directory: /scicomp/home-pure/smn9/foodnettrends/FoodNetTrends/bin
+May-21 11:17:53.200 [main] INFO  nextflow.Nextflow - 
+    ==============================================
+    FoodNet Trends Spline Analysis
+    ==============================================
+    Project ID    : 20250521_111748
+    MMWR File     : /scicomp/home-pure/smn9/foodnettrends/FoodNetTrends/preprocessed_20250521_111248/preprocessed/foodnet_data_mmwr9624_May2025.csv (exists: true)
+    Preprocessed  : true
+    Census Files  : 
+      Bacterial   : /scicomp/groups-pure/OID/NCEZID/DFWED/EDEB/foodnet/trends/data/cen9624.sas7bdat (exists: true)
+      Parasitic   : /scicomp/groups-pure/OID/NCEZID/DFWED/EDEB/foodnet/trends/data/cen9624_para.sas7bdat (exists: true)
+    Travel        : NO,UNKNOWN,YES
+    CIDT          : CIDT+,CX+,PARASITIC
+    Pathogens     : CAMPYLOBACTER, CYCLOSPORA, SALMONELLA, SHIGELLA, STEC, VIBRIO, YERSINIA
+    States        : CA,CO,CT,GA,MD,MN,NM,NY,OR,TN
+    Output Dir    : output/20250521_111748
+    Scripts Dir   : /scicomp/home-pure/smn9/foodnettrends/FoodNetTrends/bin
+    Nextflow Ver  : 24.10.4
+    Starting time : Wed May 21 11:17:53 EDT 2025
+    ==============================================
+    COMMAND LINE PARAMETERS:
+    censusFileB   : /scicomp/groups-pure/OID/NCEZID/DFWED/EDEB/foodnet/trends/data//cen9624.sas7bdat
+    censusFileP   : /scicomp/groups-pure/OID/NCEZID/DFWED/EDEB/foodnet/trends/data//cen9624_para.sas7bdat
+    metadata      : preprocessed_20250521_111248/preprocessed/foodnet_data_mmwr9624_May2025_metadata.json
+    ==============================================
+    
+May-21 11:17:53.201 [main] INFO  nextflow.Nextflow - Final validation of census file paths...
+May-21 11:17:53.202 [main] INFO  nextflow.Nextflow - Verifying bacterial census file: sun.nio.fs.UnixPath
+May-21 11:17:53.202 [main] INFO  nextflow.Nextflow - Bacterial census file exists: /scicomp/groups-pure/OID/NCEZID/DFWED/EDEB/foodnet/trends/data/cen9624.sas7bdat
+May-21 11:17:53.203 [main] INFO  nextflow.Nextflow - Verifying parasitic census file: sun.nio.fs.UnixPath
+May-21 11:17:53.204 [main] INFO  nextflow.Nextflow - Parasitic census file exists: /scicomp/groups-pure/OID/NCEZID/DFWED/EDEB/foodnet/trends/data/cen9624_para.sas7bdat
+May-21 11:17:53.205 [main] INFO  nextflow.Nextflow - Final census file status:
+May-21 11:17:53.206 [main] INFO  nextflow.Nextflow -   Bacterial census file: FOUND
+May-21 11:17:53.206 [main] INFO  nextflow.Nextflow -   Parasitic census file: FOUND
+May-21 11:17:53.207 [main] INFO  nextflow.Nextflow - ========== Census File Validation Success ===========
+May-21 11:17:53.207 [main] INFO  nextflow.Nextflow - Validated census files for analysis:
+May-21 11:17:53.208 [main] INFO  nextflow.Nextflow -   Bacterial census: /scicomp/groups-pure/OID/NCEZID/DFWED/EDEB/foodnet/trends/data/cen9624.sas7bdat
+May-21 11:17:53.208 [main] INFO  nextflow.Nextflow -   Parasitic census: /scicomp/groups-pure/OID/NCEZID/DFWED/EDEB/foodnet/trends/data/cen9624_para.sas7bdat
+May-21 11:17:53.209 [main] INFO  nextflow.Nextflow - =====================================================
+May-21 11:17:53.349 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withLabel:process_high_memory` matches labels `process_high_memory,error_retry` for process with name SPLINE:TRENDY
+May-21 11:17:53.351 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withLabel:error_retry` matches labels `process_high_memory,error_retry` for process with name SPLINE:TRENDY
+May-21 11:17:53.355 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:TRENDY` matches process SPLINE:TRENDY
+May-21 11:17:53.372 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: sge
+May-21 11:17:53.374 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'sge'
+May-21 11:17:53.392 [main] DEBUG nextflow.executor.Executor - [warm up] executor > sge
+May-21 11:17:53.402 [main] DEBUG n.processor.TaskPollingMonitor - Creating task monitor for executor 'sge' > capacity: 100; pollInterval: 5s; dumpInterval: 5m 
+May-21 11:17:53.406 [main] DEBUG n.processor.TaskPollingMonitor - >>> barrier register (monitor: sge)
+May-21 11:17:53.407 [main] DEBUG n.processor.TaskPollingMonitor - Creating submit rate limit of 10 submissions per 60 seconds
+May-21 11:17:53.414 [main] DEBUG n.executor.AbstractGridExecutor - Creating executor 'sge' > queue-stat-interval: 1m
+May-21 11:17:53.501 [main] INFO  nextflow.Nextflow - Generating dashboard in output/20250521_111748
+May-21 11:17:53.555 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withLabel:process_medium` matches labels `process_medium` for process with name SPLINE:GENERATE_DASHBOARD
+May-21 11:17:53.557 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:GENERATE_DASHBOARD` matches process SPLINE:GENERATE_DASHBOARD
+May-21 11:17:53.560 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: sge
+May-21 11:17:53.560 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'sge'
+May-21 11:17:53.569 [main] DEBUG nextflow.Session - Config process names validation disabled as requested
+May-21 11:17:53.571 [main] DEBUG nextflow.Session - Igniting dataflow network (3)
+May-21 11:17:53.572 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > SPLINE:TRENDY
+May-21 11:17:53.585 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > SPLINE:GENERATE_DASHBOARD
+May-21 11:17:53.606 [main] DEBUG nextflow.script.ScriptRunner - Parsed script files:
+  Script_ebbe008e6abea428: /scicomp/home-pure/smn9/foodnettrends/FoodNetTrends/./workflows/../modules/local/trendy.nf
+  Script_4ecb50ffb140fe37: /scicomp/home-pure/smn9/foodnettrends/FoodNetTrends/./workflows/spline.nf
+  Script_b177118f7a19e171: /scicomp/home-pure/smn9/foodnettrends/FoodNetTrends/./workflows/../modules/local/preprocess.nf
+  Script_bcd4f0b1892fafdc: /scicomp/home-pure/smn9/foodnettrends/FoodNetTrends/./workflows/../modules/local/generate_dashboard.nf
+  Script_aa501e49ff234a63: /scicomp/home-pure/smn9/foodnettrends/FoodNetTrends/./workflows/preprocess.nf
+  Script_3309c792322d66e5: /scicomp/home-pure/smn9/foodnettrends/FoodNetTrends/main.nf
+May-21 11:17:53.606 [main] DEBUG nextflow.script.ScriptRunner - > Awaiting termination 
+May-21 11:17:53.606 [main] DEBUG nextflow.Session - Session await
+May-21 11:17:54.158 [Task submitter] DEBUG nextflow.executor.GridTaskHandler - [SGE] submitted process SPLINE:TRENDY (CAMPYLOBACTER) > jobId: 3217338; workDir: /scicomp/scratch/smn9/nextflow/work/c5/8574a4b9a409b4cefadfdf25044131
+May-21 11:17:54.159 [Task submitter] INFO  nextflow.Session - [c5/8574a4] Submitted process > SPLINE:TRENDY (CAMPYLOBACTER)
+May-21 11:17:59.490 [Task submitter] DEBUG nextflow.executor.GridTaskHandler - [SGE] submitted process SPLINE:TRENDY (CYCLOSPORA) > jobId: 3217343; workDir: /scicomp/scratch/smn9/nextflow/work/f8/930e1ed5794e7a392bf9a4d4e9169a
+May-21 11:17:59.491 [Task submitter] INFO  nextflow.Session - [f8/930e1e] Submitted process > SPLINE:TRENDY (CYCLOSPORA)
+May-21 11:18:05.477 [Task submitter] DEBUG nextflow.executor.GridTaskHandler - [SGE] submitted process SPLINE:TRENDY (SHIGELLA) > jobId: 3217347; workDir: /scicomp/scratch/smn9/nextflow/work/cf/76c1f61c2735d11d1732ddd8806ff2
+May-21 11:18:05.477 [Task submitter] INFO  nextflow.Session - [cf/76c1f6] Submitted process > SPLINE:TRENDY (SHIGELLA)
+May-21 11:18:11.501 [Task submitter] DEBUG nextflow.executor.GridTaskHandler - [SGE] submitted process SPLINE:TRENDY (SALMONELLA) > jobId: 3217354; workDir: /scicomp/scratch/smn9/nextflow/work/f2/450aca5b26e6c20e9affa160b17bb3
+May-21 11:18:11.501 [Task submitter] INFO  nextflow.Session - [f2/450aca] Submitted process > SPLINE:TRENDY (SALMONELLA)
+May-21 11:18:17.483 [Task submitter] DEBUG nextflow.executor.GridTaskHandler - [SGE] submitted process SPLINE:TRENDY (STEC) > jobId: 3217355; workDir: /scicomp/scratch/smn9/nextflow/work/3c/567bac7f8b2f1d5df05c23ad28a512
+May-21 11:18:17.483 [Task submitter] INFO  nextflow.Session - [3c/567bac] Submitted process > SPLINE:TRENDY (STEC)
+May-21 11:18:23.881 [Task submitter] DEBUG nextflow.executor.GridTaskHandler - [SGE] submitted process SPLINE:TRENDY (VIBRIO) > jobId: 3217362; workDir: /scicomp/scratch/smn9/nextflow/work/f3/49e8c3afc4018eafcabde8a23f7f89
+May-21 11:18:23.881 [Task submitter] INFO  nextflow.Session - [f3/49e8c3] Submitted process > SPLINE:TRENDY (VIBRIO)
+May-21 11:18:29.488 [Task submitter] DEBUG nextflow.executor.GridTaskHandler - [SGE] submitted process SPLINE:TRENDY (YERSINIA) > jobId: 3217369; workDir: /scicomp/scratch/smn9/nextflow/work/c1/a8ddac96f234126fac509b34b9edea
+May-21 11:18:29.489 [Task submitter] INFO  nextflow.Session - [c1/a8ddac] Submitted process > SPLINE:TRENDY (YERSINIA)
+May-21 11:19:58.436 [Task monitor] DEBUG n.processor.TaskPollingMonitor - Task completed > TaskHandler[jobId: 3217338; id: 1; name: SPLINE:TRENDY (CAMPYLOBACTER); status: COMPLETED; exit: 0; error: -; workDir: /scicomp/scratch/smn9/nextflow/work/c5/8574a4b9a409b4cefadfdf25044131 started: 1747840678418; exited: 2025-05-21T15:19:37.400134164Z; ]
+May-21 11:19:58.438 [Task monitor] DEBUG nextflow.util.ThreadPoolBuilder - Creating thread pool 'TaskFinalizer' minSize=10; maxSize=12; workQueue=LinkedBlockingQueue[10000]; allowCoreThreadTimeout=false
+May-21 11:19:58.517 [TaskFinalizer-1] DEBUG nextflow.util.ThreadPoolBuilder - Creating thread pool 'PublishDir' minSize=10; maxSize=12; workQueue=LinkedBlockingQueue[10000]; allowCoreThreadTimeout=false
+May-21 11:20:08.435 [Task monitor] DEBUG n.processor.TaskPollingMonitor - Task completed > TaskHandler[jobId: 3217343; id: 2; name: SPLINE:TRENDY (CYCLOSPORA); status: COMPLETED; exit: 0; error: -; workDir: /scicomp/scratch/smn9/nextflow/work/f8/930e1ed5794e7a392bf9a4d4e9169a started: 1747840683418; exited: 2025-05-21T15:19:57.837675481Z; ]
+May-21 11:20:08.439 [Task monitor] DEBUG n.processor.TaskPollingMonitor - Task completed > TaskHandler[jobId: 3217347; id: 4; name: SPLINE:TRENDY (SHIGELLA); status: COMPLETED; exit: 0; error: -; workDir: /scicomp/scratch/smn9/nextflow/work/cf/76c1f61c2735d11d1732ddd8806ff2 started: 1747840688418; exited: 2025-05-21T15:19:58.458855752Z; ]
+May-21 11:20:13.436 [Task monitor] DEBUG n.processor.TaskPollingMonitor - Task completed > TaskHandler[jobId: 3217354; id: 3; name: SPLINE:TRENDY (SALMONELLA); status: COMPLETED; exit: 0; error: -; workDir: /scicomp/scratch/smn9/nextflow/work/f2/450aca5b26e6c20e9affa160b17bb3 started: 1747840723422; exited: 2025-05-21T15:20:07.692496354Z; ]
+May-21 11:20:18.438 [Task monitor] DEBUG n.processor.TaskPollingMonitor - Task completed > TaskHandler[jobId: 3217355; id: 5; name: SPLINE:TRENDY (STEC); status: COMPLETED; exit: 0; error: -; workDir: /scicomp/scratch/smn9/nextflow/work/3c/567bac7f8b2f1d5df05c23ad28a512 started: 1747840698418; exited: 2025-05-21T15:20:10.724473847Z; ]
+May-21 11:20:23.436 [Task monitor] DEBUG n.processor.TaskPollingMonitor - Task completed > TaskHandler[jobId: 3217362; id: 6; name: SPLINE:TRENDY (VIBRIO); status: COMPLETED; exit: 0; error: -; workDir: /scicomp/scratch/smn9/nextflow/work/f3/49e8c3afc4018eafcabde8a23f7f89 started: 1747840708421; exited: 2025-05-21T15:20:19.864952984Z; ]
+May-21 11:21:08.436 [Task monitor] DEBUG nextflow.file.FileHelper - NFS path (true): /scicomp/scratch/smn9/nextflow/work
+May-21 11:21:08.469 [Task monitor] DEBUG n.processor.TaskPollingMonitor - Task completed > TaskHandler[jobId: 3217369; id: 7; name: SPLINE:TRENDY (YERSINIA); status: COMPLETED; exit: 0; error: -; workDir: /scicomp/scratch/smn9/nextflow/work/c1/a8ddac96f234126fac509b34b9edea started: 1747840713422; exited: 2025-05-21T15:20:21.979558904Z; ]
+May-21 11:21:08.497 [Actor Thread 2] INFO  nextflow.Nextflow - All analyses complete (28 result files). Generating dashboard.
+May-21 11:21:08.718 [Task submitter] DEBUG nextflow.executor.GridTaskHandler - [SGE] submitted process SPLINE:GENERATE_DASHBOARD (Generate dashboard) > jobId: 3217470; workDir: /scicomp/scratch/smn9/nextflow/work/1e/f3dced6ae65956b2940fcef4882dce
+May-21 11:21:08.718 [Task submitter] INFO  nextflow.Session - [1e/f3dced] Submitted process > SPLINE:GENERATE_DASHBOARD (Generate dashboard)
+May-21 11:21:13.441 [Task monitor] DEBUG n.processor.TaskPollingMonitor - Task completed > TaskHandler[jobId: 3217470; id: 8; name: SPLINE:GENERATE_DASHBOARD (Generate dashboard); status: COMPLETED; exit: 2; error: -; workDir: /scicomp/scratch/smn9/nextflow/work/1e/f3dced6ae65956b2940fcef4882dce started: 1747840873437; exited: 2025-05-21T15:21:10.598641394Z; ]
+May-21 11:21:13.452 [TaskFinalizer-8] DEBUG nextflow.processor.TaskProcessor - Handling unexpected condition for
+  task: name=SPLINE:GENERATE_DASHBOARD (Generate dashboard); work-dir=/scicomp/scratch/smn9/nextflow/work/1e/f3dced6ae65956b2940fcef4882dce
+  error [nextflow.exception.ProcessFailedException]: Process `SPLINE:GENERATE_DASHBOARD (Generate dashboard)` terminated with an error exit status (2)
+May-21 11:21:13.463 [TaskFinalizer-8] INFO  nextflow.processor.TaskProcessor - [1e/f3dced] NOTE: Process `SPLINE:GENERATE_DASHBOARD (Generate dashboard)` terminated with an error exit status (2) -- Execution is retried (1)
+May-21 11:21:13.673 [Task submitter] DEBUG nextflow.executor.GridTaskHandler - [SGE] submitted process SPLINE:GENERATE_DASHBOARD (Generate dashboard) > jobId: 3217475; workDir: /scicomp/scratch/smn9/nextflow/work/14/a9fe1328f3f3a89c70153b55aae61f
+May-21 11:21:13.673 [Task submitter] INFO  nextflow.Session - [14/a9fe13] Re-submitted process > SPLINE:GENERATE_DASHBOARD (Generate dashboard)
+May-21 11:21:18.443 [Task monitor] DEBUG n.processor.TaskPollingMonitor - Task completed > TaskHandler[jobId: 3217475; id: 9; name: SPLINE:GENERATE_DASHBOARD (Generate dashboard); status: COMPLETED; exit: 2; error: -; workDir: /scicomp/scratch/smn9/nextflow/work/14/a9fe1328f3f3a89c70153b55aae61f started: 1747840878437; exited: 2025-05-21T15:21:14.544240773Z; ]
+May-21 11:21:18.452 [TaskFinalizer-9] DEBUG nextflow.processor.TaskProcessor - Handling unexpected condition for
+  task: name=SPLINE:GENERATE_DASHBOARD (Generate dashboard); work-dir=/scicomp/scratch/smn9/nextflow/work/14/a9fe1328f3f3a89c70153b55aae61f
+  error [nextflow.exception.ProcessFailedException]: Process `SPLINE:GENERATE_DASHBOARD (Generate dashboard)` terminated with an error exit status (2)
+May-21 11:21:18.453 [TaskFinalizer-9] INFO  nextflow.processor.TaskProcessor - [14/a9fe13] NOTE: Process `SPLINE:GENERATE_DASHBOARD (Generate dashboard)` terminated with an error exit status (2) -- Error is ignored
+May-21 11:21:18.458 [main] DEBUG nextflow.Session - Session await > all processes finished
+May-21 11:21:23.440 [Task monitor] DEBUG n.processor.TaskPollingMonitor - <<< barrier arrives (monitor: sge) - terminating tasks monitor poll loop
+May-21 11:21:23.440 [main] DEBUG nextflow.Session - Session await > all barriers passed
+May-21 11:21:23.444 [main] DEBUG nextflow.util.ThreadPoolManager - Thread pool 'TaskFinalizer' shutdown completed (hard=false)
+May-21 11:21:23.447 [main] DEBUG nextflow.util.ThreadPoolManager - Thread pool 'PublishDir' shutdown completed (hard=false)
+May-21 11:21:23.450 [main] INFO  nextflow.Nextflow - FoodNet Trends workflow completed successfully
+May-21 11:21:23.452 [main] INFO  nextflow.Nextflow - 
+        ==============================================
+        FoodNet Trends Analysis: COMPLETED
+        ==============================================
+        Completed at     : Wed May 21 11:21:23 EDT 2025
+        Duration         : 3m 33s
+        Success          : true
+        Work directory   : /scicomp/scratch/smn9/nextflow/work
+        Exit status      : unknown
+        Output directory : output/20250521_111748
+        ==============================================
+        
+May-21 11:21:23.457 [main] DEBUG n.trace.WorkflowStatsObserver - Workflow completed > WorkflowStats[succeededCount=7; failedCount=2; ignoredCount=1; cachedCount=0; pendingCount=0; submittedCount=0; runningCount=0; retriesCount=1; abortedCount=0; succeedDuration=3h 26m 13s; failedDuration=40ms; cachedDuration=0ms;loadCpus=0; loadMemory=0; peakRunning=7; peakCpus=112; peakMemory=896 GB; ]
+May-21 11:21:23.457 [main] DEBUG nextflow.trace.TraceFileObserver - Workflow completed -- saving trace file
+May-21 11:21:23.462 [main] DEBUG nextflow.trace.ReportObserver - Workflow completed -- rendering execution report
+May-21 11:21:24.202 [main] DEBUG nextflow.trace.TimelineObserver - Workflow completed -- rendering execution timeline
+May-21 11:21:24.375 [main] DEBUG nextflow.cache.CacheDB - Closing CacheDB done
+May-21 11:21:24.504 [main] DEBUG nextflow.util.ThreadPoolManager - Thread pool 'FileTransfer' shutdown completed (hard=false)
+May-21 11:21:24.504 [main] DEBUG nextflow.script.ScriptRunner - > Execution complete -- Goodbye
