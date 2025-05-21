@@ -1,12 +1,13 @@
 process GENERATE_DASHBOARD {
-    // Add error retry strategy to handle transient failures
-    // Use 'ignore' for the final retry to ensure workflow completes
-    errorStrategy { task.attempt <= 2 ? 'retry' : 'ignore' }
-    maxRetries 3
+    // Always ignore errors in dashboard generation to ensure workflow completes
+    errorStrategy 'ignore'
+    maxRetries 0
     tag "Generate dashboard"
     label 'process_medium'
     shell "/bin/bash"
     container 'foodnet.sif'
+    time '30m'
+    memory '4 GB'
 
     input:
     path ir_outputs
