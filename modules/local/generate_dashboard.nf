@@ -47,7 +47,7 @@ process GENERATE_DASHBOARD {
     echo "" >> ${projID}_data_quality.log
     
     # Initialize JSON structure for data quality metadata
-    cat > ${projID}_data_quality.json << EOF
+    cat > ${projID}_data_quality.json << 'JSONTEMPLATE'
     {
       "projectId": "${projID}",
       "generationDate": "${currentDate}",
@@ -58,7 +58,7 @@ process GENERATE_DASHBOARD {
         "dataConsistency": {}
       }
     }
-    EOF
+    JSONTEMPLATE
     
     # Check for placeholder data warnings in any result files
     echo "Checking for data quality issues..." >> ${projID}_data_quality.log
