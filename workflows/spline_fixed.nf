@@ -231,8 +231,8 @@ workflow SPLINE {
     
     // Run TRENDY with input data - properly separate pathogen and mmwrFile
     TRENDY(
-        pathogens.map { pathogen, mmwrFile -> pathogen },  // Just extract pathogen
-        pathogens.map { pathogen, mmwrFile -> mmwrFile },  // Just extract mmwrFile
+        pathogens.map { pth, mmwr -> pth },  // Just extract pathogen
+        pathogens.map { pth, mmwr -> mmwr },  // Just extract mmwrFile
         censusFileBVal,
         censusFilePVal,
         scripts_pathVal
@@ -296,7 +296,7 @@ workflow SPLINE {
     // *********************************************************************
     // Create pathogen channel with validated MMWR file
     pathogens = Channel.fromList(pathogenList)
-        .map { pathogen -> tuple(pathogen, mmwrFileVal) }
+        .map { pth -> tuple(pth, mmwrFileVal) }
     
     // Define path to scripts directory
     scripts_pathVal = file("${workflow.projectDir}/bin", checkIfExists: true)
