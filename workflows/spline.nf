@@ -112,18 +112,30 @@ workflow SPLINE {
                     def metadataJson = slurper.parseText(metadataContent)
                     
                     log.info "Successfully parsed metadata JSON"
-                    if (metadataJson.census_file_bacterial) {
-                    def bacterialPath = metadataJson.census_file_bacterial
-                    def bacterialFile = file(bacterialPath, checkIfExists: false)
-                    if (bacterialFile.exists()) {
-                        censusFileBVal = bacterialFile
-                        log.info "Using bacterial census file from metadata: ${censusFileBVal}"
-                    } else {
-                        log.warn "Bacterial census file in metadata doesn't exist: ${bacterialPath}"
+                    
+                    // Handle census_file_bacterial path safely
+                    try {
+                        if (metadataJson.containsKey('census_file_bacterial')) {
+                            log.info "Found census_file_bacterial in metadata: ${metadataJson.census_file_bacterial.getClass().getName()}"
+                            if (metadataJson.census_file_bacterial instanceof String) {
+                                def bacterialPath = metadataJson.census_file_bacterial.toString()
+                                log.info "Found bacterial census file path in metadata: ${bacterialPath}"
+                                def bacterialFile = file(bacterialPath, checkIfExists: false)
+                                if (bacterialFile.exists()) {
+                                    censusFileBVal = bacterialFile
+                                    log.info "Using bacterial census file from metadata: ${censusFileBVal}"
+                                } else {
+                                    log.warn "Bacterial census file in metadata doesn't exist: ${bacterialPath}"
+                                }
+                            } else {
+                                log.warn "Census file bacterial in metadata is not a string: ${metadataJson.census_file_bacterial.getClass().getName()}"
+                            }
+                        } else {
+                            log.warn "Metadata doesn't contain census_file_bacterial key"
+                        }
+                    } catch (Exception e) {
+                        log.warn "Error accessing census_file_bacterial in metadata: ${e.message}"
                     }
-                } else {
-                    log.warn "Metadata doesn't contain bacterial census file path"
-                }
                 } catch (Exception e) {
                     log.warn "Error parsing metadata JSON: ${e.message}"
                 }
@@ -251,18 +263,30 @@ workflow SPLINE {
                     def metadataJson = slurper.parseText(metadataContent)
                     
                     log.info "Successfully parsed metadata JSON for parasitic census"
-                    if (metadataJson.census_file_parasitic) {
-                    def parasiticPath = metadataJson.census_file_parasitic
-                    def parasiticFile = file(parasiticPath, checkIfExists: false)
-                    if (parasiticFile.exists()) {
-                        censusFilePVal = parasiticFile
-                        log.info "Using parasitic census file from metadata: ${censusFilePVal}"
-                    } else {
-                        log.warn "Parasitic census file in metadata doesn't exist: ${parasiticPath}"
+                    
+                    // Handle census_file_parasitic path safely
+                    try {
+                        if (metadataJson.containsKey('census_file_parasitic')) {
+                            log.info "Found census_file_parasitic in metadata: ${metadataJson.census_file_parasitic.getClass().getName()}"
+                            if (metadataJson.census_file_parasitic instanceof String) {
+                                def parasiticPath = metadataJson.census_file_parasitic.toString()
+                                log.info "Found parasitic census file path in metadata: ${parasiticPath}"
+                                def parasiticFile = file(parasiticPath, checkIfExists: false)
+                                if (parasiticFile.exists()) {
+                                    censusFilePVal = parasiticFile
+                                    log.info "Using parasitic census file from metadata: ${censusFilePVal}"
+                                } else {
+                                    log.warn "Parasitic census file in metadata doesn't exist: ${parasiticPath}"
+                                }
+                            } else {
+                                log.warn "Census file parasitic in metadata is not a string: ${metadataJson.census_file_parasitic.getClass().getName()}"
+                            }
+                        } else {
+                            log.warn "Metadata doesn't contain census_file_parasitic key"
+                        }
+                    } catch (Exception e) {
+                        log.warn "Error accessing census_file_parasitic in metadata: ${e.message}"
                     }
-                } else {
-                    log.warn "Metadata doesn't contain parasitic census file path"
-                }
                 } catch (Exception e) {
                     log.warn "Error parsing metadata JSON for parasitic census: ${e.message}"
                 }
@@ -423,25 +447,53 @@ workflow SPLINE {
                     def metadataJson = slurper.parseText(metadataContent)
                     
                     log.info "Successfully parsed metadata JSON from preprocessing"
-                    // Check for bacterial census path
-                    if (metadataJson.census_file_bacterial) {
-                    def bacterialPath = metadataJson.census_file_bacterial
-                    def bacterialFile = file(bacterialPath, checkIfExists: false)
-                    if (bacterialFile.exists()) {
-                        censusFileBVal = bacterialFile
-                        log.info "Updated bacterial census file from preprocessing metadata: ${censusFileBVal}"
+                    // Handle census_file_bacterial path safely
+                    try {
+                        if (metadataJson.containsKey('census_file_bacterial')) {
+                            log.info "Found census_file_bacterial in preprocessing metadata: ${metadataJson.census_file_bacterial.getClass().getName()}"
+                            if (metadataJson.census_file_bacterial instanceof String) {
+                                def bacterialPath = metadataJson.census_file_bacterial.toString()
+                                log.info "Found bacterial census file path in preprocessing metadata: ${bacterialPath}"
+                                def bacterialFile = file(bacterialPath, checkIfExists: false)
+                                if (bacterialFile.exists()) {
+                                    censusFileBVal = bacterialFile
+                                    log.info "Updated bacterial census file from preprocessing metadata: ${censusFileBVal}"
+                                } else {
+                                    log.warn "Bacterial census file in preprocessing metadata doesn't exist: ${bacterialPath}"
+                                }
+                            } else {
+                                log.warn "Census file bacterial in preprocessing metadata is not a string: ${metadataJson.census_file_bacterial.getClass().getName()}"
+                            }
+                        } else {
+                            log.warn "Preprocessing metadata doesn't contain census_file_bacterial key"
+                        }
+                    } catch (Exception e) {
+                        log.warn "Error accessing census_file_bacterial in preprocessing metadata: ${e.message}"
                     }
-                }
-                
-                // Check for parasitic census path
-                if (metadataJson.census_file_parasitic) {
-                    def parasiticPath = metadataJson.census_file_parasitic
-                    def parasiticFile = file(parasiticPath, checkIfExists: false)
-                    if (parasiticFile.exists()) {
-                        censusFilePVal = parasiticFile
-                        log.info "Updated parasitic census file from preprocessing metadata: ${censusFilePVal}"
+                    
+                    // Handle census_file_parasitic path safely
+                    try {
+                        if (metadataJson.containsKey('census_file_parasitic')) {
+                            log.info "Found census_file_parasitic in preprocessing metadata: ${metadataJson.census_file_parasitic.getClass().getName()}"
+                            if (metadataJson.census_file_parasitic instanceof String) {
+                                def parasiticPath = metadataJson.census_file_parasitic.toString()
+                                log.info "Found parasitic census file path in preprocessing metadata: ${parasiticPath}"
+                                def parasiticFile = file(parasiticPath, checkIfExists: false)
+                                if (parasiticFile.exists()) {
+                                    censusFilePVal = parasiticFile
+                                    log.info "Updated parasitic census file from preprocessing metadata: ${censusFilePVal}"
+                                } else {
+                                    log.warn "Parasitic census file in preprocessing metadata doesn't exist: ${parasiticPath}"
+                                }
+                            } else {
+                                log.warn "Census file parasitic in preprocessing metadata is not a string: ${metadataJson.census_file_parasitic.getClass().getName()}"
+                            }
+                        } else {
+                            log.warn "Preprocessing metadata doesn't contain census_file_parasitic key"
+                        }
+                    } catch (Exception e) {
+                        log.warn "Error accessing census_file_parasitic in preprocessing metadata: ${e.message}"
                     }
-                }
                 } catch (Exception e) {
                     log.warn "Error parsing metadata JSON from preprocessing: ${e.message}"
                 }
@@ -461,6 +513,33 @@ workflow SPLINE {
             log.info "Raw data preprocessing complete, proceeding to analysis"
         } else {
             error "Preprocessing did not produce a valid output file"
+        }
+    }
+    
+    // Verify that census file values are valid File objects
+    if (censusFileBVal != null) {
+        log.info "Verifying bacterial census file: ${censusFileBVal.getClass().getName()}, exists: ${censusFileBVal.exists()}"
+        try {
+            // Ensure we have a real file path
+            def path = censusFileBVal.toString()
+            censusFileBVal = file(path, checkIfExists: false)
+            log.info "Normalized bacterial census file path: ${censusFileBVal}, exists: ${censusFileBVal.exists()}"
+        } catch (Exception e) {
+            log.warn "Error normalizing bacterial census file: ${e.message}"
+            censusFileBVal = null
+        }
+    }
+    
+    if (censusFilePVal != null) {
+        log.info "Verifying parasitic census file: ${censusFilePVal.getClass().getName()}, exists: ${censusFilePVal.exists()}"
+        try {
+            // Ensure we have a real file path
+            def path = censusFilePVal.toString()
+            censusFilePVal = file(path, checkIfExists: false)
+            log.info "Normalized parasitic census file path: ${censusFilePVal}, exists: ${censusFilePVal.exists()}"
+        } catch (Exception e) {
+            log.warn "Error normalizing parasitic census file: ${e.message}"
+            censusFilePVal = null
         }
     }
     

@@ -49,16 +49,16 @@ def validateFilePaths() {
         error "Invalid MMWR file path format: ${params.mmwrFile}"
     }
     
-    // Census files are now optional with placeholders
+    // Census files validation
     if (params.containsKey('censusFileB')) {
         // Special handling for boolean values
         if (params.censusFileB instanceof Boolean) {
-            log.warn "Census bacterial file parameter is a boolean value: ${params.censusFileB}, will use placeholder instead"
-            params.censusFileB = "" // Reset to empty string
+            log.warn "Census bacterial file parameter is a boolean value: ${params.censusFileB}, will attempt to locate from other sources"
+            params.censusFileB = null // Reset to null
         } else if (params.censusFileB == null || params.censusFileB.toString().trim() == "") {
-            log.warn "Census bacterial file parameter is empty, will use placeholder"
-            // Explicitly set to empty string to prevent type coercion issues
-            params.censusFileB = ""
+            log.warn "Census bacterial file parameter is empty, will attempt to locate from metadata or standard locations"
+            // Explicitly set to null to let workflow find appropriate file
+            params.censusFileB = null
         } else {
             try {
                 // Just validate it can be converted to a string safely
@@ -66,24 +66,24 @@ def validateFilePaths() {
                 log.info "Census bacterial file path: ${censusPath}"
             } catch (Exception e) {
                 log.warn "Invalid census bacterial file path format: ${e.message}"
-                // Reset to empty string if invalid
-                params.censusFileB = ""
+                // Reset to null if invalid
+                params.censusFileB = null
             }
         }
     } else {
-        log.warn "Census bacterial file parameter not provided, will use placeholder"
-        params.censusFileB = ""
+        log.warn "Census bacterial file parameter not provided, will attempt to locate from metadata or standard locations"
+        params.censusFileB = null
     }
     
     if (params.containsKey('censusFileP')) {
         // Special handling for boolean values
         if (params.censusFileP instanceof Boolean) {
-            log.warn "Census parasitic file parameter is a boolean value: ${params.censusFileP}, will use placeholder instead"
-            params.censusFileP = "" // Reset to empty string
+            log.warn "Census parasitic file parameter is a boolean value: ${params.censusFileP}, will attempt to locate from other sources"
+            params.censusFileP = null // Reset to null
         } else if (params.censusFileP == null || params.censusFileP.toString().trim() == "") {
-            log.warn "Census parasitic file parameter is empty, will use placeholder"
-            // Explicitly set to empty string to prevent type coercion issues
-            params.censusFileP = ""
+            log.warn "Census parasitic file parameter is empty, will attempt to locate from metadata or standard locations"
+            // Explicitly set to null to let workflow find appropriate file
+            params.censusFileP = null
         } else {
             try {
                 // Just validate it can be converted to a string safely
@@ -91,13 +91,13 @@ def validateFilePaths() {
                 log.info "Census parasitic file path: ${censusPath}"
             } catch (Exception e) {
                 log.warn "Invalid census parasitic file path format: ${e.message}"
-                // Reset to empty string if invalid
-                params.censusFileP = ""
+                // Reset to null if invalid
+                params.censusFileP = null
             }
         }
     } else {
-        log.warn "Census parasitic file parameter not provided, will use placeholder"
-        params.censusFileP = ""
+        log.warn "Census parasitic file parameter not provided, will attempt to locate from metadata or standard locations"
+        params.censusFileP = null
     }
 }
 

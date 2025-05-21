@@ -116,10 +116,14 @@ if [[ "$workflow_mode" == "1" ]]; then
         exit 1
     fi
     
-    # Census files for preprocessing
+    # Census files for preprocessing - REQUIRED
     # Default census data files
     defaultCensusFileB="${DEFAULT_DATA_DIR}/cen9624.sas7bdat"
     defaultCensusFileP="${DEFAULT_DATA_DIR}/cen9624_para.sas7bdat"
+    
+    echo ""
+    echo "IMPORTANT: Census files are REQUIRED for this pipeline."
+    echo "These files contain population data needed to calculate incidence rates."
     
     read -p "Census file (bacterial) [${defaultCensusFileB}]: " censusFileB
     censusFileB=${censusFileB:-$defaultCensusFileB}
