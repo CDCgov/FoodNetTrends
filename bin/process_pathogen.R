@@ -117,12 +117,12 @@ args <- parser$parse_args()
 #'
 #' @param stage Stage name
 #' @param message Optional message text
-log_message <- function(stage, message=NULL) {
+log_message <- function(stage, message=NULL, ...) {
   timestamp <- format(Sys.time(), "[%Y-%m-%d %H:%M:%S]")
   if (!is.null(message)) {
-    cat(sprintf("%s %s: %s\n", timestamp, stage, message))
+    cat(sprintf("%s %s: %s\n", timestamp, stage, message), ...)
   } else {
-    cat(sprintf("%s %s\n", timestamp, stage))
+    cat(sprintf("%s %s\n", timestamp, stage), ...)
   }
   flush.console()
 }
@@ -210,9 +210,12 @@ if (!is.null(args$censusFileB) && file.exists(args$censusFileB)) {
                     ignore.case = TRUE, value = TRUE)[1]
     year_col <- grep("^year$|^yr$|^YEAR$|^mmwr_year$", names(censusBdata), 
                    ignore.case = TRUE, value = TRUE)[1]
+    pop_col <- grep("^population$|^pop$|^POPULATION$|^Population$", names(censusBdata),
+                  ignore.case = TRUE, value = TRUE)[1]
     
     log_message("DEBUG", paste("Detected state column:", state_col))
     log_message("DEBUG", paste("Detected year column:", year_col))
+    log_message("DEBUG", paste("Detected population column:", pop_col))
     
     # Rename columns to standard names and ensure proper types
     if (!is.na(state_col) && state_col != "state") {
@@ -226,6 +229,13 @@ if (!is.null(args$censusFileB) && file.exists(args$censusFileB)) {
       censusBdata$year <- as.numeric(as.character(censusBdata[[year_col]]))
     } else if (is.na(year_col)) {
       log_message("ERROR", "Could not find year column in bacterial census file")
+      censusBdata <- NULL
+    }
+    
+    if (!is.na(pop_col) && pop_col != "population") {
+      censusBdata$population <- as.numeric(as.character(censusBdata[[pop_col]]))
+    } else if (is.na(pop_col)) {
+      log_message("ERROR", "Could not find population column in bacterial census file")
       censusBdata <- NULL
     }
     
@@ -262,9 +272,12 @@ if (!is.null(args$censusFileP) && file.exists(args$censusFileP)) {
                     ignore.case = TRUE, value = TRUE)[1]
     year_col <- grep("^year$|^yr$|^YEAR$|^mmwr_year$", names(censusPdata), 
                    ignore.case = TRUE, value = TRUE)[1]
+    pop_col <- grep("^population$|^pop$|^POPULATION$|^Population$", names(censusPdata),
+                  ignore.case = TRUE, value = TRUE)[1]
     
     log_message("DEBUG", paste("Detected state column:", state_col))
     log_message("DEBUG", paste("Detected year column:", year_col))
+    log_message("DEBUG", paste("Detected population column:", pop_col))
     
     # Rename columns to standard names and ensure proper types
     if (!is.na(state_col) && state_col != "state") {
@@ -278,6 +291,13 @@ if (!is.null(args$censusFileP) && file.exists(args$censusFileP)) {
       censusPdata$year <- as.numeric(as.character(censusPdata[[year_col]]))
     } else if (is.na(year_col)) {
       log_message("ERROR", "Could not find year column in parasitic census file")
+      censusPdata <- NULL
+    }
+    
+    if (!is.na(pop_col) && pop_col != "population") {
+      censusPdata$population <- as.numeric(as.character(censusPdata[[pop_col]]))
+    } else if (is.na(pop_col)) {
+      log_message("ERROR", "Could not find population column in parasitic census file")
       censusPdata <- NULL
     }
     
@@ -368,9 +388,10 @@ if (pathogen == "CYCLOSPORA") {
   
   # Check for required columns in census data
   if (!all(c("state", "year", "population") %in% names(censusPdata))) {
+    missing_cols <- setdiff(c("state", "year", "population"), names(censusPdata))
     log_message("ERROR", paste("CRITICAL: Census parasitic data missing required columns:", 
-                             paste(setdiff(c("state", "year", "population"), names(censusPdata)), collapse=", ")))
-    log_message("ERROR", "Available columns: ", paste(names(censusPdata), collapse=", "))
+                             paste(missing_cols, collapse=", ")))
+    log_message("ERROR", paste("Available columns:", paste(names(censusPdata), collapse=", ")))
     log_message("ERROR", "USING PLACEHOLDER DATA - Results will NOT be valid for production")
     
     # Create emergency census data matching the states and years in pathogen_counts
@@ -444,9 +465,10 @@ if (pathogen == "CYCLOSPORA") {
   
   # Check for required columns in census data
   if (!all(c("state", "year", "population") %in% names(censusBdata))) {
+    missing_cols <- setdiff(c("state", "year", "population"), names(censusBdata))
     log_message("ERROR", paste("CRITICAL: Census bacterial data missing required columns:", 
-                             paste(setdiff(c("state", "year", "population"), names(censusBdata)), collapse=", ")))
-    log_message("ERROR", "Available columns: ", paste(names(censusBdata), collapse=", "))
+                             paste(missing_cols, collapse=", ")))
+    log_message("ERROR", paste("Available columns:", paste(names(censusBdata), collapse=", ")))
     log_message("ERROR", "USING PLACEHOLDER DATA - Results will NOT be valid for production")
     
     # Create emergency census data matching the states and years in pathogen_counts
@@ -794,4 +816,4 @@ sink()
 log_message("OUTPUT", paste("Saved summary to", summary_file))
 
 # Complete
-log_message("COMPLETE", paste("Analysis completed successfully for", pathogen)) 
+log_message("COMPLETE", paste("Analysis completed successfully for", pathogen))
