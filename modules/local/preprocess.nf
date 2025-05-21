@@ -2,7 +2,7 @@
  * ==================================================================
  * FoodNet Trends - PREPROCESS Process Module
  * ==================================================================
- *
+ * 
  * Purpose:
  *   This process handles the preprocessing of raw MMWR data files.
  *   It standardizes formats, cleans data, and generates optional
@@ -14,18 +14,18 @@
  *   - Census parasitic file in SAS format
  *   - Output base name
  *   - Flag to generate metadata
- *
+ * 
  * Outputs:
  *   - Cleaned CSV file with standardized format
  *   - Optional JSON metadata about dataset contents
  *   - Process logs for troubleshooting
- *
+ * 
  * Error handling:
  *   - Input file validation
  *   - Output verification
  *   - Detailed logging
- *
- * Last updated: 2025-05-18
+ * 
+ * Last updated: 2025-05-21
  * ==================================================================
  */
 
@@ -60,98 +60,105 @@ process PREPROCESS {
 
     script:
     """
-    set -e  # Exit on error to prevent silent failures
+    # Create process log
+    echo "===============================================" > ${outputBase}_process.log
+    echo "FoodNet Trends Preprocessing" >> ${outputBase}_process.log
+    echo "===============================================" >> ${outputBase}_process.log
+    echo "Starting preprocessing" >> ${outputBase}_process.log
+    echo "Input file: ${mmwrFile}" >> ${outputBase}_process.log
+    echo "Census file (bacterial): ${censusFileB}" >> ${outputBase}_process.log
+    echo "Census file (parasitic): ${censusFileP}" >> ${outputBase}_process.log
+    echo "Output base: ${outputBase}" >> ${outputBase}_process.log
+    echo "Generate metadata: ${generateMetadata}" >> ${outputBase}_process.log
     
-    current_date=`date`
-    echo "Starting preprocessing at \$current_date" | tee ${outputBase}_process.log
-    echo "Input file: ${mmwrFile}" | tee -a ${outputBase}_process.log
-    echo "Census file (bacterial): ${censusFileB}" | tee -a ${outputBase}_process.log
-    echo "Census file (parasitic): ${censusFileP}" | tee -a ${outputBase}_process.log
-    echo "Output base: ${outputBase}" | tee -a ${outputBase}_process.log
-    echo "Generate metadata: ${generateMetadata}" | tee -a ${outputBase}_process.log
+    # Create warnings log
+    touch ${outputBase}_warnings.log
     
-    # Additional validation for input file - prevents cryptic R errors later
+    # Validate MMWR file
     if [ ! -f "${mmwrFile}" ]; then
         echo "ERROR: Input file does not exist: ${mmwrFile}" > ${outputBase}_error.log
         exit 1
     fi
     
-    # Define reusable placeholder function directly - avoid heredoc that causes syntax issues
-    handle_census_file() {
-        local file_path="\$1"
-        local pathogen_type="\$2"
-        local placeholder_file="\$3"
-        local log_file="\$4"
-        local output_path=""
-
-        if [ ! -f "\${file_path}" ] || [ ! -s "\${file_path}" ]; then
-            echo "WARNING: Census \${pathogen_type} file missing or empty: \${file_path}" >> \${log_file}
-            echo "Creating standardized placeholder for census \${pathogen_type} file" >> \${log_file}
-            
-            # Create directory for placeholder file safely using parameter expansion
-            placeholder_dir=\${placeholder_file%/*}
-            mkdir -p "\${placeholder_dir}"
-            
-            # Create standardized placeholder file
-            echo "state,population,year,pathogentype" > "\${placeholder_file}"
-            for state in CA CO CT GA MD MN NM NY OR TN; do
-                for year in {2016..2023}; do
-                    echo "\${state},5000000,\${year},\${pathogen_type}" >> "\${placeholder_file}"
-                done
-            done
-            
-            echo "CRITICAL WARNING: Using PLACEHOLDER \${pathogen_type} census data" | tee -a \${log_file}
-            echo "                  Results will NOT be valid for production use!" | tee -a \${log_file}
-            echo "                  Placeholder file created at: \${placeholder_file}" | tee -a \${log_file}
-            
-            output_path="\${placeholder_file}"
-        else
-            echo "Census \${pathogen_type} file exists: \${file_path}" >> \${log_file}
-            output_path="\${file_path}"
-            
-            # Verify file format
-            if [[ "\${file_path}" == *.csv ]]; then
-                echo "Census \${pathogen_type} file format: CSV" >> \${log_file}
-                # Verify file has required columns
-                if ! head -1 "\${file_path}" | grep -i -q "state" || ! head -1 "\${file_path}" | grep -i -q "year"; then
-                    echo "WARNING: Census \${pathogen_type} file may be missing required columns" >> \${log_file}
-                fi
-            elif [[ "\${file_path}" == *.sas7bdat ]]; then
-                echo "Census \${pathogen_type} file format: SAS" >> \${log_file}
-            else
-                echo "WARNING: Census \${pathogen_type} file has unknown format: \${file_path}" >> \${log_file}
-            fi
-        fi
+    # Handle census bacterial file
+    if [ ! -f "${censusFileB}" ] || [ ! -s "${censusFileB}" ]; then
+        echo "WARNING: Census bacterial file missing or empty" >> ${outputBase}_warnings.log
+        echo "Creating placeholder bacterial census data" >> ${outputBase}_warnings.log
         
-        echo "\${output_path}"
-    }
+        # Create placeholder for bacterial census
+        mkdir -p "${PWD}"
+        echo "state,population,year,pathogentype" > "${PWD}/placeholder_census_bacterial.csv"
+        echo "CA,10000000,2020,Bacterial" >> "${PWD}/placeholder_census_bacterial.csv"
+        echo "CO,5000000,2020,Bacterial" >> "${PWD}/placeholder_census_bacterial.csv"
+        echo "CT,3000000,2020,Bacterial" >> "${PWD}/placeholder_census_bacterial.csv"
+        echo "GA,8000000,2020,Bacterial" >> "${PWD}/placeholder_census_bacterial.csv"
+        echo "MD,5000000,2020,Bacterial" >> "${PWD}/placeholder_census_bacterial.csv"
+        echo "MN,4000000,2020,Bacterial" >> "${PWD}/placeholder_census_bacterial.csv"
+        echo "NM,2000000,2020,Bacterial" >> "${PWD}/placeholder_census_bacterial.csv"
+        echo "NY,15000000,2020,Bacterial" >> "${PWD}/placeholder_census_bacterial.csv"
+        echo "OR,3000000,2020,Bacterial" >> "${PWD}/placeholder_census_bacterial.csv"
+        echo "TN,5000000,2020,Bacterial" >> "${PWD}/placeholder_census_bacterial.csv"
+        
+        echo "CRITICAL WARNING: Using PLACEHOLDER bacterial census data" >> ${outputBase}_warnings.log
+        echo "Results will NOT be valid for production use!" >> ${outputBase}_warnings.log
+        
+        CENSUS_B="${PWD}/placeholder_census_bacterial.csv"
+    else
+        echo "Using provided bacterial census data: ${censusFileB}" >> ${outputBase}_process.log
+        CENSUS_B="${censusFileB}"
+    fi
     
-    # Handle census bacterial file - using backticks instead of $()
-    CENSUS_B=`handle_census_file "${censusFileB}" "bacterial" "${PWD}/placeholder_census_bacterial.csv" "${outputBase}_warnings.log"`
+    # Handle census parasitic file
+    if [ ! -f "${censusFileP}" ] || [ ! -s "${censusFileP}" ]; then
+        echo "WARNING: Census parasitic file missing or empty" >> ${outputBase}_warnings.log
+        echo "Creating placeholder parasitic census data" >> ${outputBase}_warnings.log
+        
+        # Create placeholder for parasitic census
+        mkdir -p "${PWD}"
+        echo "state,population,year,pathogentype" > "${PWD}/placeholder_census_parasitic.csv"
+        echo "CA,10000000,2020,Parasitic" >> "${PWD}/placeholder_census_parasitic.csv"
+        echo "CO,5000000,2020,Parasitic" >> "${PWD}/placeholder_census_parasitic.csv"
+        echo "CT,3000000,2020,Parasitic" >> "${PWD}/placeholder_census_parasitic.csv"
+        echo "GA,8000000,2020,Parasitic" >> "${PWD}/placeholder_census_parasitic.csv"
+        echo "MD,5000000,2020,Parasitic" >> "${PWD}/placeholder_census_parasitic.csv"
+        echo "MN,4000000,2020,Parasitic" >> "${PWD}/placeholder_census_parasitic.csv"
+        echo "NM,2000000,2020,Parasitic" >> "${PWD}/placeholder_census_parasitic.csv"
+        echo "NY,15000000,2020,Parasitic" >> "${PWD}/placeholder_census_parasitic.csv"
+        echo "OR,3000000,2020,Parasitic" >> "${PWD}/placeholder_census_parasitic.csv"
+        echo "TN,5000000,2020,Parasitic" >> "${PWD}/placeholder_census_parasitic.csv"
+        
+        echo "CRITICAL WARNING: Using PLACEHOLDER parasitic census data" >> ${outputBase}_warnings.log
+        echo "Results will NOT be valid for production use!" >> ${outputBase}_warnings.log
+        
+        CENSUS_P="${PWD}/placeholder_census_parasitic.csv"
+    else
+        echo "Using provided parasitic census data: ${censusFileP}" >> ${outputBase}_process.log
+        CENSUS_P="${censusFileP}"
+    fi
     
-    # Handle census parasitic file - using backticks instead of $()
-    CENSUS_P=`handle_census_file "${censusFileP}" "parasitic" "${PWD}/placeholder_census_parasitic.csv" "${outputBase}_warnings.log"`
+    # Execute the R preprocessing script
+    echo "Running preprocessing script with:" >> ${outputBase}_process.log
+    echo "  MMWR file: ${mmwrFile}" >> ${outputBase}_process.log
+    echo "  Census bacterial file: \$CENSUS_B" >> ${outputBase}_process.log
+    echo "  Census parasitic file: \$CENSUS_P" >> ${outputBase}_process.log
+    echo "  Output file: ${outputBase}.csv" >> ${outputBase}_process.log
+    echo "  Generate metadata: ${generateMetadata}" >> ${outputBase}_process.log
     
-    # Execute the R preprocessing script with output capturing and proper argument handling
-    echo "Using census bacterial file: \${CENSUS_B}" | tee -a ${outputBase}_process.log
-    echo "Using census parasitic file: \${CENSUS_P}" | tee -a ${outputBase}_process.log
-    
-    # Note: tee command duplicates output to both console and log file
     Rscript ${workflow.projectDir}/bin/calcIR.R \\
       --mmwrFile="${mmwrFile}" \\
-      --censusFileB="\${CENSUS_B}" \\
-      --censusFileP="\${CENSUS_P}" \\
+      --censusFileB="\$CENSUS_B" \\
+      --censusFileP="\$CENSUS_P" \\
       --outputFile="${outputBase}.csv" \\
       --generate_metadata=${generateMetadata} \\
       2>&1 | tee ${outputBase}_R.log
     
-    # Verify script created expected output before proceeding
+    # Verify output was created
     if [ ! -f "${outputBase}.csv" ]; then
         echo "ERROR: Expected output file not created: ${outputBase}.csv" > ${outputBase}_error.log
         exit 1
     fi
     
-    end_date=`date`
-    echo "Preprocessing completed at \$end_date" | tee -a ${outputBase}_process.log
+    echo "Preprocessing completed successfully" >> ${outputBase}_process.log
+    echo "===============================================" >> ${outputBase}_process.log
     """
 }

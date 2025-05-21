@@ -69,40 +69,32 @@ process TRENDY {
     #!/usr/bin/env bash
     set -e  # Exit immediately if a command exits with non-zero status
     
-    # Enhanced error handling with logging
+    # Create log file
+    echo "Starting analysis for pathogen: ${pathogen}" > ${pathogen}_trendy.log
+    echo "CPU cores: ${task.cpus}, Memory: ${task.memory}" >> ${pathogen}_trendy.log
+    
+    # Create error function
     error_exit() {
-        # Use date without command substitution
-        local error_time=`date`
+        # Log error message
         echo "ERROR: \$1" | tee -a "${pathogen}_trendy.log"
-        echo "\$error_time: Error in TRENDY process for ${pathogen}: \$1" >> "${pathogen}_error_summary.txt"
-        # Create a basic summary file to prevent "missing output" errors in the workflow
+        echo "Error in TRENDY process for ${pathogen}: \$1" >> "${pathogen}_error_summary.txt"
+        
+        # Create a basic summary file
         echo "Error processing ${pathogen}" > "${pathogen}_summary.txt"
-        echo "Error occurred at \$error_time" >> "${pathogen}_summary.txt"
+        echo "Error occurred at `date`" >> "${pathogen}_summary.txt"
         echo "Error message: \$1" >> "${pathogen}_summary.txt"
         exit 1
     }
     
+    # Set error trap
     trap 'error_exit "Command failed with exit code \$?: \$BASH_COMMAND"' ERR
-    
-    # Log start time and resource information
-    start_time=`date`
-    echo "Starting TRENDY analysis for ${pathogen} at \$start_time" | tee -a "${pathogen}_trendy.log"
-    echo "CPU cores: ${task.cpus}, Memory: ${task.memory}" | tee -a "${pathogen}_trendy.log"
-    
-    # Initialize variable defaults to ensure they're always defined
-    CENSUS_B_ARG="--censusFileB=empty_census_bact.csv"
-    CENSUS_P_ARG="--censusFileP=empty_census_para.csv"
-    PREPROC_ARG=""
-    
-    # Log start of analysis with enhanced file checking
-    echo "Starting analysis for pathogen: ${pathogen}" > ${pathogen}_trendy.log
     
     # Verify MMWR file exists before proceeding
     if [ ! -f "${mmwrFile}" ]; then
         error_exit "MMWR data file does not exist: ${mmwrFile}"
     fi
     
-    # Get file extension safely
+    # Get file extension
     MMWR_FILE_EXT=""
     if [[ "${mmwrFile}" == *.csv ]]; then
         MMWR_FILE_EXT="csv"
@@ -115,7 +107,7 @@ process TRENDY {
     
     echo "Using MMWR data file: ${mmwrFile} (${MMWR_FILE_EXT} format)" | tee -a ${pathogen}_trendy.log
     
-    # Make a local copy of the MMWR file to handle path issues - with better error reporting
+    # Make a local copy of the MMWR file to handle path issues
     if ! cp -v "${mmwrFile}" "./input_data.${MMWR_FILE_EXT}"; then
         error_exit "Failed to copy MMWR file - check file permissions and path"
     fi
@@ -126,6 +118,11 @@ process TRENDY {
     if [ ! -s "./input_data.${MMWR_FILE_EXT}" ]; then
         error_exit "MMWR data file is empty"
     fi
+    
+    # Initialize variable defaults
+    CENSUS_B_ARG="--censusFileB=empty_census_bact.csv"
+    CENSUS_P_ARG="--censusFileP=empty_census_para.csv"
+    PREPROC_ARG=""
     
     # Handle census bacterial file
     if [ -f "${censusBFile}" ] && [ -s "${censusBFile}" ]; then
@@ -219,29 +216,7 @@ process TRENDY {
         CENSUS_P_ARG="--censusFileP=empty_census_para.csv"
     fi
     
-    # Show file information
-    echo "Checking copied files:" >> ${pathogen}_trendy.log
-    ls -la ./ >> ${pathogen}_trendy.log
-    
-    # Run the main trend analysis with explicit path handling for everything
-    echo "Using scripts path: ${bin_dir}" >> ${pathogen}_trendy.log
-    
-    # Create explicit path to R script - Use new unified script
-    SCRIPT_PATH="${bin_dir}/process_pathogen.R"
-    echo "Full script path: \${SCRIPT_PATH}" >> ${pathogen}_trendy.log
-    
-    # Check that R script exists
-    if [ ! -f "\${SCRIPT_PATH}" ]; then
-        # Fall back to trendy.R if process_pathogen.R doesn't exist
-        echo "New script not found, falling back to legacy script" >> ${pathogen}_trendy.log
-        SCRIPT_PATH="${bin_dir}/trendy.R"
-        if [ ! -f "\${SCRIPT_PATH}" ]; then
-            dir_contents=`ls -la ${bin_dir}`
-            error_exit "R script not found at \${SCRIPT_PATH}. Directory contents of ${bin_dir}: \$dir_contents"
-        fi
-    fi
-    
-    # Check that data files exist and log their status clearly
+    # Check data files and log their status
     echo "===== DATA FILES VERIFICATION =====" >> ${pathogen}_trendy.log
     if [ -f "./census_bact.sas7bdat" ] && [ -s "./census_bact.sas7bdat" ]; then
         echo "VALID: Using real bacterial census data (SAS format)" >> ${pathogen}_trendy.log
@@ -260,11 +235,11 @@ process TRENDY {
     fi
     echo "===================================" >> ${pathogen}_trendy.log
     
-    # Check that our local data file copy exists and is readable
+    # Check local data file copy exists and is readable
     if [ ! -f "./input_data.${mmwrFile.extension}" ] || [ ! -r "./input_data.${mmwrFile.extension}" ]; then
-        # Get directory contents for error message
-        dir_contents=`ls -la ./`
-        error_exit "Local MMWR data file copy not found or not readable. Original file: ${mmwrFile}, Local copy attempt: ./input_data.${mmwrFile.extension}, Current directory contents: \$dir_contents"
+        # List directory contents for debugging
+        ls -la ./ > dir_contents.txt
+        error_exit "Local MMWR data file copy not found or not readable. Original file: ${mmwrFile}, Local copy attempt: ./input_data.${mmwrFile.extension}"
     fi
     
     # Add preprocessed flag based on file extension
@@ -276,12 +251,12 @@ process TRENDY {
         echo "Using raw data mode for SAS file" >> ${pathogen}_trendy.log
     fi
     
-    # Make sure the census variables are fully initialized first
+    # Log census arguments
     echo "Census bacterial arg: \${CENSUS_B_ARG}" >> ${pathogen}_trendy.log
     echo "Census parasitic arg: \${CENSUS_P_ARG}" >> ${pathogen}_trendy.log
     echo "Preprocessing arg: \${PREPROC_ARG}" >> ${pathogen}_trendy.log
     
-    # Create a results summary file that will be clearly visible
+    # Create a results summary file
     echo "====================================================" > ${pathogen}_data_summary.txt
     echo "     ANALYSIS SETUP FOR PATHOGEN: ${pathogen}" >> ${pathogen}_data_summary.txt
     echo "====================================================" >> ${pathogen}_data_summary.txt
@@ -326,14 +301,28 @@ process TRENDY {
     echo "  MCMC Chains:     ${params.chains}" >> ${pathogen}_data_summary.txt
     echo "  Iterations:      ${params.iterations}" >> ${pathogen}_data_summary.txt
     echo "  Cores:           ${params.cores}" >> ${pathogen}_data_summary.txt
-    echo "  Script Path:     \${SCRIPT_PATH}" >> ${pathogen}_data_summary.txt
     echo "====================================================" >> ${pathogen}_data_summary.txt
     echo "" >> ${pathogen}_data_summary.txt
     
     # Copy to the log file as well
     cat ${pathogen}_data_summary.txt >> ${pathogen}_trendy.log
-
-    # Run the pathogen analysis with the new unified script
+    
+    # Find the R script
+    SCRIPT_PATH="${bin_dir}/process_pathogen.R"
+    echo "Checking script path: \${SCRIPT_PATH}" >> ${pathogen}_trendy.log
+    
+    # Check that R script exists
+    if [ ! -f "\${SCRIPT_PATH}" ]; then
+        # Fall back to trendy.R if process_pathogen.R doesn't exist
+        echo "New script not found, falling back to legacy script" >> ${pathogen}_trendy.log
+        SCRIPT_PATH="${bin_dir}/trendy.R"
+        if [ ! -f "\${SCRIPT_PATH}" ]; then
+            ls -la ${bin_dir} > script_dir_contents.txt
+            error_exit "R script not found. Checked ${bin_dir}/process_pathogen.R and ${bin_dir}/trendy.R"
+        fi
+    fi
+    
+    # Run the pathogen analysis script
     echo "Running pathogen analysis for ${pathogen}" >> ${pathogen}_trendy.log
     echo "Using script: \${SCRIPT_PATH}" >> ${pathogen}_trendy.log
     
@@ -385,10 +374,10 @@ process TRENDY {
         echo "WARNING: No model file was generated!" >> ${pathogen}_data_summary.txt
     fi
     
-    # Check for figures - capture count directly using backticks
-    png_count=`ls -1 ${pathogen}_*.png 2>/dev/null | wc -l`
-    if [ \$png_count -gt 0 ]; then
-        echo "SUCCESS: Generated \$png_count visualization files" >> ${pathogen}_data_summary.txt
+    # Check for figures
+    PNG_COUNT=`ls -1 ${pathogen}_*.png 2>/dev/null | wc -l`
+    if [ \$PNG_COUNT -gt 0 ]; then
+        echo "SUCCESS: Generated \$PNG_COUNT visualization files" >> ${pathogen}_data_summary.txt
         ls -la ${pathogen}_*.png >> ${pathogen}_data_summary.txt
     else
         echo "WARNING: No visualization files were generated!" >> ${pathogen}_data_summary.txt
