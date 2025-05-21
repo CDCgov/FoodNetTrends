@@ -25,10 +25,12 @@ process GENERATE_DASHBOARD {
     script:
     def timestamp = new java.text.SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date())
     def currentDate = new Date().toString()
-    def isoDate = new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX").format(new Date())
     """
-    # Use Nextflow-provided timestamp
-    TIMESTAMP='${timestamp}'
+    #!/bin/bash
+    # Simple dashboard generator script
+    
+    # Set timestamp from Nextflow variable
+    MY_TIMESTAMP="${timestamp}"
     
     # Memory optimization for R
     export R_MAX_VSIZE=12G
@@ -38,20 +40,15 @@ process GENERATE_DASHBOARD {
     echo "=========================================" > ${projID}_data_quality.log
     echo "  FoodNet Trends Data Quality Assessment" >> ${projID}_data_quality.log
     echo "  Project ID: ${projID}" >> ${projID}_data_quality.log
-    # Use Nextflow-provided date
     echo "  Generated: ${currentDate}" >> ${projID}_data_quality.log
     echo "=========================================" >> ${projID}_data_quality.log
     echo "" >> ${projID}_data_quality.log
     
     # Initialize JSON structure for data quality metadata
-    # Use Nextflow-provided ISO date format
-    DATETIME="${isoDate}"
-    
-    # Create the JSON file with a heredoc that allows variable interpolation
     cat > ${projID}_data_quality.json << EOF
     {
       "projectId": "${projID}",
-      "generationDate": "\$DATETIME",
+      "generationDate": "${currentDate}",
       "dataQuality": {
         "usesPlaceholderData": false,
         "affectedPathogens": [],
@@ -76,7 +73,6 @@ process GENERATE_DASHBOARD {
         while read -r SUMMARY_FILE; do
             if [ -f "\$SUMMARY_FILE" ]; then
                 # Extract pathogen name
-                # Extract pathogen name more safely without command substitution
                 BASE_NAME=\${SUMMARY_FILE##*/}
                 PATHOGEN=\${BASE_NAME%_data_summary.txt}
                 
@@ -92,12 +88,11 @@ process GENERATE_DASHBOARD {
                     # Add warning - safely handle variable
                     if [ -n "\$PATHOGEN" ]; then
                         echo "WARNING: Placeholder data detected for pathogen: \$PATHOGEN" >> ${projID}_data_quality.log
-                        PATHOGEN_WARNINGS="\$PATHOGEN_WARNINGS\n- \$PATHOGEN: Uses placeholder data (results NOT suitable for production use)"
+                        PATHOGEN_WARNINGS="\$PATHOGEN_WARNINGS\\n- \$PATHOGEN: Uses placeholder data (results NOT suitable for production use)"
                     else
                         echo "WARNING: Placeholder data detected in unidentified file" >> ${projID}_data_quality.log
-                        PATHOGEN_WARNINGS="\$PATHOGEN_WARNINGS\n- UNKNOWN: Uses placeholder data (results NOT suitable for production use)"
+                        PATHOGEN_WARNINGS="\$PATHOGEN_WARNINGS\\n- UNKNOWN: Uses placeholder data (results NOT suitable for production use)"
                     fi
-                    # Increment counter using shell addition
                     let DATA_QUALITY_WARNINGS+=1
                     PLACEHOLDER_DATA_FOUND=1
                 fi
@@ -156,7 +151,7 @@ EOFTEMPLATE
     # Count IR files for data consistency
     echo "" >> ${projID}_data_quality.log
     echo "Checking data consistency..." >> ${projID}_data_quality.log
-    # Count files more safely with pure shell
+    # Count files with pure shell
     set +e  # Don't fail if no files found
     ls -1 *_IRCatch.csv > ir_files_list.txt 2>/dev/null
     if [ -s ir_files_list.txt ]; then
@@ -232,7 +227,7 @@ EOFTEMPLATE
 <p>The dashboard generation script was not found. This is a simplified fallback dashboard.</p>
 ERRORTEMPLATE
 
-        # Add dynamic content with Nextflow-provided date
+        # Add dynamic content directly
         echo "<p>Project ID: ${projID}</p>" >> ${projID}_dashboard.html
         echo "<p>Analysis completed at: ${currentDate}</p>" >> ${projID}_dashboard.html
         
@@ -422,18 +417,18 @@ ERRORTEMPLATE
     fi
     
     # Also create dashboard with timestamp format to ensure compatibility
-    if [ ! -f "${TIMESTAMP}_dashboard.html" ]; then
-        echo "Creating emergency fallback dashboard at ${TIMESTAMP}_dashboard.html" >> ${projID}_data_quality.log
-        echo "<!DOCTYPE html><html><head><title>FoodNet Dashboard Fallback</title></head><body><h1>FoodNet Analysis</h1><p>Dashboard generation failed. See logs for details.</p></body></html>" > ${TIMESTAMP}_dashboard.html
+    if [ ! -f "\${MY_TIMESTAMP}_dashboard.html" ]; then
+        echo "Creating emergency fallback dashboard at \${MY_TIMESTAMP}_dashboard.html" >> ${projID}_data_quality.log
+        echo "<!DOCTYPE html><html><head><title>FoodNet Dashboard Fallback</title></head><body><h1>FoodNet Analysis</h1><p>Dashboard generation failed. See logs for details.</p></body></html>" > \${MY_TIMESTAMP}_dashboard.html
     fi
     
     # Create a symlink to ensure we have both formats available
-    if [ -f "${projID}_dashboard.html" ] && [ ! -f "${TIMESTAMP}_dashboard.html" ]; then
-        ln -sf "${projID}_dashboard.html" "${TIMESTAMP}_dashboard.html"
-        echo "Created symlink from ${projID}_dashboard.html to ${TIMESTAMP}_dashboard.html" >> ${projID}_data_quality.log
-    elif [ ! -f "${projID}_dashboard.html" ] && [ -f "${TIMESTAMP}_dashboard.html" ]; then
-        ln -sf "${TIMESTAMP}_dashboard.html" "${projID}_dashboard.html"
-        echo "Created symlink from ${TIMESTAMP}_dashboard.html to ${projID}_dashboard.html" >> ${projID}_data_quality.log
+    if [ -f "${projID}_dashboard.html" ] && [ ! -f "\${MY_TIMESTAMP}_dashboard.html" ]; then
+        ln -sf "${projID}_dashboard.html" "\${MY_TIMESTAMP}_dashboard.html"
+        echo "Created symlink from ${projID}_dashboard.html to \${MY_TIMESTAMP}_dashboard.html" >> ${projID}_data_quality.log
+    elif [ ! -f "${projID}_dashboard.html" ] && [ -f "\${MY_TIMESTAMP}_dashboard.html" ]; then
+        ln -sf "\${MY_TIMESTAMP}_dashboard.html" "${projID}_dashboard.html"
+        echo "Created symlink from \${MY_TIMESTAMP}_dashboard.html to ${projID}_dashboard.html" >> ${projID}_data_quality.log
     fi
     """
 }
