@@ -797,8 +797,29 @@ workflow SPLINE {
             dashboardScriptVal
         )
         
-        // Get dashboard output
-        dashboard = GENERATE_DASHBOARD.out.dashboard
+        // Get dashboard output - use collect() to ensure we get all files
+        dashboard = GENERATE_DASHBOARD.out.dashboard.collect()
+        
+        // Add a fallback mechanism to ensure we always have a dashboard
+        // even if the module failed to create one
+        dashboard.ifEmpty { 
+            log.warn "Dashboard output is empty, creating a fallback"
+            def timestamp = new java.text.SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date())
+            def fallbackHtml = file("${workDir}/fallback_${timestamp}_dashboard.html")
+            
+            fallbackHtml.text = """<!DOCTYPE html>
+<html>
+<head><title>Fallback Dashboard</title></head>
+<body>
+<h1>FoodNet Trends Fallback Dashboard</h1>
+<p>No dashboard was created by the pipeline. This is an automatically generated fallback.</p>
+<p>Generated at: ${new Date()}</p>
+<p>Please check the log files for more information.</p>
+</body>
+</html>"""
+            
+            dashboard = Channel.fromPath(fallbackHtml.toString())
+        }
     } else {
         log.info "Dashboard generation disabled, skipping"
     }

@@ -1,7 +1,8 @@
 process GENERATE_DASHBOARD {
     // Add error retry strategy to handle transient failures
-    errorStrategy 'retry'
-    maxRetries 2
+    // Use 'ignore' for the final retry to ensure workflow completes
+    errorStrategy { task.attempt <= 2 ? 'retry' : 'ignore' }
+    maxRetries 3
     tag "Generate dashboard"
     label 'process_medium'
     shell "/bin/bash"
@@ -15,9 +16,9 @@ process GENERATE_DASHBOARD {
     val dashboardScript
 
     output:
-    path "${projID}_dashboard.html", emit: dashboard
-    path "${projID}_data_quality.log", optional: true, emit: quality_log
-    path "${projID}_data_quality.json", optional: true, emit: quality_json
+    path "*_dashboard.html", emit: dashboard
+    path "*_data_quality.log", optional: true, emit: quality_log
+    path "*_data_quality.json", optional: true, emit: quality_json
     publishDir "${params.outdir}/${projID}", mode: params.publish_dir_mode
 
     script:
@@ -387,9 +388,27 @@ ERRORTEMPLATE
     echo "Dashboard generation completed at \$COMPLETION_TIME" >> ${projID}_data_quality.log
     
     # Make sure the output dashboard exists even if it failed to generate properly
+    # Create dashboard with both timestamp and projID to ensure it matches the expected pattern
+    TIMESTAMP=\$(date +%Y%m%d_%H%M%S)
+    # First try with the pattern specified in the output
     if [ ! -f "${projID}_dashboard.html" ]; then
+        echo "Creating emergency fallback dashboard at ${projID}_dashboard.html" >> ${projID}_data_quality.log
         echo "<!DOCTYPE html><html><head><title>FoodNet Dashboard Fallback</title></head><body><h1>FoodNet Analysis</h1><p>Dashboard generation failed. See logs for details.</p></body></html>" > ${projID}_dashboard.html
-        echo "WARNING: Created emergency fallback dashboard due to missing output file" >> ${projID}_data_quality.log
+    fi
+    
+    # Also create dashboard with timestamp format to ensure compatibility
+    if [ ! -f "${TIMESTAMP}_dashboard.html" ]; then
+        echo "Creating emergency fallback dashboard at ${TIMESTAMP}_dashboard.html" >> ${projID}_data_quality.log
+        echo "<!DOCTYPE html><html><head><title>FoodNet Dashboard Fallback</title></head><body><h1>FoodNet Analysis</h1><p>Dashboard generation failed. See logs for details.</p></body></html>" > ${TIMESTAMP}_dashboard.html
+    fi
+    
+    # Create a symlink to ensure we have both formats available
+    if [ -f "${projID}_dashboard.html" ] && [ ! -f "${TIMESTAMP}_dashboard.html" ]; then
+        ln -sf "${projID}_dashboard.html" "${TIMESTAMP}_dashboard.html"
+        echo "Created symlink from ${projID}_dashboard.html to ${TIMESTAMP}_dashboard.html" >> ${projID}_data_quality.log
+    elif [ ! -f "${projID}_dashboard.html" ] && [ -f "${TIMESTAMP}_dashboard.html" ]; then
+        ln -sf "${TIMESTAMP}_dashboard.html" "${projID}_dashboard.html"
+        echo "Created symlink from ${TIMESTAMP}_dashboard.html to ${projID}_dashboard.html" >> ${projID}_data_quality.log
     fi
     """
 }

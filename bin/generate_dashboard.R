@@ -1211,6 +1211,15 @@ generate_dashboard <- function() {
   cat("Writing dashboard to:", output_path, "\n")
   writeLines(html_template, output_path)
   
+  # Also create a timestamp version for compatibility with Nextflow patterns
+  timestamp_output <- gsub("^.*_", paste0(format(Sys.time(), "%Y%m%d_%H%M%S"), "_"), output_path)
+  
+  # If the timestamp version is different, create it too
+  if (timestamp_output != output_path) {
+    cat("Also writing timestamp version to:", timestamp_output, "\n")
+    file.copy(output_path, timestamp_output, overwrite=TRUE)
+  }
+  
   cat("Dashboard generation complete!\n")
   return(output_path)
 }
@@ -1240,6 +1249,13 @@ result <- tryCatch({
     writeLines(emergency_content, args$outputFile)
     dashboard_path <- args$outputFile
     cat("Created emergency fallback dashboard at", dashboard_path, "\n")
+    
+    # Also create a timestamp version of the emergency dashboard
+    timestamp_output <- format(Sys.time(), "%Y%m%d_%H%M%S_dashboard.html")
+    if (timestamp_output != args$outputFile) {
+      cat("Also creating timestamp-based emergency dashboard at", timestamp_output, "\n")
+      writeLines(emergency_content, timestamp_output)
+    }
   }
   
   dashboard_path
