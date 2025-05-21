@@ -1,12 +1,12 @@
 #!/bin/bash
 # =========================================================================
-# FoodNet Trends Dashboard Generator Script - FALLBACK OPTION
+# FoodNet Trends Dashboard Generator Script - STANDALONE OPTION
 # =========================================================================
 #
 # Purpose:
 #   Run just the dashboard generation workflow with Nextflow and container.
-#   This is a FALLBACK option for when dashboard generation fails in 
-#   the main pipeline.
+#   This is a STANDALONE option that can be used to regenerate the dashboard
+#   after the main analysis has completed.
 #
 # Usage:
 #   ./dashboard.sh [project_id]
@@ -18,15 +18,15 @@ PROJECT_ID=${1:-$(date +%Y%m%d_%H%M%S)}
 OUTPUT_DIR="output"
 
 echo "============================================================"
-echo "FoodNet Trends Dashboard Generator (FALLBACK)"
+echo "FoodNet Trends Dashboard Generator"
 echo "============================================================"
 echo "Project ID:     $PROJECT_ID"
 echo "Output Directory: $OUTPUT_DIR/$PROJECT_ID"
 echo "Generated at:   $(date)"
 echo "============================================================"
-echo "NOTE: This script is a FALLBACK option for when dashboard"
-echo "generation fails in the main pipeline. The dashboard should"
-echo "normally be generated automatically."
+echo "This script will generate a dashboard for the analysis results"
+echo "located in $OUTPUT_DIR/$PROJECT_ID. It can be used after the"
+echo "main analysis is complete to regenerate or update the dashboard."
 echo "============================================================"
 echo
 

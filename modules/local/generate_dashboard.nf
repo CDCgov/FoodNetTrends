@@ -17,7 +17,7 @@ process GENERATE_DASHBOARD {
     val dashboardScript
 
     output:
-    path "*_dashboard.html", emit: dashboard
+    path "*.html", emit: dashboard
     path "*_data_quality.log", optional: true, emit: quality_log
     path "*_data_quality.json", optional: true, emit: quality_json
     publishDir "${params.outdir}/${projID}", mode: params.publish_dir_mode
