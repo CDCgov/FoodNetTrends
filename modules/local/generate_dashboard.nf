@@ -300,7 +300,7 @@ ERRORTEMPLATE
   <h1>FoodNet Trends Analysis Dashboard</h1>
   <div class="error-banner">
     <h2>Error: Dashboard Generation Failed</h2>
-ERROR_TEMPLATE
+ERRORTEMPLATE
 
             # Add the exit code information separately
             echo "    <p>The dashboard generation script failed with exit code \$SCRIPT_EXIT_CODE.</p>" >> ${projID}_dashboard.html
@@ -311,7 +311,7 @@ ERROR_TEMPLATE
   
   <div class="debug-info">
     <h3>Debug Information</h3>
-ERROR_TEMPLATE
+ERRORTEMPLATE
 
             # Add the dynamic project ID separately
             echo "    <p><strong>Project ID:</strong> ${projID}</p>" >> ${projID}_dashboard.html
@@ -327,7 +327,7 @@ ERROR_TEMPLATE
       <li>Verify that the census files are properly formatted</li>
       <li>Run the workflow with proper input files instead of placeholders</li>
     </ul>
-ERROR_TEMPLATE
+ERRORTEMPLATE
 
             # Add the error log information separately if it exists
             if [ -f "dashboard_generation.log" ]; then

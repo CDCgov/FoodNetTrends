@@ -1,0 +1,537 @@
+Dashboard generation completed at: Wed May 21 17:08:53 EDT 2025
+============================================================
+[smn9@rosalind02 FoodNetTrends]$ cp -r output/20250521_165439 ~/
+[smn9@rosalind02 FoodNetTrends]$ cat .nextflow.log
+May-21 17:08:00.839 [main] DEBUG nextflow.cli.Launcher - $> nextflow run main.nf -entry DASHBOARD_GEN -profile singularity,production -process.memory 16.GB -process.cpus 4 -executor.queueSize 100 -executor.submitRateLimit 10/1min --projID 20250521_165439 --outdir output --enable_dashboard true --dashboard_title 'FoodNet Trends Analysis: 20250521_165439' --dashboard_theme modern --publish_dir_mode copy
+May-21 17:08:01.442 [main] DEBUG nextflow.cli.CmdRun - N E X T F L O W  ~  version 24.10.4
+May-21 17:08:01.553 [main] DEBUG nextflow.plugin.PluginsFacade - Setting up plugin manager > mode=prod; embedded=false; plugins-dir=/scicomp/home-pure/smn9/.nextflow/plugins; core-plugins: nf-amazon@2.9.2,nf-azure@1.10.2,nf-cloudcache@0.4.2,nf-codecommit@0.2.2,nf-console@1.1.4,nf-google@1.15.3,nf-tower@1.9.3,nf-wave@1.7.4
+May-21 17:08:01.631 [main] INFO  o.pf4j.DefaultPluginStatusProvider - Enabled plugins: []
+May-21 17:08:01.633 [main] INFO  o.pf4j.DefaultPluginStatusProvider - Disabled plugins: []
+May-21 17:08:01.638 [main] INFO  org.pf4j.DefaultPluginManager - PF4J version 3.12.0 in 'deployment' mode
+May-21 17:08:01.656 [main] INFO  org.pf4j.AbstractPluginManager - No plugins
+May-21 17:08:01.713 [main] DEBUG nextflow.config.ConfigBuilder - Found config local: /scicomp/home-pure/smn9/foodnettrends/FoodNetTrends/nextflow.config
+May-21 17:08:01.717 [main] DEBUG nextflow.config.ConfigBuilder - Parsing config file: /scicomp/home-pure/smn9/foodnettrends/FoodNetTrends/nextflow.config
+May-21 17:08:01.849 [main] DEBUG n.secret.LocalSecretsProvider - Secrets store: /scicomp/home-pure/smn9/.nextflow/secrets/store.json
+May-21 17:08:01.854 [main] DEBUG nextflow.secret.SecretsLoader - Discovered secrets providers: [nextflow.secret.LocalSecretsProvider@452c8a40] - activable => nextflow.secret.LocalSecretsProvider@452c8a40
+May-21 17:08:01.884 [main] DEBUG nextflow.config.ConfigBuilder - Applying config profile: `singularity,production`
+May-21 17:08:06.395 [main] DEBUG nextflow.config.ConfigBuilder - Applying config profile: `singularity,production`
+May-21 17:08:06.429 [main] DEBUG nextflow.config.ConfigBuilder - Available config profiles: [bih, cfc_dev, uzl_omics, ifb_core, embl_hd, denbi_qbic, alice, mjolnir_globe, uppmax, giga, incliva, ilifu, ki_luria, uge, icr_alma, rosalind_uge, lugh, mccleary, unibe_ibu, vai, czbiohub_aws, jax, roslin, ccga_med, tes, scw, unc_longleaf, tigem, tubingen_apg, google, apollo, ipop_up, vsc_calcua, pdc_kth, googlels, ceci_nic5, humantechnopole, stjude, daisybio, eddie, medair, biowulf, bi, bigpurple, adcra, cedars, local, pawsey_setonix, vsc_kul_uhasselt, pawsey_nimbus, ucl_myriad, utd_ganymede, seattlechildrens, icr_davros, ceres, munin, rosalind, hasta, cfc, uzh, shu_bmrc, ebi_codon_slurm, ebc, ccga_dx, crick, ku_sund_danhead, marvin, biohpc_gen, mana, york_viking, unc_lccc, wehi, awsbatch, wustl_htcf, arcc, ceci_dragon2, imperial, maestro, software_license, cannon, genotoul, nci_gadi, abims, janelia, nu_genomics, googlebatch, oist, sahmri, kaust, alliance_canada, mpcdf, leicester, vsc_ugent, create, sage, cambridge, jex, ebi_codon, cheaha, xanadu, nyu_hpc, test, marjorie, computerome, ucd_sonic, gpu, seg_globe, mssm, sanger, dkfz, bluebear, pasteur, einstein, ethz_euler, m3c, imb, ucl_cscluster, tuos_stanage, production, azurebatch, hki, training, seadragon, crukmi, csiro_petrichor, qmul_apocrita, engaging, gis, hypatia, psmn, eva, unity, cropdiversityhpc, nygc, fgcz, conda, crg, singularity, mpcdf_viper, pe2, no_dashboard, self_hosted_runner, tufts, uw_hyak_pedslabs, binac2, debug, genouest, cbe, unsw_katana, phoenix, seawulf, uod_hpc, fub_curta, uct_hpc, aws_tower, binac, fsu_draco]
+May-21 17:08:06.519 [main] DEBUG nextflow.cli.CmdRun - Applied DSL=2 from script declaration
+May-21 17:08:06.547 [main] DEBUG nextflow.cli.CmdRun - Launching `main.nf` [clever_meitner] DSL2 - revision: 9b6afb60d0
+May-21 17:08:06.549 [main] DEBUG nextflow.plugin.PluginsFacade - Plugins default=[]
+May-21 17:08:06.549 [main] DEBUG nextflow.plugin.PluginsFacade - Plugins resolved requirement=[]
+May-21 17:08:06.617 [main] DEBUG nextflow.Session - Session UUID: e9844910-6281-43fb-9b38-daee80bfccbd
+May-21 17:08:06.617 [main] DEBUG nextflow.Session - Run name: clever_meitner
+May-21 17:08:06.618 [main] DEBUG nextflow.Session - Executor pool size: 4
+May-21 17:08:06.630 [main] DEBUG nextflow.file.FilePorter - File porter settings maxRetries=3; maxTransfers=50; pollTimeout=null
+May-21 17:08:06.649 [main] DEBUG nextflow.util.ThreadPoolBuilder - Creating thread pool 'FileTransfer' minSize=10; maxSize=12; workQueue=LinkedBlockingQueue[10000]; allowCoreThreadTimeout=false
+May-21 17:08:06.752 [main] DEBUG nextflow.cli.CmdRun -
+  Version: 24.10.4 build 5934
+  Created: 20-01-2025 16:47 UTC (11:47 EDT)
+  System: Linux 4.18.0-553.45.1.el8_10.x86_64
+  Runtime: Groovy 4.0.23 on OpenJDK 64-Bit Server VM 17.0.6+10
+  Encoding: UTF-8 (UTF-8)
+  Process: 1308476@rosalind02 [10.128.41.96]
+  CPUs: 4 - Mem: 4 GB (2.3 GB) - Swap: 8 GB (889.9 MB)
+May-21 17:08:06.849 [main] DEBUG nextflow.Session - Work-dir: /scicomp/scratch/smn9/nextflow/work [nfs]
+May-21 17:08:06.965 [main] DEBUG nextflow.executor.ExecutorFactory - Extension executors providers=[]
+May-21 17:08:06.996 [main] DEBUG nextflow.Session - Observer factory: DefaultObserverFactory
+May-21 17:08:07.137 [main] DEBUG nextflow.cache.CacheFactory - Using Nextflow cache factory: nextflow.cache.DefaultCacheFactory
+May-21 17:08:07.150 [main] DEBUG nextflow.util.CustomThreadPool - Creating default thread pool > poolSize: 5; maxThreads: 1000
+May-21 17:08:07.346 [main] DEBUG nextflow.Session - Session start
+May-21 17:08:07.351 [main] DEBUG nextflow.trace.TraceFileObserver - Workflow started -- trace file: /scicomp/home-pure/smn9/foodnettrends/FoodNetTrends/output/20250521_165439/pipeline_info/execution_trace_2025-05-21_17-08-06.txt
+May-21 17:08:07.425 [main] DEBUG nextflow.Session - Using default localLib path: /scicomp/home-pure/smn9/foodnettrends/FoodNetTrends/lib
+May-21 17:08:07.444 [main] DEBUG nextflow.Session - Adding to the classpath library: /scicomp/home-pure/smn9/foodnettrends/FoodNetTrends/lib
+May-21 17:08:07.981 [main] DEBUG nextflow.script.ScriptRunner - > Launching execution
+May-21 17:08:11.087 [main] INFO  nextflow.Nextflow - Starting standalone dashboard generation
+May-21 17:08:11.088 [main] INFO  nextflow.Nextflow - Project ID: 20250521_165439
+May-21 17:08:11.088 [main] INFO  nextflow.Nextflow - Output directory: output/20250521_165439
+May-21 17:08:11.158 [main] INFO  nextflow.Nextflow - Found 7 result files
+May-21 17:08:11.177 [main] INFO  nextflow.Nextflow - Verifying analysis completion...
+May-21 17:08:11.178 [main] INFO  nextflow.Nextflow - Found 22 log files, indicating analysis has run
+May-21 17:08:11.594 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withLabel:process_high_memory` matches labels `process_high_memory` for process with name DASHBOARD_GEN:DASHBOARD_ONLY:GENERATE_DASHBOARD
+May-21 17:08:11.598 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:GENERATE_DASHBOARD` matches process DASHBOARD_GEN:DASHBOARD_ONLY:GENERATE_DASHBOARD
+May-21 17:08:11.615 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: sge
+May-21 17:08:11.615 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'sge'
+May-21 17:08:11.631 [main] DEBUG nextflow.executor.Executor - [warm up] executor > sge
+May-21 17:08:11.638 [main] DEBUG n.processor.TaskPollingMonitor - Creating task monitor for executor 'sge' > capacity: 100; pollInterval: 5s; dumpInterval: 5m
+May-21 17:08:11.641 [main] DEBUG n.processor.TaskPollingMonitor - >>> barrier register (monitor: sge)
+May-21 17:08:11.642 [main] DEBUG n.processor.TaskPollingMonitor - Creating submit rate limit of 10 submissions per 60 seconds
+May-21 17:08:11.647 [main] DEBUG n.executor.AbstractGridExecutor - Creating executor 'sge' > queue-stat-interval: 1m
+May-21 17:08:11.726 [main] DEBUG nextflow.Session - Config process names validation disabled as requested
+May-21 17:08:11.726 [main] DEBUG nextflow.Session - Igniting dataflow network (2)
+May-21 17:08:11.732 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > DASHBOARD_GEN:DASHBOARD_ONLY:GENERATE_DASHBOARD
+May-21 17:08:11.733 [main] DEBUG nextflow.script.ScriptRunner - Parsed script files:
+  Script_d6c39438d13d9478: /scicomp/home-pure/smn9/foodnettrends/FoodNetTrends/main.nf
+  Script_c4583ddfd8817ed4: /scicomp/home-pure/smn9/foodnettrends/FoodNetTrends/./workflows/../modules/local/generate_dashboard.nf
+  Script_ebbe008e6abea428: /scicomp/home-pure/smn9/foodnettrends/FoodNetTrends/./workflows/../modules/local/trendy.nf
+  Script_b177118f7a19e171: /scicomp/home-pure/smn9/foodnettrends/FoodNetTrends/./workflows/../modules/local/preprocess.nf
+  Script_f6cd9355e62b5583: /scicomp/home-pure/smn9/foodnettrends/FoodNetTrends/./workflows/dashboard.nf
+  Script_aa501e49ff234a63: /scicomp/home-pure/smn9/foodnettrends/FoodNetTrends/./workflows/preprocess.nf
+  Script_fca3f991d28308be: /scicomp/home-pure/smn9/foodnettrends/FoodNetTrends/./workflows/spline_fixed.nf
+May-21 17:08:11.733 [main] DEBUG nextflow.script.ScriptRunner - > Awaiting termination
+May-21 17:08:11.733 [main] DEBUG nextflow.Session - Session await
+May-21 17:08:13.259 [Task submitter] DEBUG nextflow.executor.GridTaskHandler - [SGE] submitted process DASHBOARD_GEN:DASHBOARD_ONLY:GENERATE_DASHBOARD (Generate dashboard) > jobId: 3238786; workDir: /scicomp/scratch/smn9/nextflow/work/68/93a6a568263b6ae93065eaaf664597
+May-21 17:08:13.260 [Task submitter] INFO  nextflow.Session - [68/93a6a5] Submitted process > DASHBOARD_GEN:DASHBOARD_ONLY:GENERATE_DASHBOARD (Generate dashboard)
+May-21 17:08:46.686 [Task monitor] DEBUG n.processor.TaskPollingMonitor - Task completed > TaskHandler[jobId: 3238786; id: 1; name: DASHBOARD_GEN:DASHBOARD_ONLY:GENERATE_DASHBOARD (Generate dashboard); status: COMPLETED; exit: 0; error: -; workDir: /scicomp/scratch/smn9/nextflow/work/68/93a6a568263b6ae93065eaaf664597 started: 1747861726654; exited: 2025-05-21T21:08:18.069389517Z; ]
+May-21 17:08:46.689 [Task monitor] DEBUG nextflow.util.ThreadPoolBuilder - Creating thread pool 'TaskFinalizer' minSize=10; maxSize=12; workQueue=LinkedBlockingQueue[10000]; allowCoreThreadTimeout=false
+May-21 17:08:46.755 [TaskFinalizer-1] DEBUG nextflow.processor.TaskProcessor - Process `DASHBOARD_GEN:DASHBOARD_ONLY:GENERATE_DASHBOARD (Generate dashboard)` is unable to find [UnixPath]: `/scicomp/scratch/smn9/nextflow/work/68/93a6a568263b6ae93065eaaf664597/dashboard.html` (pattern: `dashboard.html`)
+May-21 17:08:46.879 [TaskFinalizer-1] DEBUG nextflow.processor.TaskProcessor - Process DASHBOARD_GEN:DASHBOARD_ONLY:GENERATE_DASHBOARD > Skipping output binding because one or more optional files are missing: fileoutparam<0>
+May-21 17:08:46.879 [TaskFinalizer-1] DEBUG nextflow.processor.TaskProcessor - Process DASHBOARD_GEN:DASHBOARD_ONLY:GENERATE_DASHBOARD > Skipping output binding because one or more optional files are missing: fileoutparam<1>
+May-21 17:08:46.905 [TaskFinalizer-1] DEBUG nextflow.util.ThreadPoolBuilder - Creating thread pool 'PublishDir' minSize=10; maxSize=12; workQueue=LinkedBlockingQueue[10000]; allowCoreThreadTimeout=false
+May-21 17:08:46.926 [main] DEBUG nextflow.Session - Session await > all processes finished
+May-21 17:08:51.653 [Task monitor] DEBUG n.processor.TaskPollingMonitor - <<< barrier arrives (monitor: sge) - terminating tasks monitor poll loop
+May-21 17:08:51.653 [main] DEBUG nextflow.Session - Session await > all barriers passed
+May-21 17:08:51.656 [main] DEBUG nextflow.util.ThreadPoolManager - Thread pool 'TaskFinalizer' shutdown completed (hard=false)
+May-21 17:08:51.657 [main] DEBUG nextflow.util.ThreadPoolManager - Thread pool 'PublishDir' shutdown completed (hard=false)
+May-21 17:08:51.659 [main] INFO  nextflow.Nextflow - FoodNet Trends workflow completed successfully
+May-21 17:08:51.665 [main] DEBUG n.trace.WorkflowStatsObserver - Workflow completed > WorkflowStats[succeededCount=1; failedCount=0; ignoredCount=0; cachedCount=0; pendingCount=0; submittedCount=0; runningCount=0; retriesCount=0; abortedCount=0; succeedDuration=160ms; failedDuration=0ms; cachedDuration=0ms;loadCpus=0; loadMemory=0; peakRunning=1; peakCpus=4; peakMemory=16 GB; ]
+May-21 17:08:51.666 [main] DEBUG nextflow.trace.TraceFileObserver - Workflow completed -- saving trace file
+May-21 17:08:51.679 [main] DEBUG nextflow.trace.ReportObserver - Workflow completed -- rendering execution report
+May-21 17:08:52.458 [main] DEBUG nextflow.trace.TimelineObserver - Workflow completed -- rendering execution timeline
+May-21 17:08:52.825 [main] DEBUG nextflow.cache.CacheDB - Closing CacheDB done
+May-21 17:08:53.089 [main] DEBUG nextflow.util.ThreadPoolManager - Thread pool 'FileTransfer' shutdown completed (hard=false)
+May-21 17:08:53.089 [main] DEBUG nextflow.script.ScriptRunner - > Execution complete -- Goodbye
+[smn9@rosalind02 FoodNetTrends]$ ls /scicomp/scratch/smn9/nextflow/work/68/93a6a568263b6ae93065eaaf664597/
+20250521_165439_data_quality.json  CAMPYLOBACTER_IRCatch.csv  dashboard_template.html  SHIGELLA_IRCatch.csv  VIBRIO_IRCatch.csv
+20250521_165439_data_quality.log   CYCLOSPORA_IRCatch.csv     SALMONELLA_IRCatch.csv   STEC_IRCatch.csv      YERSINIA_IRCatch.csv
+[smn9@rosalind02 FoodNetTrends]$ cat /scicomp/scratch/smn9/nextflow/work/68/93a6a568263b6ae93065eaaf664597/.command.sh
+#!/bin/bash
+    # Simple dashboard generator script
+
+    # Set timestamp from Nextflow variable
+    MY_TIMESTAMP="20250521_170811"
+
+    # Memory optimization for R
+    export R_MAX_VSIZE=12G
+    export R_GC_MEM_GROW=0
+
+    # Create a data quality assessment log
+    echo "=========================================" > 20250521_165439_data_quality.log
+    echo "  FoodNet Trends Data Quality Assessment" >> 20250521_165439_data_quality.log
+    echo "  Project ID: 20250521_165439" >> 20250521_165439_data_quality.log
+    echo "  Generated: Wed May 21 17:08:11 EDT 2025" >> 20250521_165439_data_quality.log
+    echo "=========================================" >> 20250521_165439_data_quality.log
+    echo "" >> 20250521_165439_data_quality.log
+
+    # Initialize JSON structure for data quality metadata
+    cat > 20250521_165439_data_quality.json << EOF
+    {
+      "projectId": "20250521_165439",
+      "generationDate": "Wed May 21 17:08:11 EDT 2025",
+      "dataQuality": {
+        "usesPlaceholderData": false,
+        "affectedPathogens": [],
+        "warnings": [],
+        "dataConsistency": {}
+      }
+    }
+    EOF
+
+    # Check for placeholder data warnings in any result files
+    echo "Checking for data quality issues..." >> 20250521_165439_data_quality.log
+
+    # Create placeholder and warnings flags
+    PLACEHOLDER_DATA_FOUND=0
+    PATHOGEN_WARNINGS=""
+    AFFECTED_PATHOGENS=""
+    DATA_QUALITY_WARNINGS=0
+
+    # Look for placeholder warnings in summary files
+    find . -name "*_data_summary.txt" > summary_files.txt
+    if [ -s summary_files.txt ]; then
+        while read -r SUMMARY_FILE; do
+            if [ -f "$SUMMARY_FILE" ]; then
+                # Extract pathogen name
+                BASE_NAME=${SUMMARY_FILE##*/}
+                PATHOGEN=${BASE_NAME%_data_summary.txt}
+
+                # Check for placeholders
+                if grep -q "PLACEHOLDER DATA\|placeholder data\|SYNTHETIC DATA" "$SUMMARY_FILE"; then
+                    # Update pathogen list
+                    if [ -z "$AFFECTED_PATHOGENS" ]; then
+                        AFFECTED_PATHOGENS="\"$PATHOGEN\""
+                    else
+                        AFFECTED_PATHOGENS="$AFFECTED_PATHOGENS, \"$PATHOGEN\""
+                    fi
+
+                    # Add warning - safely handle variable
+                    if [ -n "$PATHOGEN" ]; then
+                        echo "WARNING: Placeholder data detected for pathogen: $PATHOGEN" >> 20250521_165439_data_quality.log
+                        PATHOGEN_WARNINGS="$PATHOGEN_WARNINGS\n- $PATHOGEN: Uses placeholder data (results NOT suitable for production use)"
+                    else
+                        echo "WARNING: Placeholder data detected in unidentified file" >> 20250521_165439_data_quality.log
+                        PATHOGEN_WARNINGS="$PATHOGEN_WARNINGS\n- UNKNOWN: Uses placeholder data (results NOT suitable for production use)"
+                    fi
+                    let DATA_QUALITY_WARNINGS+=1
+                    PLACEHOLDER_DATA_FOUND=1
+                fi
+            fi
+        done < summary_files.txt
+    fi
+
+    # First set default template
+    TEMPLATE_TO_USE="dashboard_template.html"
+
+    # Handle placeholder data - complete rewrite to avoid nested if statements
+    if [ $PLACEHOLDER_DATA_FOUND -eq 1 ]; then
+        # Update JSON to indicate placeholder data is being used
+        sed -i 's/"usesPlaceholderData": false/"usesPlaceholderData": true/' 20250521_165439_data_quality.json
+        # Add the affected pathogens to the JSON
+        sed -i "s/\"affectedPathogens\": \[\]/\"affectedPathogens\": [$AFFECTED_PATHOGENS]/" 20250521_165439_data_quality.json
+
+        # Add warning to log
+        echo "WARNING: Placeholder data detected" >> 20250521_165439_data_quality.log
+        echo "*** RESULTS MAY NOT BE SUITABLE FOR PRODUCTION USE ***" >> 20250521_165439_data_quality.log
+        echo "" >> 20250521_165439_data_quality.log
+
+        # Create a warning banner for HTML
+        WARNING_BANNER="<div style='background-color: #f8d7da; color: #721c24; padding: 15px; margin: 20px 0; border: 1px solid #f5c6cb; border-radius: 5px;'><h3 style='margin-top:0'>⚠️ WARNING: Placeholder Data Detected</h3><p>This analysis contains placeholder data which may not represent real-world conditions.</p><p><strong>Results are NOT suitable for production or public health decision-making!</strong></p></div>"
+
+        # Template handling - avoid nesting if statements
+        if [ -f "dashboard_template.html" ]; then
+            cp "dashboard_template.html" modified_template.html
+            sed -i "s|<body>|<body>\n$WARNING_BANNER|" modified_template.html
+            TEMPLATE_TO_USE="modified_template.html"
+        else
+            # Create a simple fallback template using a heredoc instead of multiple echo statements
+            cat > fallback_template.html << 'EOFTEMPLATE'
+<!DOCTYPE html>
+<html>
+<head><title>FoodNet Trends Dashboard - Fallback Template</title></head>
+<body>
+EOFTEMPLATE
+            # Add the warning banner separately
+            echo "$WARNING_BANNER" >> fallback_template.html
+
+            # Complete the HTML template
+            cat >> fallback_template.html << 'EOFTEMPLATE'
+<h1>FoodNet Trends Analysis</h1>
+<p>This is a fallback template due to missing template file.</p>
+</body>
+</html>
+EOFTEMPLATE
+            TEMPLATE_TO_USE="fallback_template.html"
+        fi
+    else
+        # No placeholder warnings
+        echo "No placeholder data warnings detected." >> 20250521_165439_data_quality.log
+    fi
+
+    # Count IR files for data consistency
+    echo "" >> 20250521_165439_data_quality.log
+    echo "Checking data consistency..." >> 20250521_165439_data_quality.log
+    # Count files with pure shell
+    set +e  # Don't fail if no files found
+    ls -1 *_IRCatch.csv > ir_files_list.txt 2>/dev/null
+    if [ -s ir_files_list.txt ]; then
+        IR_FILE_COUNT=0
+        while read -r LINE; do
+            let IR_FILE_COUNT+=1
+        done < ir_files_list.txt
+    else
+        IR_FILE_COUNT=0
+    fi
+    set -e
+    echo "Found $IR_FILE_COUNT incidence rate files." >> 20250521_165439_data_quality.log
+
+    # Add to JSON
+    sed -i "s/"dataConsistency": {}/"dataConsistency": {\n      \"incidenceRateFiles\": $IR_FILE_COUNT,\n      \"dataQualityWarnings\": $DATA_QUALITY_WARNINGS\n    }/" 20250521_165439_data_quality.json
+
+    # Create temporary debug info for troubleshooting
+    echo "Creating debug information for dashboard generation" >> 20250521_165439_data_quality.log
+
+    # Ensure the debuginfo directory exists before trying to write to it
+    mkdir -p debuginfo
+
+    # Create empty debug files to prevent missing file errors
+    touch debuginfo/directory_listing.txt
+    touch debuginfo/resultdir_listing.txt
+    touch debuginfo/result_files.txt
+    touch debuginfo/file_checks.txt
+
+    # Write directory listings safely with error handling
+    { ls -la > debuginfo/directory_listing.txt; } 2>/dev/null || echo "Failed to create directory listing" >> 20250521_165439_data_quality.log
+    { ls -la output/20250521_165439 > debuginfo/resultdir_listing.txt; } 2>/dev/null || echo "Could not list result directory: output/20250521_165439" > debuginfo/resultdir_listing.txt
+
+    # Collect info about input and result files with robust error handling
+    { find . -name "*_IRCatch.csv" -o -name "*_summary.txt" -o -name "*EstIRRCatch*.csv" > debuginfo/result_files.txt; } 2>/dev/null || echo "Warning: find command failed" >> 20250521_165439_data_quality.log
+
+    # Read the count safely, ensuring the file exists
+    if [ -f "debuginfo/result_files.txt" ]; then
+        # Count files with pure shell
+        RESULT_COUNT=0
+        if [ -s debuginfo/result_files.txt ]; then
+            while read -r LINE; do
+                let RESULT_COUNT+=1
+            done < debuginfo/result_files.txt
+        fi
+        echo "Found $RESULT_COUNT result files" >> 20250521_165439_data_quality.log
+    else
+        echo "Warning: result_files.txt not created properly" >> 20250521_165439_data_quality.log
+        RESULT_COUNT=0
+        echo "Found 0 result files" >> 20250521_165439_data_quality.log
+    fi
+
+    # Check for common result files that should exist without using shell variables
+    # Use a simpler approach to check each pathogen individually
+    ls CAMPYLOBACTER_*_IRCatch.csv 1>/dev/null 2>&1 && echo "Found IR files for CAMPYLOBACTER" >> debuginfo/file_checks.txt || echo "Missing IR files for CAMPYLOBACTER" >> debuginfo/file_checks.txt
+    ls CYCLOSPORA_*_IRCatch.csv 1>/dev/null 2>&1 && echo "Found IR files for CYCLOSPORA" >> debuginfo/file_checks.txt || echo "Missing IR files for CYCLOSPORA" >> debuginfo/file_checks.txt
+    ls SALMONELLA_*_IRCatch.csv 1>/dev/null 2>&1 && echo "Found IR files for SALMONELLA" >> debuginfo/file_checks.txt || echo "Missing IR files for SALMONELLA" >> debuginfo/file_checks.txt
+    ls SHIGELLA_*_IRCatch.csv 1>/dev/null 2>&1 && echo "Found IR files for SHIGELLA" >> debuginfo/file_checks.txt || echo "Missing IR files for SHIGELLA" >> debuginfo/file_checks.txt
+
+    # Generate the dashboard with improved error handling
+    echo "Generating dashboard with template: $TEMPLATE_TO_USE" >> 20250521_165439_data_quality.log
+
+    # Verify dashboard script exists and run it
+    if [ ! -f "/scicomp/home-pure/smn9/foodnettrends/FoodNetTrends/bin/generate_dashboard.R" ]; then
+        echo "ERROR: Dashboard script not found: /scicomp/home-pure/smn9/foodnettrends/FoodNetTrends/bin/generate_dashboard.R" >> 20250521_165439_data_quality.log
+        # Create fallback dashboard - using a safer approach
+        cat > 20250521_165439_dashboard.html << 'ERRORTEMPLATE'
+<!DOCTYPE html>
+<html>
+<head><title>FoodNet Trends Dashboard - Error</title></head>
+<body>
+<h1>FoodNet Trends Analysis Dashboard</h1>
+<h2>Error: Script Not Found</h2>
+<p>The dashboard generation script was not found. This is a simplified fallback dashboard.</p>
+ERRORTEMPLATE
+
+        # Add dynamic content directly
+        echo "<p>Project ID: 20250521_165439</p>" >> 20250521_165439_dashboard.html
+        echo "<p>Analysis completed at: Wed May 21 17:08:11 EDT 2025</p>" >> 20250521_165439_dashboard.html
+
+        # Close the HTML
+        cat >> 20250521_165439_dashboard.html << 'ERRORTEMPLATE'
+</body>
+</html>
+ERRORTEMPLATE
+    else
+        # Run script with debugging environment and error handling
+        echo "Preparing dashboard data..." >> 20250521_165439_data_quality.log
+
+        # Set environment variables to help R script with debugging
+        export R_DEBUG_LEVEL=1
+        export TRENDY_DEBUG=1
+
+        # Log which result files we have before running R
+        echo "Incidence rate files available:" >> 20250521_165439_data_quality.log
+        find . -name "*_IRCatch.csv" -ls >> 20250521_165439_data_quality.log 2>/dev/null || echo "  None found" >> 20250521_165439_data_quality.log
+
+        # Run script with error handling and detailed logging - use enhanced version
+        echo "About to run enhanced dashboard generator..." >> 20250521_165439_data_quality.log
+        echo "Script path: /scicomp/home-pure/smn9/foodnettrends/FoodNetTrends/bin/generate_dashboard_enhanced.R" >> 20250521_165439_data_quality.log
+        echo "Working directory: $(pwd)" >> 20250521_165439_data_quality.log
+        echo "Available files: $(ls -la)" >> 20250521_165439_data_quality.log
+
+        set +e
+        Rscript \
+          "/scicomp/home-pure/smn9/foodnettrends/FoodNetTrends/bin/generate_dashboard_enhanced.R" \
+          --outDir="output/20250521_165439" \
+          --resultDir="output/20250521_165439" \
+          --outputFile="20250521_165439_dashboard.html" \
+          --title="FoodNet Trends Analysis: 20250521_165439" \
+          --templateFile="$TEMPLATE_TO_USE" \
+          --qualityDataPath="20250521_165439_data_quality.json" \
+          --memoryLimit=14 \
+          --theme="modern" \
+          --debug 2>&1 | tee -a dashboard_generation.log
+
+        SCRIPT_EXIT_CODE=$?
+        set -e
+
+        echo "R script exit code: $SCRIPT_EXIT_CODE" >> 20250521_165439_data_quality.log
+        echo "Files after R script: $(ls -la *.html 2>/dev/null || echo 'No HTML files')" >> 20250521_165439_data_quality.log
+
+        # Handle script errors
+        if [ $SCRIPT_EXIT_CODE -ne 0 ]; then
+            echo "ERROR: Dashboard generation script failed with exit code $SCRIPT_EXIT_CODE" >> 20250521_165439_data_quality.log
+            # Save the log file for debugging
+            cp dashboard_generation.log debuginfo/
+
+            # Create a more informative fallback dashboard - using a safer approach with multiple parts
+            # First create the basic HTML structure
+            cat > 20250521_165439_dashboard.html << 'ERRORTEMPLATE'
+<!DOCTYPE html>
+<html>
+<head>
+  <title>FoodNet Trends Dashboard - Error</title>
+  <style>
+    body { font-family: Arial, sans-serif; line-height: 1.6; padding: 20px; max-width: 1000px; margin: 0 auto; }
+    .error-banner { background-color: #f8d7da; color: #721c24; padding: 15px; border-radius: 5px; }
+    .debug-info { background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin-top: 20px; }
+    h1 { color: #0066cc; }
+    pre { background-color: #f1f1f1; padding: 10px; overflow-x: auto; }
+  </style>
+</head>
+<body>
+  <h1>FoodNet Trends Analysis Dashboard</h1>
+  <div class="error-banner">
+    <h2>Error: Dashboard Generation Failed</h2>
+ERROR_TEMPLATE
+
+            # Add the exit code information separately
+            echo "    <p>The dashboard generation script failed with exit code $SCRIPT_EXIT_CODE.</p>" >> 20250521_165439_dashboard.html
+
+            # Continue with the rest of the template
+            cat >> 20250521_165439_dashboard.html << 'ERRORTEMPLATE'
+  </div>
+
+  <div class="debug-info">
+    <h3>Debug Information</h3>
+ERROR_TEMPLATE
+
+            # Add the dynamic project ID separately
+            echo "    <p><strong>Project ID:</strong> 20250521_165439</p>" >> 20250521_165439_dashboard.html
+
+            # Add date from Nextflow variable
+            echo "    <p><strong>Analysis time:</strong> Wed May 21 17:08:11 EDT 2025</p>" >> 20250521_165439_dashboard.html
+
+            # Continue with static content
+            cat >> 20250521_165439_dashboard.html << 'ERRORTEMPLATE'
+    <h4>Possible solutions:</h4>
+    <ul>
+      <li>Check that all required result files exist</li>
+      <li>Verify that the census files are properly formatted</li>
+      <li>Run the workflow with proper input files instead of placeholders</li>
+    </ul>
+ERROR_TEMPLATE
+
+            # Add the error log information separately if it exists
+            if [ -f "dashboard_generation.log" ]; then
+                echo "    <h4>Script Errors:</h4>" >> 20250521_165439_dashboard.html
+                echo "    <pre>" >> 20250521_165439_dashboard.html
+                tail -n 10 dashboard_generation.log >> 20250521_165439_dashboard.html 2>/dev/null || echo "Error reading log file" >> 20250521_165439_dashboard.html
+                echo "    </pre>" >> 20250521_165439_dashboard.html
+            fi
+
+            # Close the HTML structure
+            cat >> 20250521_165439_dashboard.html << 'ERRORTEMPLATE'
+  </div>
+</body>
+</html>
+ERRORTEMPLATE
+        fi
+    fi
+
+    # Verify dashboard was created and collect debug info
+    if [ ! -f "20250521_165439_dashboard.html" ]; then
+        echo "ERROR: Dashboard file was not created" >> 20250521_165439_data_quality.log
+
+        # Collect diagnostic information
+        echo "Collecting diagnostic information for troubleshooting" >> 20250521_165439_data_quality.log
+        R --version > debuginfo/r_version.txt 2>&1 || echo "R not available" > debuginfo/r_version.txt
+        env > debuginfo/environment.txt
+        df -h > debuginfo/disk_space.txt
+
+        # Save R package info if possible
+        Rscript -e "installed.packages()[,c('Package', 'Version')]" > debuginfo/r_packages.txt 2>/dev/null || echo "Cannot list R packages" > debuginfo/r_packages.txt
+
+        # Create a simple fallback dashboard with diagnostic info - using a safer approach with multiple steps
+        # First create the basic HTML structure
+        cat > 20250521_165439_dashboard.html << 'ERRORTEMPLATE'
+<!DOCTYPE html>
+<html>
+<head>
+  <title>FoodNet Trends Dashboard - Error</title>
+  <style>
+    body { font-family: Arial, sans-serif; line-height: 1.6; padding: 20px; max-width: 1000px; margin: 0 auto; }
+    .error-banner { background-color: #f8d7da; color: #721c24; padding: 15px; border-radius: 5px; }
+    .debug-info { background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin-top: 20px; }
+    h1 { color: #0066cc; }
+  </style>
+</head>
+<body>
+  <h1>FoodNet Trends Analysis Dashboard</h1>
+  <div class="error-banner">
+    <h2>Error: Missing Dashboard Output</h2>
+    <p>The dashboard HTML file was not created properly.</p>
+  </div>
+
+  <div class="debug-info">
+    <h3>Analysis Information</h3>
+ERRORTEMPLATE
+
+        # Add the dynamic parts separately to avoid shell expansion issues
+        # Add date from Nextflow variable
+        echo "    <p><strong>Project ID:</strong> 20250521_165439</p>" >> 20250521_165439_dashboard.html
+        echo "    <p><strong>Analysis completed at:</strong> Wed May 21 17:08:11 EDT 2025</p>" >> 20250521_165439_dashboard.html
+
+        # Complete the HTML structure
+        cat >> 20250521_165439_dashboard.html << 'ERRORTEMPLATE'
+    <h4>Diagnostic Information</h4>
+    <p>Diagnostic information has been saved to the 'debuginfo' directory.</p>
+
+    <h4>Possible solutions:</h4>
+    <ul>
+      <li>Check that all required input files are available</li>
+      <li>Verify that the analysis produced valid result files</li>
+      <li>Run the workflow with proper input files instead of placeholders if applicable</li>
+      <li>Check the disk space and permissions in the output directory</li>
+    </ul>
+  </div>
+</body>
+</html>
+ERRORTEMPLATE
+    else
+        # Dashboard was created, copy debug info if available
+        if [ -d "debuginfo" ]; then
+            mkdir -p "output/20250521_165439/debuginfo"
+            cp -r debuginfo/* "output/20250521_165439/debuginfo/" 2>/dev/null
+        fi
+    fi
+
+    # Final note with Nextflow-provided date
+    echo "Dashboard generation completed at Wed May 21 17:08:11 EDT 2025" >> 20250521_165439_data_quality.log
+
+    # Make sure the output dashboard exists even if it failed to generate properly
+    # Create dashboard with both timestamp and projID to ensure it matches the expected pattern
+    # First try with the pattern specified in the output
+    if [ ! -f "20250521_165439_dashboard.html" ]; then
+        echo "Creating emergency fallback dashboard at 20250521_165439_dashboard.html" >> 20250521_165439_data_quality.log
+        echo "<!DOCTYPE html><html><head><title>FoodNet Dashboard Fallback</title></head><body><h1>FoodNet Analysis</h1><p>Dashboard generation failed. See logs for details.</p></body></html>" > 20250521_165439_dashboard.html
+    fi
+
+    # Also create dashboard with timestamp format to ensure compatibility
+    if [ ! -f "${MY_TIMESTAMP}_dashboard.html" ]; then
+        echo "Creating emergency fallback dashboard at ${MY_TIMESTAMP}_dashboard.html" >> 20250521_165439_data_quality.log
+        echo "<!DOCTYPE html><html><head><title>FoodNet Dashboard Fallback</title></head><body><h1>FoodNet Analysis</h1><p>Dashboard generation failed. See logs for details.</p></body></html>" > ${MY_TIMESTAMP}_dashboard.html
+    fi
+
+    # Create both file formats to ensure Nextflow can find the expected output
+    if [ -f "20250521_165439_dashboard.html" ]; then
+        # Copy rather than symlink to ensure both files exist
+        cp "20250521_165439_dashboard.html" "${MY_TIMESTAMP}_dashboard.html"
+        echo "Created copy from 20250521_165439_dashboard.html to ${MY_TIMESTAMP}_dashboard.html" >> 20250521_165439_data_quality.log
+    elif [ -f "${MY_TIMESTAMP}_dashboard.html" ]; then
+        cp "${MY_TIMESTAMP}_dashboard.html" "20250521_165439_dashboard.html"
+        echo "Created copy from ${MY_TIMESTAMP}_dashboard.html to 20250521_165439_dashboard.html" >> 20250521_165439_data_quality.log
+    fi
+
+    # Create a guaranteed output file in the CURRENT directory (important for Nextflow to find it)
+    echo "Creating guaranteed dashboard file for Nextflow to find" >> 20250521_165439_data_quality.log
+
+    # Force the creation of a dashboard in the work directory
+    echo "<!DOCTYPE html><html><head><title>FoodNet Dashboard</title></head><body><h1>FoodNet Analysis Dashboard</h1><p>Project ID: 20250521_165439</p><p>Generated at: Wed May 21 17:08:11 EDT 2025</p></body></html>" > ./dashboard.html
+
+    # List files in current directory to debug
+    echo "Files in current directory:" >> 20250521_165439_data_quality.log
+    ls -la . >> 20250521_165439_data_quality.log
+
+    # Try with different paths to be super sure
+    echo "<!DOCTYPE html><html><body><h1>Dashboard</h1></body></html>" > ./output.html
+    echo "<!DOCTYPE html><html><body><h1>Dashboard</h1></body></html>" > "/scicomp/home-pure/smn9/foodnettrends/FoodNetTrends/emergency.html"
+
+    # Make sure we can see them
+    echo "After creating guaranteed files:" >> 20250521_165439_data_quality.log
+    ls -la *.html >> 20250521_165439_data_quality.log || echo "No HTML files found" >> 20250521_165439_data_quality.log
+
+    # Create a sentinel file for publishDir to pick up
+    touch "./dashboard_completed.txt"
+    echo "Dashboard generation completed at Wed May 21 17:08:11 EDT 2025" > "./dashboard_completed.txt"
+
+    # Create an extremely simple fallback HTML in case no other exists
+    if ! ls *.html 1>/dev/null 2>&1; then
+      echo "<!DOCTYPE html><html><head><title>Emergency Dashboard</title></head><body><h1>Emergency Dashboard</h1><p>No other dashboard files were created. This is an emergency fallback.</p></body></html>" > emergency_dashboard.html
+    fi
+[smn9@rosalind02 FoodNetTrends]$
