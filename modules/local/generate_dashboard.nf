@@ -114,16 +114,23 @@ process GENERATE_DASHBOARD {
             sed -i "s|<body>|<body>\\n\$WARNING_BANNER|" modified_template.html
             TEMPLATE_TO_USE="modified_template.html"
         else
-            # Create a simple fallback template
-            echo "<!DOCTYPE html>" > fallback_template.html
-            echo "<html>" >> fallback_template.html
-            echo "<head><title>FoodNet Trends Dashboard - Fallback Template</title></head>" >> fallback_template.html
-            echo "<body>" >> fallback_template.html
+            # Create a simple fallback template using a heredoc instead of multiple echo statements
+            cat > fallback_template.html << 'EOFTEMPLATE'
+<!DOCTYPE html>
+<html>
+<head><title>FoodNet Trends Dashboard - Fallback Template</title></head>
+<body>
+EOFTEMPLATE
+            # Add the warning banner separately
             echo "\$WARNING_BANNER" >> fallback_template.html
-            echo "<h1>FoodNet Trends Analysis</h1>" >> fallback_template.html
-            echo "<p>This is a fallback template due to missing template file.</p>" >> fallback_template.html
-            echo "</body>" >> fallback_template.html
-            echo "</html>" >> fallback_template.html
+            
+            # Complete the HTML template
+            cat >> fallback_template.html << 'EOFTEMPLATE'
+<h1>FoodNet Trends Analysis</h1>
+<p>This is a fallback template due to missing template file.</p>
+</body>
+</html>
+EOFTEMPLATE
             TEMPLATE_TO_USE="fallback_template.html"
         fi
     else
@@ -142,14 +149,28 @@ process GENERATE_DASHBOARD {
     
     # Create temporary debug info for troubleshooting
     echo "Creating debug information for dashboard generation" >> ${projID}_data_quality.log
-    mkdir -p debuginfo
-    ls -la > debuginfo/directory_listing.txt
-    ls -la ${resultDir} > debuginfo/resultdir_listing.txt 2>/dev/null || echo "Could not list result directory" > debuginfo/resultdir_listing.txt
     
-    # Collect info about input and result files
-    find . -name "*_IRCatch.csv" -o -name "*_summary.txt" -o -name "*EstIRRCatch*.csv" > debuginfo/result_files.txt
-    RESULT_COUNT=\$(wc -l < debuginfo/result_files.txt)
-    echo "Found \$RESULT_COUNT result files" >> ${projID}_data_quality.log
+    # Ensure the debuginfo directory exists before trying to write to it
+    mkdir -p debuginfo
+    
+    # Write directory listings safely with error handling
+    { ls -la > debuginfo/directory_listing.txt; } 2>/dev/null || echo "Failed to create directory listing" >> ${projID}_data_quality.log
+    { ls -la ${resultDir} > debuginfo/resultdir_listing.txt; } 2>/dev/null || echo "Could not list result directory: ${resultDir}" > debuginfo/resultdir_listing.txt
+    
+    # Collect info about input and result files with robust error handling
+    # First make sure the result_files.txt exists even if find fails
+    touch debuginfo/result_files.txt
+    { find . -name "*_IRCatch.csv" -o -name "*_summary.txt" -o -name "*EstIRRCatch*.csv" > debuginfo/result_files.txt; } 2>/dev/null || echo "Warning: find command failed" >> ${projID}_data_quality.log
+    
+    # Read the count safely, ensuring the file exists
+    if [ -f "debuginfo/result_files.txt" ]; then
+        RESULT_COUNT=\$(wc -l < debuginfo/result_files.txt 2>/dev/null || echo 0)
+        echo "Found \$RESULT_COUNT result files" >> ${projID}_data_quality.log
+    else
+        echo "Warning: result_files.txt not created properly" >> ${projID}_data_quality.log
+        RESULT_COUNT=0
+        echo "Found 0 result files" >> ${projID}_data_quality.log
+    fi
     
     # Check for common result files that should exist without using shell variables
     # Use a simpler approach to check each pathogen individually
@@ -164,8 +185,8 @@ process GENERATE_DASHBOARD {
     # Verify dashboard script exists and run it
     if [ ! -f "${dashboardScript}" ]; then
         echo "ERROR: Dashboard script not found: ${dashboardScript}" >> ${projID}_data_quality.log
-        # Create fallback dashboard with proper closing tags
-        cat > ${projID}_dashboard.html << EOF
+        # Create fallback dashboard - using a safer approach
+        cat > ${projID}_dashboard.html << 'ERRORTEMPLATE'
 <!DOCTYPE html>
 <html>
 <head><title>FoodNet Trends Dashboard - Error</title></head>
@@ -173,11 +194,17 @@ process GENERATE_DASHBOARD {
 <h1>FoodNet Trends Analysis Dashboard</h1>
 <h2>Error: Script Not Found</h2>
 <p>The dashboard generation script was not found. This is a simplified fallback dashboard.</p>
-<p>Analysis completed at: \$(date)</p>
-<p>Project ID: ${projID}</p>
+ERRORTEMPLATE
+
+        # Add dynamic content separately
+        echo "<p>Project ID: ${projID}</p>" >> ${projID}_dashboard.html
+        echo "<p>Analysis completed at: $(date)</p>" >> ${projID}_dashboard.html
+        
+        # Close the HTML
+        cat >> ${projID}_dashboard.html << 'ERRORTEMPLATE'
 </body>
 </html>
-EOF
+ERRORTEMPLATE
     else
         # Run script with debugging environment and error handling
         echo "Preparing dashboard data..." >> ${projID}_data_quality.log
@@ -214,8 +241,9 @@ EOF
             # Save the log file for debugging
             cp dashboard_generation.log debuginfo/
             
-            # Create a more informative fallback dashboard - using simpler commands
-            cat > ${projID}_dashboard.html << EOF
+            # Create a more informative fallback dashboard - using a safer approach with multiple parts
+            # First create the basic HTML structure
+            cat > ${projID}_dashboard.html << 'ERROR_TEMPLATE'
 <!DOCTYPE html>
 <html>
 <head>
@@ -232,31 +260,49 @@ EOF
   <h1>FoodNet Trends Analysis Dashboard</h1>
   <div class="error-banner">
     <h2>Error: Dashboard Generation Failed</h2>
-    <p>The dashboard generation script failed with exit code \$SCRIPT_EXIT_CODE.</p>
+ERROR_TEMPLATE
+
+            # Add the exit code information separately
+            echo "    <p>The dashboard generation script failed with exit code \$SCRIPT_EXIT_CODE.</p>" >> ${projID}_dashboard.html
+            
+            # Continue with the rest of the template
+            cat >> ${projID}_dashboard.html << 'ERROR_TEMPLATE'
   </div>
   
   <div class="debug-info">
     <h3>Debug Information</h3>
-    <p><strong>Project ID:</strong> ${projID}</p>
-    
+ERROR_TEMPLATE
+
+            # Add the dynamic project ID separately
+            echo "    <p><strong>Project ID:</strong> ${projID}</p>" >> ${projID}_dashboard.html
+            
+            # Get and add the date separately
+            echo "    <p><strong>Analysis time:</strong> $(date)</p>" >> ${projID}_dashboard.html
+            
+            # Continue with static content
+            cat >> ${projID}_dashboard.html << 'ERROR_TEMPLATE'    
     <h4>Possible solutions:</h4>
     <ul>
       <li>Check that all required result files exist</li>
       <li>Verify that the census files are properly formatted</li>
       <li>Run the workflow with proper input files instead of placeholders</li>
     </ul>
+ERROR_TEMPLATE
+
+            # Add the error log information separately if it exists
+            if [ -f "dashboard_generation.log" ]; then
+                echo "    <h4>Script Errors:</h4>" >> ${projID}_dashboard.html
+                echo "    <pre>" >> ${projID}_dashboard.html
+                tail -n 10 dashboard_generation.log >> ${projID}_dashboard.html 2>/dev/null || echo "Error reading log file" >> ${projID}_dashboard.html
+                echo "    </pre>" >> ${projID}_dashboard.html
+            fi
+            
+            # Close the HTML structure
+            cat >> ${projID}_dashboard.html << 'ERROR_TEMPLATE'
   </div>
 </body>
 </html>
-EOF
-
-            # Add runtime information separately - properly escaped for Nextflow
-            CURRENT_DATE=\$(date)
-            echo "<script>document.getElementsByClassName('debug-info')[0].insertAdjacentHTML('afterbegin', '<p><strong>Analysis time:</strong> \$CURRENT_DATE</p>');</script>" >> ${projID}_dashboard.html
-            
-            # Add error log information - properly escaped for Nextflow
-            ERROR_LOG=\$(tail -n 10 dashboard_generation.log 2>/dev/null || echo "No log file available")
-            echo "<script>document.getElementsByClassName('debug-info')[0].insertAdjacentHTML('beforeend', '<h4>Script Errors:</h4><pre>\$ERROR_LOG</pre>');</script>" >> ${projID}_dashboard.html
+ERROR_TEMPLATE
         fi
     fi
     
@@ -273,8 +319,9 @@ EOF
         # Save R package info if possible
         Rscript -e "installed.packages()[,c('Package', 'Version')]" > debuginfo/r_packages.txt 2>/dev/null || echo "Cannot list R packages" > debuginfo/r_packages.txt
         
-        # Create a simple fallback dashboard with diagnostic info
-        cat > ${projID}_dashboard.html << EOF
+        # Create a simple fallback dashboard with diagnostic info - using a safer approach with multiple steps
+        # First create the basic HTML structure
+        cat > ${projID}_dashboard.html << 'ERRORTEMPLATE'
 <!DOCTYPE html>
 <html>
 <head>
@@ -295,9 +342,14 @@ EOF
   
   <div class="debug-info">
     <h3>Analysis Information</h3>
-    <p><strong>Analysis completed at:</strong> \$(date)</p>
-    <p><strong>Project ID:</strong> ${projID}</p>
-    
+ERRORTEMPLATE
+
+        # Add the dynamic parts separately to avoid shell expansion issues
+        echo "    <p><strong>Project ID:</strong> ${projID}</p>" >> ${projID}_dashboard.html
+        echo "    <p><strong>Analysis completed at:</strong> $(date)</p>" >> ${projID}_dashboard.html
+        
+        # Complete the HTML structure
+        cat >> ${projID}_dashboard.html << 'ERRORTEMPLATE'    
     <h4>Diagnostic Information</h4>
     <p>Diagnostic information has been saved to the 'debuginfo' directory.</p>
     
@@ -311,7 +363,7 @@ EOF
   </div>
 </body>
 </html>
-EOF
+ERRORTEMPLATE
     else
         # Dashboard was created, copy debug info if available
         if [ -d "debuginfo" ]; then
