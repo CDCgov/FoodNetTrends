@@ -78,50 +78,50 @@ process PREPROCESS {
     # Create function to handle census files
     cat > handle_census_file.sh << 'EOT'
     function handle_census_file() {
-        local file_path=$1
-        local pathogen_type=$2
-        local placeholder_file=$3
-        local log_file=$4
+        local file_path="\$1"
+        local pathogen_type="\$2"
+        local placeholder_file="\$3"
+        local log_file="\$4"
 
-        if [ ! -f "${file_path}" ] || [ ! -s "${file_path}" ]; then
-            echo "WARNING: Census ${pathogen_type} file missing or empty: ${file_path}" >> ${log_file}
-            echo "Creating standardized placeholder for census ${pathogen_type} file" >> ${log_file}
+        if [ ! -f "\${file_path}" ] || [ ! -s "\${file_path}" ]; then
+            echo "WARNING: Census \${pathogen_type} file missing or empty: \${file_path}" >> \${log_file}
+            echo "Creating standardized placeholder for census \${pathogen_type} file" >> \${log_file}
             
             # Create directory if it doesn't exist
-            mkdir -p "$(dirname "${placeholder_file}")"
+            mkdir -p "\$(dirname "\${placeholder_file}")"
             
             # Create standardized placeholder file
-            echo "state,population,year,pathogentype" > "${placeholder_file}"
+            echo "state,population,year,pathogentype" > "\${placeholder_file}"
             for state in CA CO CT GA MD MN NM NY OR TN; do
                 for year in {2016..2023}; do
-                    echo "${state},5000000,${year},${pathogen_type}" >> "${placeholder_file}"
+                    echo "\${state},5000000,\${year},\${pathogen_type}" >> "\${placeholder_file}"
                 done
             done
             
-            echo "CRITICAL WARNING: Using PLACEHOLDER ${pathogen_type} census data" | tee -a ${log_file}
-            echo "                  Results will NOT be valid for production use!" | tee -a ${log_file}
-            echo "                  Placeholder file created at: ${placeholder_file}" | tee -a ${log_file}
+            echo "CRITICAL WARNING: Using PLACEHOLDER \${pathogen_type} census data" | tee -a \${log_file}
+            echo "                  Results will NOT be valid for production use!" | tee -a \${log_file}
+            echo "                  Placeholder file created at: \${placeholder_file}" | tee -a \${log_file}
             
-            local output_path="${placeholder_file}"
+            local output_path="\${placeholder_file}"
         else
-            echo "Census ${pathogen_type} file exists: ${file_path}" >> ${log_file}
-            local output_path="${file_path}"
+            echo "Census \${pathogen_type} file exists: \${file_path}" >> \${log_file}
+            local output_path="\${file_path}"
             
             # Verify file format
-            if [[ "${file_path}" == *.csv ]]; then
-                echo "Census ${pathogen_type} file format: CSV" >> ${log_file}
+            if [[ "\${file_path}" == *.csv ]]; then
+                echo "Census \${pathogen_type} file format: CSV" >> \${log_file}
                 # Verify file has required columns
-                if ! head -1 "${file_path}" | grep -i -q "state" || ! head -1 "${file_path}" | grep -i -q "year"; then
-                    echo "WARNING: Census ${pathogen_type} file may be missing required columns" >> ${log_file}
+                if ! head -1 "\${file_path}" | grep -i -q "state" || ! head -1 "\${file_path}" | grep -i -q "year"; then
+                    echo "WARNING: Census \${pathogen_type} file may be missing required columns" >> \${log_file}
                 fi
-            elif [[ "${file_path}" == *.sas7bdat ]]; then
-                echo "Census ${pathogen_type} file format: SAS" >> ${log_file}
+            elif [[ "\${file_path}" == *.sas7bdat ]]; then
+                echo "Census \${pathogen_type} file format: SAS" >> \${log_file}
             else
-                echo "WARNING: Census ${pathogen_type} file has unknown format: ${file_path}" >> ${log_file}
+                echo "WARNING: Census \${pathogen_type} file has unknown format: \${file_path}" >> \${log_file}
             fi
         fi
         
-        echo "${output_path}"
+        echo "\${output_path}"
     }
     EOT
 
@@ -129,22 +129,22 @@ process PREPROCESS {
     source handle_census_file.sh
     
     # Handle census bacterial file
-    CENSUS_B=$(handle_census_file "${censusFileB}" "bacterial" "${PWD}/placeholder_census_bacterial.csv" "${outputBase}_warnings.log")
+    CENSUS_B=\$(handle_census_file "${censusFileB}" "bacterial" "${PWD}/placeholder_census_bacterial.csv" "${outputBase}_warnings.log")
     
     # Handle census parasitic file 
-    CENSUS_P=$(handle_census_file "${censusFileP}" "parasitic" "${PWD}/placeholder_census_parasitic.csv" "${outputBase}_warnings.log")
+    CENSUS_P=\$(handle_census_file "${censusFileP}" "parasitic" "${PWD}/placeholder_census_parasitic.csv" "${outputBase}_warnings.log")
     
     # Execute the R preprocessing script with output capturing and proper argument handling
     echo "Using census bacterial file: \${CENSUS_B}" | tee -a ${outputBase}_process.log
     echo "Using census parasitic file: \${CENSUS_P}" | tee -a ${outputBase}_process.log
     
     # Note: tee command duplicates output to both console and log file
-    Rscript ${workflow.projectDir}/bin/calcIR.R \
-      --mmwrFile="${mmwrFile}" \
-      --censusFileB="\${CENSUS_B}" \
-      --censusFileP="\${CENSUS_P}" \
-      --outputFile="${outputBase}.csv" \
-      --generate_metadata=${generateMetadata} \
+    Rscript ${workflow.projectDir}/bin/calcIR.R \\
+      --mmwrFile="${mmwrFile}" \\
+      --censusFileB="\${CENSUS_B}" \\
+      --censusFileP="\${CENSUS_P}" \\
+      --outputFile="${outputBase}.csv" \\
+      --generate_metadata=${generateMetadata} \\
       2>&1 | tee ${outputBase}_R.log
     
     # Verify script created expected output before proceeding
