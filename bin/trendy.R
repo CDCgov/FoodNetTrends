@@ -283,6 +283,14 @@ if (!dir.exists(outDir)) {
   stop("Failed to create output directory: ", outDir)
 }
 
+# Add this function to capture traceback when errors occur
+get_detailed_error <- function(e) {
+  e_message <- conditionMessage(e)
+  e_call <- conditionCall(e)
+  tb <- paste(capture.output(traceback()), collapse="\n")
+  return(paste("Error message:", e_message, "\nCall:", deparse(e_call), "\nTraceback:\n", tb))
+}
+
 # Load discovery data if available
 if (!is.null(metadata) && metadata != "" && file.exists(metadata)) {
   report_progress("SETUP", message=paste("Loading metadata from:", metadata))
@@ -697,14 +705,6 @@ if (!("state" %in% names(census)) || !("year" %in% names(census)) || length(uniq
   cat('DEBUG: Number of records in census:', nrow(census), '\n')
 }
 
-# Add this function to capture traceback when errors occur
-get_detailed_error <- function(e) {
-  e_message <- conditionMessage(e)
-  e_call <- conditionCall(e)
-  tb <- paste(capture.output(traceback()), collapse="\n")
-  return(paste("Error message:", e_message, "\nCall:", deparse(e_call), "\nTraceback:\n", tb))
-}
-
 # Add these lines right before the model fitting section to improve error logging
 report_progress("MODEL", message="Starting model fitting process for pathogen")
 model_success <- FALSE
@@ -1015,28 +1015,26 @@ process_pathogen_cyclospora_style <- function(pathogen_name, mmwrdata, census,
   return(pathogen_model)
 }
 
-# Now, at the very end of the script, add code to call this function
-# and generate output for all pathogens using this robust approach
+# =====================================================================================
+# MAIN EXECUTION CODE - OVERRIDE STANDARD PROCESSING WITH ROBUST CYCLOSPORA-STYLE CODE
+# =====================================================================================
 
-# First, make sure we have a list of pathogens to process
-pathogens_to_analyze <- NULL
 if (!is.null(opts$pathogen)) {
+  # Get the pathogen(s) to analyze
   pathogens_to_analyze <- clean_list(opts$pathogen)
-} else {
-  # Try to extract from mmwrdata
-  pathogens_to_analyze <- unique(mmwrdata$pathogen)
-}
-
-if (length(pathogens_to_analyze) > 0) {
-  report_progress("PROCESSING", message=paste("Processing", length(pathogens_to_analyze), "pathogens with robust approach"))
+  report_progress("MODEL", message=paste("Using robust Cyclospora-style approach for pathogen(s):", 
+                                         paste(pathogens_to_analyze, collapse=", ")))
   
-  # Process each pathogen
-  for (pathogen in pathogens_to_analyze) {
-    report_progress("PROCESSING", message=paste("Starting robust processing for pathogen:", pathogen))
+  # Process each pathogen with the robust approach
+  current_pathogen <- pathogens_to_analyze[1]
+  if (!is.null(current_pathogen) && current_pathogen != "") {
+    report_progress("MODEL", message=paste("NOTE: Using robust Cyclospora-style approach for", current_pathogen, 
+                                           "instead of standard processing"))
     
-    # Process the pathogen using the more robust approach
+    # Process using the more robust approach - this completely bypasses
+    # the standard processing which has been problematic for census data handling
     model <- process_pathogen_cyclospora_style(
-      pathogen_name = pathogen,
+      pathogen_name = current_pathogen,
       mmwrdata = mmwrdata,
       census = census,
       modelcores = modelcores,
@@ -1046,9 +1044,14 @@ if (length(pathogens_to_analyze) > 0) {
       max_treedepth = max_treedepth,
       seed = seed
     )
+    
+    report_progress("COMPLETE", message=paste("Robust Cyclospora-style processing completed for", current_pathogen))
+    
+    # We're done - exit here to avoid running the standard code path
+    # This is intentional to prevent standard processing from overwriting our results
+    report_progress("INFO", message="Exiting script after robust processing")
+    quit(status = 0)
+  } else {
+    report_progress("WARNING", message="No pathogen specified for processing")
   }
-  
-  report_progress("COMPLETE", message="Robust processing completed for all pathogens")
-} else {
-  report_progress("WARNING", message="No pathogens specified for processing")
 }
