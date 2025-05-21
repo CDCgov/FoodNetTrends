@@ -97,8 +97,8 @@ process GENERATE_DASHBOARD {
                         echo "WARNING: Placeholder data detected in unidentified file" >> ${projID}_data_quality.log
                         PATHOGEN_WARNINGS="\$PATHOGEN_WARNINGS\n- UNKNOWN: Uses placeholder data (results NOT suitable for production use)"
                     fi
-                    # Increment counter without command substitution
-                    DATA_QUALITY_WARNINGS=\`expr \$DATA_QUALITY_WARNINGS + 1\`
+                    # Increment counter using shell addition
+                    let DATA_QUALITY_WARNINGS+=1
                     PLACEHOLDER_DATA_FOUND=1
                 fi
             fi
@@ -156,10 +156,17 @@ EOFTEMPLATE
     # Count IR files for data consistency
     echo "" >> ${projID}_data_quality.log
     echo "Checking data consistency..." >> ${projID}_data_quality.log
-    # Count files more safely
+    # Count files more safely with pure shell
     set +e  # Don't fail if no files found
     ls -1 *_IRCatch.csv > ir_files_list.txt 2>/dev/null
-    IR_FILE_COUNT=\`wc -l < ir_files_list.txt 2>/dev/null || echo 0\`
+    if [ -s ir_files_list.txt ]; then
+        IR_FILE_COUNT=0
+        while read -r LINE; do
+            let IR_FILE_COUNT+=1
+        done < ir_files_list.txt
+    else
+        IR_FILE_COUNT=0
+    fi
     set -e
     echo "Found \$IR_FILE_COUNT incidence rate files." >> ${projID}_data_quality.log
     
@@ -187,8 +194,13 @@ EOFTEMPLATE
     
     # Read the count safely, ensuring the file exists
     if [ -f "debuginfo/result_files.txt" ]; then
-        # Count files more safely
-        RESULT_COUNT=\`wc -l < debuginfo/result_files.txt 2>/dev/null || echo 0\`
+        # Count files with pure shell
+        RESULT_COUNT=0
+        if [ -s debuginfo/result_files.txt ]; then
+            while read -r LINE; do
+                let RESULT_COUNT+=1
+            done < debuginfo/result_files.txt
+        fi
         echo "Found \$RESULT_COUNT result files" >> ${projID}_data_quality.log
     else
         echo "Warning: result_files.txt not created properly" >> ${projID}_data_quality.log
