@@ -247,26 +247,27 @@ workflow SPLINE {
     
     // Run dashboard generation after all modeling is complete with better error handling
     if (params.enable_dashboard) {
-        def resultsForDashboard = results.collect()
+        // Collect all result files into a value channel
+        def resultFiles = results.collect()
         
         // Log results being passed to dashboard for debugging
-        log.info "Collected ${resultsForDashboard.size()} result files for dashboard generation:"
-        resultsForDashboard.each { resultFile ->
+        log.info "Collected ${resultFiles.size()} result files for dashboard generation:"
+        resultFiles.each { resultFile ->
             log.info "  Result file: ${resultFile}"
         }
         
         // Instead of `.`, use a real path for resultDir
-        def resultDir = "${params.outdir}/${projID}"
+        def resultDirPath = "${params.outdir}/${projID}"
         
         // Make sure output directory exists
-        new File(resultDir).mkdirs()
+        new File(resultDirPath).mkdirs()
         
-        log.info "Generating dashboard in ${resultDir}"
+        log.info "Generating dashboard in ${resultDirPath}"
         
         // Run the dashboard generator with all available outputs
         GENERATE_DASHBOARD(
-            resultsForDashboard,
-            resultDir,
+            resultFiles,
+            resultDirPath,
             projID,
             dashboardTemplateVal,
             dashboardScriptVal
