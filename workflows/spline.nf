@@ -57,16 +57,24 @@ workflow SPLINE {
     // Check for census bacterial file - REQUIRED
     log.info "Checking for census bacterial file"
     
-    // First priority: Direct user-provided path from params
+    // Direct command-line parameter for census files takes priority
     if (params.censusFileB && !(params.censusFileB instanceof Boolean) && params.censusFileB.toString().trim()) {
         // Valid string path provided
-        censusFileBVal = file(params.censusFileB.toString(), checkIfExists: false)
-        if (censusFileBVal.exists()) {
-            log.info "Using user-provided bacterial census file: ${censusFileBVal}"
-        } else {
-            log.warn "User-provided census bacterial file not found: ${params.censusFileB}"
+        try {
+            def bPath = params.censusFileB.toString().trim()
+            censusFileBVal = file(bPath)
+            if (censusFileBVal.exists()) {
+                log.info "Using user-provided bacterial census file: ${censusFileBVal}"
+            } else {
+                log.warn "User-provided census bacterial file not found: ${bPath}"
+                censusFileBVal = null
+            }
+        } catch (Exception e) {
+            log.warn "Error processing bacterial census file parameter: ${e.message}"
             censusFileBVal = null
         }
+    } else {
+        log.warn "No direct bacterial census file parameter provided"
     }
     
     // Second priority: Check metadata file for census file paths
@@ -81,10 +89,18 @@ workflow SPLINE {
             metadataFile = file("${params.outdir}/${projID}/preprocessed/${projID}_metadata.json", checkIfExists: false)
         }
         
-        if (metadataFile?.exists()) {
+        if (metadataFile != null && metadataFile.exists()) {
             try {
-                def metadataJson = groovy.json.JsonSlurper().parse(metadataFile)
-                if (metadataJson.census_file_bacterial) {
+                log.info "Reading metadata file: ${metadataFile}"
+                def metadataContent = metadataFile.text
+                log.info "Metadata file size: ${metadataContent.size()} bytes"
+                
+                try {
+                    def slurper = new nextflow.util.JsonSlurper()
+                    def metadataJson = slurper.parseText(metadataContent)
+                    
+                    log.info "Successfully parsed metadata JSON"
+                    if (metadataJson.census_file_bacterial) {
                     def bacterialPath = metadataJson.census_file_bacterial
                     def bacterialFile = file(bacterialPath, checkIfExists: false)
                     if (bacterialFile.exists()) {
@@ -96,8 +112,11 @@ workflow SPLINE {
                 } else {
                     log.warn "Metadata doesn't contain bacterial census file path"
                 }
+                } catch (Exception e) {
+                    log.warn "Error parsing metadata JSON: ${e.message}"
+                }
             } catch (Exception e) {
-                log.warn "Could not parse metadata file: ${e.message}"
+                log.warn "Error reading metadata file: ${e.message}"
             }
         }
     }
@@ -110,20 +129,41 @@ workflow SPLINE {
             log.info "Using preprocessed bacterial census file: ${censusFileBVal}"
         }
     }
-    // Try standard locations
+    // Final attempt: Try standard locations
     else {
-        // Try standard locations
+        log.info "Searching standard locations for bacterial census file..."
+        // Look in all possible standard locations with both CSV and SAS formats
         def stdLocations = [
+            // Current project directory locations
             "${workflow.projectDir}/data/census_bacterial.csv",
             "${workflow.projectDir}/assets/census_bacterial.csv",
-            "${workflow.launchDir}/census_bacterial.csv",
+            "${workflow.projectDir}/census_bacterial.csv",
+            "${workflow.projectDir}/data/census_bacterial.sas7bdat",
+            "${workflow.projectDir}/assets/census_bacterial.sas7bdat",
+            "${workflow.projectDir}/census_bacterial.sas7bdat",
+            
+            // User-specified output directory
             "${params.outdir}/census_bacterial.csv",
-            "${workflow.launchDir}/input/census_bacterial.csv",
+            "${params.outdir}/census_bacterial.sas7bdat",
+            "${params.outdir}/data/census_bacterial.csv",
+            "${params.outdir}/data/census_bacterial.sas7bdat",
+            
+            // Launch directory (where nextflow was started)
+            "${workflow.launchDir}/census_bacterial.csv",
+            "${workflow.launchDir}/census_bacterial.sas7bdat",
             "${workflow.launchDir}/data/census_bacterial.csv",
+            "${workflow.launchDir}/data/census_bacterial.sas7bdat",
+            "${workflow.launchDir}/input/census_bacterial.csv",
+            "${workflow.launchDir}/input/census_bacterial.sas7bdat",
             "${workflow.launchDir}/assets/census_bacterial.csv",
-            "${params.outdir}/input/census_bacterial.csv",
+            "${workflow.launchDir}/assets/census_bacterial.sas7bdat",
+            
+            // Generic census file names
             "${workflow.projectDir}/data/FoodNet_census.csv",
-            "${workflow.projectDir}/assets/FoodNet_census.csv"
+            "${workflow.projectDir}/assets/FoodNet_census.csv",
+            "${workflow.launchDir}/data/FoodNet_census.csv",
+            "${workflow.launchDir}/FoodNet_census.csv",
+            "${params.outdir}/FoodNet_census.csv"
         ]
         
         boolean found = false
@@ -145,16 +185,24 @@ workflow SPLINE {
     // Check for parasitic census file - REQUIRED
     log.info "Checking for census parasitic file"
     
-    // First priority: Direct user-provided path from params
+    // Direct command-line parameter for census files takes priority
     if (params.censusFileP && !(params.censusFileP instanceof Boolean) && params.censusFileP.toString().trim()) {
         // Valid string path provided
-        censusFilePVal = file(params.censusFileP.toString(), checkIfExists: false)
-        if (censusFilePVal.exists()) {
-            log.info "Using user-provided parasitic census file: ${censusFilePVal}"
-        } else {
-            log.warn "User-provided census parasitic file not found: ${params.censusFileP}"
+        try {
+            def pPath = params.censusFileP.toString().trim()
+            censusFilePVal = file(pPath)
+            if (censusFilePVal.exists()) {
+                log.info "Using user-provided parasitic census file: ${censusFilePVal}"
+            } else {
+                log.warn "User-provided census parasitic file not found: ${pPath}"
+                censusFilePVal = null
+            }
+        } catch (Exception e) {
+            log.warn "Error processing parasitic census file parameter: ${e.message}"
             censusFilePVal = null
         }
+    } else {
+        log.warn "No direct parasitic census file parameter provided"
     }
     
     // Second priority: Check metadata file for census file paths
@@ -169,10 +217,18 @@ workflow SPLINE {
             metadataFile = file("${params.outdir}/${projID}/preprocessed/${projID}_metadata.json", checkIfExists: false)
         }
         
-        if (metadataFile?.exists()) {
+        if (metadataFile != null && metadataFile.exists()) {
             try {
-                def metadataJson = groovy.json.JsonSlurper().parse(metadataFile)
-                if (metadataJson.census_file_parasitic) {
+                log.info "Reading metadata file for parasitic census: ${metadataFile}"
+                def metadataContent = metadataFile.text
+                log.info "Metadata file size: ${metadataContent.size()} bytes"
+                
+                try {
+                    def slurper = new nextflow.util.JsonSlurper()
+                    def metadataJson = slurper.parseText(metadataContent)
+                    
+                    log.info "Successfully parsed metadata JSON for parasitic census"
+                    if (metadataJson.census_file_parasitic) {
                     def parasiticPath = metadataJson.census_file_parasitic
                     def parasiticFile = file(parasiticPath, checkIfExists: false)
                     if (parasiticFile.exists()) {
@@ -184,8 +240,11 @@ workflow SPLINE {
                 } else {
                     log.warn "Metadata doesn't contain parasitic census file path"
                 }
+                } catch (Exception e) {
+                    log.warn "Error parsing metadata JSON for parasitic census: ${e.message}"
+                }
             } catch (Exception e) {
-                log.warn "Could not parse metadata file for parasitic census: ${e.message}"
+                log.warn "Error reading metadata file for parasitic census: ${e.message}"
             }
         }
     }
@@ -198,20 +257,41 @@ workflow SPLINE {
             log.info "Using preprocessed parasitic census file: ${censusFilePVal}"
         }
     }
-    // Try standard locations
+    // Final attempt: Try standard locations
     else {
-        // Try standard locations
+        log.info "Searching standard locations for parasitic census file..."
+        // Look in all possible standard locations with both CSV and SAS formats
         def stdLocations = [
+            // Current project directory locations
             "${workflow.projectDir}/data/census_parasitic.csv",
             "${workflow.projectDir}/assets/census_parasitic.csv",
-            "${workflow.launchDir}/census_parasitic.csv",
+            "${workflow.projectDir}/census_parasitic.csv",
+            "${workflow.projectDir}/data/census_parasitic.sas7bdat",
+            "${workflow.projectDir}/assets/census_parasitic.sas7bdat",
+            "${workflow.projectDir}/census_parasitic.sas7bdat",
+            
+            // User-specified output directory
             "${params.outdir}/census_parasitic.csv",
-            "${workflow.launchDir}/input/census_parasitic.csv",
+            "${params.outdir}/census_parasitic.sas7bdat",
+            "${params.outdir}/data/census_parasitic.csv",
+            "${params.outdir}/data/census_parasitic.sas7bdat",
+            
+            // Launch directory (where nextflow was started)
+            "${workflow.launchDir}/census_parasitic.csv",
+            "${workflow.launchDir}/census_parasitic.sas7bdat",
             "${workflow.launchDir}/data/census_parasitic.csv",
+            "${workflow.launchDir}/data/census_parasitic.sas7bdat",
+            "${workflow.launchDir}/input/census_parasitic.csv",
+            "${workflow.launchDir}/input/census_parasitic.sas7bdat",
             "${workflow.launchDir}/assets/census_parasitic.csv",
-            "${params.outdir}/input/census_parasitic.csv",
-            "${workflow.projectDir}/data/FoodNet_census.csv",
-            "${workflow.projectDir}/assets/FoodNet_census.csv"
+            "${workflow.launchDir}/assets/census_parasitic.sas7bdat",
+            
+            // Generic census file names - parasitic might use the same as bacterial in some datasets
+            "${workflow.projectDir}/data/FoodNet_census_para.csv",
+            "${workflow.projectDir}/assets/FoodNet_census_para.csv",
+            "${workflow.launchDir}/data/FoodNet_census_para.csv",
+            "${workflow.launchDir}/FoodNet_census_para.csv",
+            "${params.outdir}/FoodNet_census_para.csv"
         ]
         
         boolean found = false
@@ -306,10 +386,17 @@ workflow SPLINE {
             
             // If we have metadata from preprocessing, extract census file paths if available
             try {
-                def metadataJson = groovy.json.JsonSlurper().parse(metadataFromProcess)
+                log.info "Reading metadata from preprocessing: ${metadataFromProcess}"
+                def metadataContent = metadataFromProcess.text
+                log.info "Metadata file size: ${metadataContent.size()} bytes"
                 
-                // Check for bacterial census path
-                if (metadataJson.census_file_bacterial) {
+                try {
+                    def slurper = new nextflow.util.JsonSlurper()
+                    def metadataJson = slurper.parseText(metadataContent)
+                    
+                    log.info "Successfully parsed metadata JSON from preprocessing"
+                    // Check for bacterial census path
+                    if (metadataJson.census_file_bacterial) {
                     def bacterialPath = metadataJson.census_file_bacterial
                     def bacterialFile = file(bacterialPath, checkIfExists: false)
                     if (bacterialFile.exists()) {
@@ -327,8 +414,11 @@ workflow SPLINE {
                         log.info "Updated parasitic census file from preprocessing metadata: ${censusFilePVal}"
                     }
                 }
+                } catch (Exception e) {
+                    log.warn "Error parsing metadata JSON from preprocessing: ${e.message}"
+                }
             } catch (Exception e) {
-                log.warn "Could not extract census paths from metadata: ${e.message}"
+                log.warn "Error reading metadata from preprocessing: ${e.message}"
             }
         } catch (Exception e) {
             log.warn "No metadata file produced from preprocessing step: ${e.message}"
@@ -346,18 +436,48 @@ workflow SPLINE {
         }
     }
     
-    // Validate census files before proceeding
+    // Validate census files before proceeding and provide helpful error messages
     if (censusFileBVal == null || !censusFileBVal.exists()) {
+        log.error """
+        ========================================================================
+        ERROR: Required bacterial census file not found
+        
+        Census files are required for accurate rate calculations.
+        Please ensure the bacterial census file exists and is specified via one of:
+        
+        1. Command-line parameter: --censusFileB "/path/to/census_bacterial.csv"
+        2. Available in metadata from preprocessing
+        3. Located in a standard location (checked multiple paths)
+        
+        The file may be in CSV or SAS7BDAT format.
+        ========================================================================
+        """
         error "A valid bacterial census file (censusFileB) is required but was not found. Please check your parameters."
     }
     
     if (censusFilePVal == null || !censusFilePVal.exists()) {
+        log.error """
+        ========================================================================
+        ERROR: Required parasitic census file not found
+        
+        Census files are required for accurate rate calculations.
+        Please ensure the parasitic census file exists and is specified via one of:
+        
+        1. Command-line parameter: --censusFileP "/path/to/census_parasitic.csv"
+        2. Available in metadata from preprocessing
+        3. Located in a standard location (checked multiple paths)
+        
+        The file may be in CSV or SAS7BDAT format.
+        ========================================================================
+        """
         error "A valid parasitic census file (censusFileP) is required but was not found. Please check your parameters."
     }
     
+    log.info "========== Census File Validation Success ==========="
     log.info "Validated census files for analysis:"
     log.info "  Bacterial census: ${censusFileBVal}"
     log.info "  Parasitic census: ${censusFilePVal}"
+    log.info "====================================================="
     
     // Run TRENDY with input data - properly separate pathogen and mmwrFile
     TRENDY(
