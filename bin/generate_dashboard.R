@@ -42,6 +42,8 @@ parser$add_argument("--title", type = "character", default = "FoodNet Trends Das
                    help = "Dashboard title (default: FoodNet Trends Dashboard)")
 parser$add_argument("--logoPath", type = "character", 
                    help = "Path to logo image file (optional)")
+parser$add_argument("--qualityDataPath", type = "character", 
+                   help = "Path to quality metadata JSON file (optional)")
 
 # Parse arguments with error handling
 tryCatch({
@@ -532,6 +534,44 @@ generate_dashboard <- function() {
     logo_data_url <- embed_image(args$logoPath)
   }
   
+  # Process data quality info
+  quality_data <- NULL
+  if (!is.null(args$qualityDataPath) && file.exists(args$qualityDataPath)) {
+    cat("Processing data quality information...\n")
+    tryCatch({
+      quality_data <- jsonlite::fromJSON(args$qualityDataPath)
+      cat("Found data quality information:\n")
+      cat("  Uses placeholder data: ", quality_data$dataQuality$usesPlaceholderData, "\n")
+      cat("  Affected pathogens: ", paste(quality_data$dataQuality$affectedPathogens, collapse=", "), "\n")
+    }, error = function(e) {
+      cat("WARNING: Error reading quality data file: ", e$message, "\n")
+      quality_data <- NULL
+    })
+  }
+  
+  # Create a special data quality banner if needed
+  quality_banner <- NULL
+  if (!is.null(quality_data) && isTRUE(quality_data$dataQuality$usesPlaceholderData)) {
+    affected <- paste(quality_data$dataQuality$affectedPathogens, collapse=", ")
+    if (length(quality_data$dataQuality$affectedPathogens) > 0) {
+      quality_banner <- paste0(
+        "<div class='quality-warning' id='quality-warning-banner'>",
+        "<h4>⚠️ Data Quality Alert</h4>",
+        "<p>This analysis contains placeholder data for: <strong>", affected, "</strong></p>",
+        "<p>Results using placeholder data are <strong>NOT suitable</strong> for public health decision-making.</p>",
+        "</div>"
+      )
+    } else {
+      quality_banner <- paste0(
+        "<div class='quality-warning' id='quality-warning-banner'>",
+        "<h4>⚠️ Data Quality Alert</h4>",
+        "<p>This analysis contains <strong>placeholder data</strong> which may not represent real-world conditions.</p>",
+        "<p>Results are <strong>NOT suitable</strong> for public health decision-making.</p>",
+        "</div>"
+      )
+    }
+  }
+
   # Create template variables
   template_vars <- list(
     title = args$title,
@@ -543,6 +583,8 @@ generate_dashboard <- function() {
     rr_data = if (is.null(rr_data) || nrow(rr_data) == 0) "[]" else jsonlite::toJSON(rr_data, auto_unbox = TRUE),
     summary_data = if (is.null(summary_data) || length(summary_data) == 0) "[]" else jsonlite::toJSON(summary_data, auto_unbox = TRUE),
     logo_data_url = if (is.null(logo_data_url)) "" else logo_data_url,
+    quality_data = if (is.null(quality_data)) "{}" else jsonlite::toJSON(quality_data, auto_unbox = TRUE),
+    quality_banner = if (is.null(quality_banner)) "" else quality_banner,
     generation_date = format(Sys.time(), "%Y-%m-%d %H:%M:%S")
   )
   
@@ -583,6 +625,11 @@ generate_dashboard <- function() {
       tags$div(class = "dashboard-header",
               tags$h1(args$title),
               tags$p(paste("Generated:", format(Sys.time(), "%Y-%m-%d %H:%M:%S")))),
+      
+      # Add quality warning banner if needed
+      if (!is.null(quality_banner)) {
+        HTML(quality_banner)
+      },
       
       # Add filters and controls
       tags$div(class = "dashboard-controls",
@@ -687,6 +734,12 @@ generate_dashboard <- function() {
       tags$div(class = "dashboard-header",
               tags$h1(args$title),
               tags$p(paste("Generated (with errors):", format(Sys.time(), "%Y-%m-%d %H:%M:%S")))),
+      
+      # Add quality warning banner if needed
+      if (!is.null(quality_banner)) {
+        HTML(quality_banner)
+      },
+      
       tags$div(class = "dashboard-widget error-message",
               tags$h2("Dashboard Generation Error"),
               tags$p(paste("Error creating dashboard widgets:", e$message)),
@@ -896,6 +949,21 @@ generate_dashboard <- function() {
       text-align: center;
     }
     
+    .quality-warning {
+      padding: 15px;
+      background-color: #f8d7da;
+      color: #721c24;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      border: 1px solid #f5c6cb;
+    }
+    
+    .quality-warning h4 {
+      margin-top: 0;
+      margin-bottom: 10px;
+      font-size: 18px;
+    }
+    
     .dashboard-footer {
       margin-top: 40px;
       padding-top: 20px;
@@ -938,6 +1006,7 @@ generate_dashboard <- function() {
       irData: {{ir_data}},
       rrData: {{rr_data}},
       summaryData: {{summary_data}},
+      qualityData: {{quality_data}},
       generationDate: "{{generation_date}}"
     };
     
@@ -959,6 +1028,13 @@ generate_dashboard <- function() {
           document.querySelector(`.tab-content[data-tab="${tabId}"]`).classList.add("active");
         });
       });
+      
+      // Check if we have data quality issues
+      if (dashboardData.qualityData && dashboardData.qualityData.dataQuality && 
+          dashboardData.qualityData.dataQuality.usesPlaceholderData) {
+        console.warn("WARNING: Dashboard contains placeholder data!");
+        document.body.classList.add("has-placeholder-data");
+      }
     });
   </script>
 </body>
@@ -1013,4 +1089,4 @@ result <- tryCatch({
 cat("===============================================================\n")
 cat("Dashboard successfully created at:", result, "\n")
 cat("Open this file in a web browser to view the dashboard\n")
-cat("===============================================================\n") 
+cat("===============================================================\n")
