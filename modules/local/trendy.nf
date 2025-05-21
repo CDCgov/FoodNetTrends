@@ -65,6 +65,9 @@ process TRENDY {
     task.ext.when == null || task.ext.when
     
     script:
+    def mmwrExt = mmwrFile.toString().endsWith('.csv') ? 'csv' : 'sas7bdat'
+    def mmwrIsPreprocessed = mmwrExt == 'csv'
+    def localMmwrFile = "input_data.${mmwrExt}"
     """
     #!/usr/bin/env bash
     set -e  # Exit immediately if a command exits with non-zero status
@@ -94,28 +97,17 @@ process TRENDY {
         error_exit "MMWR data file does not exist: ${mmwrFile}"
     fi
     
-    # Get file extension
-    MMWR_FILE_EXT=""
-    if [[ "${mmwrFile}" == *.csv ]]; then
-        MMWR_FILE_EXT="csv"
-    elif [[ "${mmwrFile}" == *.sas7bdat ]]; then
-        MMWR_FILE_EXT="sas7bdat"
-    else
-        # Default to csv if no recognized extension
-        MMWR_FILE_EXT="csv"
-    fi
-    
-    echo "Using MMWR data file: ${mmwrFile} (${MMWR_FILE_EXT} format)" | tee -a ${pathogen}_trendy.log
+    echo "Using MMWR data file: ${mmwrFile} (${mmwrExt} format)" | tee -a ${pathogen}_trendy.log
     
     # Make a local copy of the MMWR file to handle path issues
-    if ! cp -v "${mmwrFile}" "./input_data.${MMWR_FILE_EXT}"; then
+    if ! cp -v "${mmwrFile}" "${localMmwrFile}"; then
         error_exit "Failed to copy MMWR file - check file permissions and path"
     fi
     
-    echo "Created local copy of MMWR file as: input_data.${MMWR_FILE_EXT}" | tee -a ${pathogen}_trendy.log
+    echo "Created local copy of MMWR file as: ${localMmwrFile}" | tee -a ${pathogen}_trendy.log
     
     # Validate file is not empty
-    if [ ! -s "./input_data.${MMWR_FILE_EXT}" ]; then
+    if [ ! -s "${localMmwrFile}" ]; then
         error_exit "MMWR data file is empty"
     fi
     
@@ -236,18 +228,18 @@ process TRENDY {
     echo "===================================" >> ${pathogen}_trendy.log
     
     # Check local data file copy exists and is readable
-    if [ ! -f "./input_data.${mmwrFile.extension}" ] || [ ! -r "./input_data.${mmwrFile.extension}" ]; then
+    if [ ! -f "${localMmwrFile}" ] || [ ! -r "${localMmwrFile}" ]; then
         # List directory contents for debugging
         ls -la ./ > dir_contents.txt
-        error_exit "Local MMWR data file copy not found or not readable. Original file: ${mmwrFile}, Local copy attempt: ./input_data.${mmwrFile.extension}"
+        error_exit "Local MMWR data file copy not found or not readable. Original file: ${mmwrFile}, Local copy attempt: ${localMmwrFile}"
     fi
     
-    # Add preprocessed flag based on file extension
-    if [ "${mmwrFile.extension}" = "csv" ]; then
-        PREPROC_ARG="--preprocessed=TRUE --cleanFile=./input_data.csv"
+    # Add preprocessed flag based on file type
+    if [ "${mmwrIsPreprocessed}" = "true" ]; then
+        PREPROC_ARG="--preprocessed=TRUE --cleanFile=./${localMmwrFile}"
         echo "Using preprocessed mode for CSV file" >> ${pathogen}_trendy.log
     else
-        PREPROC_ARG="--preprocessed=FALSE --rawFile=./input_data.sas7bdat"
+        PREPROC_ARG="--preprocessed=FALSE --rawFile=./${localMmwrFile}"
         echo "Using raw data mode for SAS file" >> ${pathogen}_trendy.log
     fi
     
@@ -261,7 +253,7 @@ process TRENDY {
     echo "     ANALYSIS SETUP FOR PATHOGEN: ${pathogen}" >> ${pathogen}_data_summary.txt
     echo "====================================================" >> ${pathogen}_data_summary.txt
     echo "Data Sources:" >> ${pathogen}_data_summary.txt
-    echo "  MMWR Data:       ./input_data.${mmwrFile.extension}" >> ${pathogen}_data_summary.txt
+    echo "  MMWR Data:       ${localMmwrFile}" >> ${pathogen}_data_summary.txt
     echo "  Census Data:" >> ${pathogen}_data_summary.txt
     
     # Check census data files and record their status
@@ -329,7 +321,7 @@ process TRENDY {
     # Run the R script with both stderr and stdout captured to a dedicated log file
     Rscript "\${SCRIPT_PATH}" \\
         --pathogen="${pathogen}" \\
-        --mmwrFile="./input_data.${mmwrFile.extension}" \\
+        --mmwrFile="./${localMmwrFile}" \\
         \${CENSUS_B_ARG} \\
         \${CENSUS_P_ARG} \\
         \${PREPROC_ARG} \\
