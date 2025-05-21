@@ -113,33 +113,78 @@ args <- parser$parse_args()
 # Helper Functions
 # ==========================================================================
 
-#' Print progress message with timestamp
-#'
-#' @param stage Stage name
-#' @param message Optional message text
-log_message <- function(stage, message=NULL, ...) {
-  timestamp <- format(Sys.time(), "[%Y-%m-%d %H:%M:%S]")
-  if (!is.null(message)) {
-    cat(sprintf("%s %s: %s\n", timestamp, stage, message), ...)
+#' Source progress tracking utilities
+#' 
+#' This loads the progress tracking system from progress_utils.R
+#' which provides enhanced progress visualization for the pipeline
+tryCatch({
+  # Attempt to source progress utilities
+  script_path <- commandArgs(trailingOnly = FALSE)
+  script_path <- sub("--file=", "", script_path[grep("--file=", script_path)])
+  script_dir <- dirname(script_path)
+  
+  # Try to load progress utilities
+  progress_utils_path <- file.path(script_dir, "progress_utils.R")
+  if (file.exists(progress_utils_path)) {
+    source(progress_utils_path)
+    cat("Progress tracking enabled using milestone-based progress bars\n")
+    has_progress_tracking <- TRUE
   } else {
-    cat(sprintf("%s %s\n", timestamp, stage), ...)
+    # Define fallback log_message function if progress_utils.R is not found
+    log_message <- function(stage, message=NULL, ...) {
+      timestamp <- format(Sys.time(), "[%Y-%m-%d %H:%M:%S]")
+      if (!is.null(message)) {
+        cat(sprintf("%s %s: %s\n", timestamp, stage, message), ...)
+      } else {
+        cat(sprintf("%s %s\n", timestamp, stage), ...)
+      }
+      flush.console()
+    }
+    cat("Progress tracking not available - using basic logging\n")
+    has_progress_tracking <- FALSE
   }
-  flush.console()
-}
+}, error = function(e) {
+  # Define fallback log_message if there's an error loading progress utilities
+  log_message <- function(stage, message=NULL, ...) {
+    timestamp <- format(Sys.time(), "[%Y-%m-%d %H:%M:%S]")
+    if (!is.null(message)) {
+      cat(sprintf("%s %s: %s\n", timestamp, stage, message), ...)
+    } else {
+      cat(sprintf("%s %s\n", timestamp, stage), ...)
+    }
+    flush.console()
+  }
+  cat("Error loading progress tracking:", e$message, "\n")
+  cat("Falling back to basic logging\n")
+  has_progress_tracking <- FALSE
+})
 
 # ==========================================================================
 # Main Analysis
 # ==========================================================================
 
-log_message("SETUP", "Initializing analysis for pathogen: PATHOGEN")
+# Initialize progress tracking if available
 pathogen <- toupper(args$pathogen)
-log_message("CONFIG", paste("Pathogen:", pathogen))
-log_message("CONFIG", paste("MMWR File:", args$mmwrFile))
-log_message("CONFIG", paste("Census Bacterial:", args$censusFileB))
-log_message("CONFIG", paste("Census Parasitic:", args$censusFileP))
-log_message("CONFIG", paste("Travel:", args$travel))
-log_message("CONFIG", paste("CIDT:", args$cidt))
-log_message("CONFIG", paste("Preprocessed:", args$preprocessed))
+if (exists("has_progress_tracking") && has_progress_tracking) {
+  initialize_progress(pathogen)
+  log_progress("SETUP", "Initializing analysis for pathogen", milestone="SETUP")
+  log_progress("CONFIG", paste("Pathogen:", pathogen))
+  log_progress("CONFIG", paste("MMWR File:", args$mmwrFile))
+  log_progress("CONFIG", paste("Census Bacterial:", args$censusFileB))
+  log_progress("CONFIG", paste("Census Parasitic:", args$censusFileP))
+  log_progress("CONFIG", paste("Travel:", args$travel))
+  log_progress("CONFIG", paste("CIDT:", args$cidt))
+  log_progress("CONFIG", paste("Preprocessed:", args$preprocessed))
+} else {
+  log_message("SETUP", "Initializing analysis for pathogen: PATHOGEN")
+  log_message("CONFIG", paste("Pathogen:", pathogen))
+  log_message("CONFIG", paste("MMWR File:", args$mmwrFile))
+  log_message("CONFIG", paste("Census Bacterial:", args$censusFileB))
+  log_message("CONFIG", paste("Census Parasitic:", args$censusFileP))
+  log_message("CONFIG", paste("Travel:", args$travel))
+  log_message("CONFIG", paste("CIDT:", args$cidt))
+  log_message("CONFIG", paste("Preprocessed:", args$preprocessed))
+}
 
 # Convert preprocessed string to logical
 preprocessed <- as.logical(toupper(args$preprocessed))
@@ -150,7 +195,11 @@ set.seed(args$seed)
 # ---- Load Data ----
 
 # Import MMWR data
-log_message("IMPORT", "Loading MMWR data file")
+if (exists("has_progress_tracking") && has_progress_tracking) {
+  log_progress("IMPORT", "Loading MMWR data file", milestone="DATA_LOADING")
+} else {
+  log_message("IMPORT", "Loading MMWR data file")
+}
 mmwrdata <- NULL
 
 tryCatch({
@@ -453,7 +502,11 @@ if (pathogen == "CYCLOSPORA") {
     log_message("DEBUG", paste("Census data year class:", class(censusPdata$year)))
     
     # Join with census data
-    log_message("MODEL", "Joining pathogen counts with census data")
+    if (exists("has_progress_tracking") && has_progress_tracking) {
+      log_progress("MODEL", "Joining pathogen counts with census data", milestone="DATA_JOINING")
+    } else {
+      log_message("MODEL", "Joining pathogen counts with census data")
+    }
     analysis_data <- left_join(pathogen_counts, censusPdata, by = c("state", "year"))
     
     # Handle missing population values
@@ -675,27 +728,64 @@ if (pathogen == "CYCLOSPORA") {
 
 # ---- Fit Bayesian Model ----
 
-log_message("MODEL", "Fitting Bayesian hierarchical model")
+if (exists("has_progress_tracking") && has_progress_tracking) {
+  log_progress("MODEL", "Fitting Bayesian hierarchical model", milestone="MODEL_START")
+} else {
+  log_message("MODEL", "Fitting Bayesian hierarchical model")
+}
 
 # Fit model with error handling
 model_fit <- tryCatch({
   # Set up model formula
   formula <- count ~ s(year) + (1 | state) + offset(log(population))
   
-  # Fit model
-  brm(
-    formula = formula,
-    data = analysis_data,
-    family = "negbinomial",
-    cores = args$cores,
-    chains = args$chains,
-    iter = args$iterations,
-    control = list(
-      adapt_delta = args$adapt_delta,
-      max_treedepth = args$max_treedepth
-    ),
-    seed = args$seed
-  )
+  # Set up MCMC callback for progress tracking
+  if (exists("has_progress_tracking") && has_progress_tracking) {
+    # Define callback function to update progress during MCMC
+    mcmc_progress <- function(iter, chain, ...) {
+      # Update progress every 10% of iterations per chain
+      if (iter %% max(1, round(args$iterations / 10)) == 0) {
+        milestone <- get_model_milestone(iter, args$iterations, chain, args$chains)
+        log_progress("MODEL", sprintf("MCMC chain %d: iteration %d of %d", 
+                                     chain, iter, args$iterations), 
+                    milestone=milestone)
+      }
+      return(TRUE)  # Must return TRUE to continue sampling
+    }
+    
+    # Fit model with progress callback
+    brm(
+      formula = formula,
+      data = analysis_data,
+      family = "negbinomial",
+      cores = args$cores,
+      chains = args$chains,
+      iter = args$iterations,
+      control = list(
+        adapt_delta = args$adapt_delta,
+        max_treedepth = args$max_treedepth
+      ),
+      seed = args$seed,
+      backend = "rstan",  # Must use rstan for refresh
+      refresh = 0,  # Disable default progress to avoid conflicts with our progress bar
+      callback = mcmc_progress
+    )
+  } else {
+    # Fit model without progress tracking
+    brm(
+      formula = formula,
+      data = analysis_data,
+      family = "negbinomial",
+      cores = args$cores,
+      chains = args$chains,
+      iter = args$iterations,
+      control = list(
+        adapt_delta = args$adapt_delta,
+        max_treedepth = args$max_treedepth
+      ),
+      seed = args$seed
+    )
+  }
 }, error = function(e) {
   log_message("ERROR", paste("Model fitting failed:", e$message))
   
@@ -715,14 +805,27 @@ model_fit <- tryCatch({
 })
 
 # Save model to file
+if (exists("has_progress_tracking") && has_progress_tracking) {
+  log_progress("OUTPUT", "Saving model file", milestone="MODEL_COMPLETE")
+} else {
+  log_message("OUTPUT", "Saving model file")
+}
 model_file <- paste0(pathogen, "_brm.Rds")
 saveRDS(model_fit, file = model_file)
-log_message("OUTPUT", paste("Saved model to", model_file))
+if (exists("has_progress_tracking") && has_progress_tracking) {
+  log_progress("OUTPUT", paste("Saved model to", model_file))
+} else {
+  log_message("OUTPUT", paste("Saved model to", model_file))
+}
 
 # ---- Generate Results ----
 
 # Generate incidence rate estimates
-log_message("RESULTS", "Generating incidence rate estimates")
+if (exists("has_progress_tracking") && has_progress_tracking) {
+  log_progress("RESULTS", "Generating incidence rate estimates", milestone="IR_CALCULATION")
+} else {
+  log_message("RESULTS", "Generating incidence rate estimates")
+}
 
 ir_data <- tryCatch({
   # Extract years and states
@@ -794,10 +897,18 @@ ir_data <- tryCatch({
 # Save IR results
 ir_file <- paste0(pathogen, "_IRCatch.csv")
 write.csv(ir_data, file = ir_file, row.names = FALSE)
-log_message("OUTPUT", paste("Saved IR data to", ir_file))
+if (exists("has_progress_tracking") && has_progress_tracking) {
+  log_progress("OUTPUT", paste("Saved IR data to", ir_file))
+} else {
+  log_message("OUTPUT", paste("Saved IR data to", ir_file))
+}
 
 # Generate estimated incidence rate ratio results for different periods
-log_message("RESULTS", "Generating incidence rate ratios")
+if (exists("has_progress_tracking") && has_progress_tracking) {
+  log_progress("RESULTS", "Generating incidence rate ratios", milestone="IRR_CALCULATION")
+} else {
+  log_message("RESULTS", "Generating incidence rate ratios")
+}
 
 # Define comparison periods
 periods <- c("2016_2020", "2018_2022", "2020_2022")
@@ -887,7 +998,11 @@ for (period in periods) {
 
 # ---- Generate Plots ----
 
-log_message("PLOTS", "Generating visualization plots")
+if (exists("has_progress_tracking") && has_progress_tracking) {
+  log_progress("PLOTS", "Generating visualization plots", milestone="VISUALIZATION")
+} else {
+  log_message("PLOTS", "Generating visualization plots")
+}
 
 tryCatch({
   # Create trend plot
@@ -960,7 +1075,11 @@ tryCatch({
 
 # ---- Generate Summary ----
 
-log_message("SUMMARY", "Generating summary report")
+if (exists("has_progress_tracking") && has_progress_tracking) {
+  log_progress("SUMMARY", "Generating summary report", milestone="SUMMARY")
+} else {
+  log_message("SUMMARY", "Generating summary report")
+}
 
 # Create summary file
 summary_file <- paste0(pathogen, "_summary.txt")
@@ -985,7 +1104,11 @@ cat("\n")
 cat("==============================================\n")
 sink()
 
-log_message("OUTPUT", paste("Saved summary to", summary_file))
+if (exists("has_progress_tracking") && has_progress_tracking) {
+  log_progress("OUTPUT", paste("Saved summary to", summary_file))
+} else {
+  log_message("OUTPUT", paste("Saved summary to", summary_file))
+}
 
 # Generate a simple summary file if it doesn't exist already
 # This helps prevent "Missing output file" errors in the pipeline
@@ -1005,4 +1128,8 @@ if (!file.exists(summary_file_path)) {
 }
 
 # Complete
-log_message("COMPLETE", paste("Analysis completed successfully for", pathogen))
+if (exists("has_progress_tracking") && has_progress_tracking) {
+  log_progress("COMPLETE", paste("Analysis completed successfully for", pathogen), milestone="COMPLETE")
+} else {
+  log_message("COMPLETE", paste("Analysis completed successfully for", pathogen))
+}

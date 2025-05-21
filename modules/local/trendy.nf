@@ -111,9 +111,9 @@ process TRENDY {
         error_exit "MMWR data file is empty"
     fi
     
-    # Initialize variable defaults
-    CENSUS_B_ARG="--censusFileB=empty_census_bact.csv"
-    CENSUS_P_ARG="--censusFileP=empty_census_para.csv"
+    # Initialize variable defaults (empty but will be set if required files exist)
+    CENSUS_B_ARG=""
+    CENSUS_P_ARG=""
     PREPROC_ARG=""
     
     # Handle census bacterial file
@@ -145,21 +145,8 @@ process TRENDY {
             CENSUS_B_ARG="--censusFileB=census_bact.csv"
         fi
     else
-        # Create empty placeholder
-        echo "Census bacterial file missing or empty, creating placeholder" >> ${pathogen}_trendy.log
-        echo "state,population,year,pathogentype" > empty_census_bact.csv
-        echo "CA,10000000,2020,Bacterial" >> empty_census_bact.csv
-        echo "CO,5000000,2020,Bacterial" >> empty_census_bact.csv
-        echo "CT,3000000,2020,Bacterial" >> empty_census_bact.csv
-        echo "GA,8000000,2020,Bacterial" >> empty_census_bact.csv
-        echo "MD,5000000,2020,Bacterial" >> empty_census_bact.csv
-        echo "MN,4000000,2020,Bacterial" >> empty_census_bact.csv
-        echo "NM,2000000,2020,Bacterial" >> empty_census_bact.csv
-        echo "NY,15000000,2020,Bacterial" >> empty_census_bact.csv
-        echo "OR,3000000,2020,Bacterial" >> empty_census_bact.csv
-        echo "TN,5000000,2020,Bacterial" >> empty_census_bact.csv
-        chmod 644 empty_census_bact.csv
-        CENSUS_B_ARG="--censusFileB=empty_census_bact.csv"
+        # Census file is required - exit with error
+        error_exit "ERROR: Census bacterial file is required but was missing or empty"
     fi
     
     # Handle census parasitic file
@@ -191,21 +178,8 @@ process TRENDY {
             CENSUS_P_ARG="--censusFileP=census_para.csv"
         fi
     else
-        # Create empty placeholder
-        echo "Census parasitic file missing or empty, creating placeholder" >> ${pathogen}_trendy.log
-        echo "state,population,year,pathogentype" > empty_census_para.csv
-        echo "CA,10000000,2020,Parasitic" >> empty_census_para.csv
-        echo "CO,5000000,2020,Parasitic" >> empty_census_para.csv
-        echo "CT,3000000,2020,Parasitic" >> empty_census_para.csv
-        echo "GA,8000000,2020,Parasitic" >> empty_census_para.csv
-        echo "MD,5000000,2020,Parasitic" >> empty_census_para.csv
-        echo "MN,4000000,2020,Parasitic" >> empty_census_para.csv
-        echo "NM,2000000,2020,Parasitic" >> empty_census_para.csv
-        echo "NY,15000000,2020,Parasitic" >> empty_census_para.csv
-        echo "OR,3000000,2020,Parasitic" >> empty_census_para.csv
-        echo "TN,5000000,2020,Parasitic" >> empty_census_para.csv
-        chmod 644 empty_census_para.csv
-        CENSUS_P_ARG="--censusFileP=empty_census_para.csv"
+        # Census parasitic file is required - exit with error
+        error_exit "ERROR: Census parasitic file is required but was missing or empty"
     fi
     
     # Check data files and log their status
@@ -312,6 +286,15 @@ process TRENDY {
             ls -la ${bin_dir} > script_dir_contents.txt
             error_exit "R script not found. Checked ${bin_dir}/process_pathogen.R and ${bin_dir}/trendy.R"
         fi
+    fi
+    
+    # Copy progress utility file if it exists
+    PROGRESS_UTILS="${bin_dir}/progress_utils.R"
+    if [ -f "\${PROGRESS_UTILS}" ]; then
+        echo "Copying progress tracking utilities..." >> ${pathogen}_trendy.log
+        cp -v "\${PROGRESS_UTILS}" ./ || echo "Warning: Could not copy progress utilities" >> ${pathogen}_trendy.log
+    else
+        echo "Progress tracking utilities not found (this is okay)" >> ${pathogen}_trendy.log
     fi
     
     # Run the pathogen analysis script

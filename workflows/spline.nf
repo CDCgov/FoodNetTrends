@@ -54,7 +54,7 @@ workflow SPLINE {
     def censusFileBVal = null
     def censusFilePVal = null
     
-    // DIRECT APPROACH FOR BACTERIAL CENSUS FILE - NO PLACEHOLDERS
+    // Check for census bacterial file - REQUIRED
     log.info "Checking for census bacterial file"
     
     // First check if a valid census file is available from preprocessing
@@ -70,10 +70,10 @@ workflow SPLINE {
         if (censusFileBVal.exists()) {
             log.info "Using user-provided bacterial census file: ${censusFileBVal}"
         } else {
-            error "Census bacterial file not found: ${params.censusFileB} - PLACEHOLDERS DISABLED"
+            error "Census bacterial file not found: ${params.censusFileB}"
         }
     }
-    // Last option - check standard locations
+    // Try standard locations
     else {
         // Try standard locations
         def stdLocations = [
@@ -101,17 +101,11 @@ workflow SPLINE {
         }
         
         if (!found) {
-            // As a last resort, create a minimal but REAL census file
-            log.warn "No bacterial census file found. Creating a basic census file with real state data."
-            def realCensusContent = "state,population,year,pathogentype\nCA,39538223,2022,Bacterial\nCO,5773714,2022,Bacterial\nCT,3605944,2022,Bacterial\nGA,10711908,2022,Bacterial\nMD,6177224,2022,Bacterial\nMN,5706494,2022,Bacterial\nNM,2117522,2022,Bacterial\nNY,20201249,2022,Bacterial\nOR,4237256,2022,Bacterial\nTN,6910840,2022,Bacterial\n"
-            def realCensusFile = new File("${workflow.launchDir}/census_bacterial_real.csv")
-            realCensusFile.text = realCensusContent
-            censusFileBVal = file(realCensusFile.absolutePath)
-            log.info "Created real bacterial census file at ${censusFileBVal}"
+            error "No bacterial census file found. Please provide a valid census file using --censusFileB parameter."
         }
     }
     
-    // DIRECT APPROACH FOR PARASITIC CENSUS FILE - NO PLACEHOLDERS
+    // Check for parasitic census file - REQUIRED
     log.info "Checking for census parasitic file"
     
     // First check if a valid parasitic census file is available from preprocessing
@@ -127,10 +121,10 @@ workflow SPLINE {
         if (censusFilePVal.exists()) {
             log.info "Using user-provided parasitic census file: ${censusFilePVal}"
         } else {
-            error "Census parasitic file not found: ${params.censusFileP} - PLACEHOLDERS DISABLED"
+            error "Census parasitic file not found: ${params.censusFileP}"
         }
     }
-    // Last option - check standard locations
+    // Try standard locations
     else {
         // Try standard locations
         def stdLocations = [
@@ -158,13 +152,7 @@ workflow SPLINE {
         }
         
         if (!found) {
-            // As a last resort, create a minimal but REAL census file
-            log.warn "No parasitic census file found. Creating a basic census file with real state data."
-            def realCensusContent = "state,population,year,pathogentype\nCA,39538223,2022,Parasitic\nCO,5773714,2022,Parasitic\nCT,3605944,2022,Parasitic\nGA,10711908,2022,Parasitic\nMD,6177224,2022,Parasitic\nMN,5706494,2022,Parasitic\nNM,2117522,2022,Parasitic\nNY,20201249,2022,Parasitic\nOR,4237256,2022,Parasitic\nTN,6910840,2022,Parasitic\n"
-            def realCensusFile = new File("${workflow.launchDir}/census_parasitic_real.csv")
-            realCensusFile.text = realCensusContent
-            censusFilePVal = file(realCensusFile.absolutePath)
-            log.info "Created real parasitic census file at ${censusFilePVal}"
+            error "No parasitic census file found. Please provide a valid census file using --censusFileP parameter."
         }
     }
     
