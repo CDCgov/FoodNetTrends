@@ -200,9 +200,10 @@ workflow SPLINE {
         log.info "Raw data preprocessing complete, proceeding to analysis"
     }
     
-    // Run TRENDY with input data
+    // Run TRENDY with input data - properly separate pathogen and mmwrFile
     TRENDY(
-        pathogens,
+        pathogens.map { pathogen, mmwrFile -> pathogen },  // Just extract pathogen
+        pathogens.map { pathogen, mmwrFile -> mmwrFile },  // Just extract mmwrFile
         censusFileBVal,
         censusFilePVal,
         scripts_pathVal
