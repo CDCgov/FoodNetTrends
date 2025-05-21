@@ -72,9 +72,14 @@ process GENERATE_DASHBOARD {
                         AFFECTED_PATHOGENS="\$AFFECTED_PATHOGENS, \\\"\$PATHOGEN\\\""
                     fi
                     
-                    # Add warning
-                    echo "WARNING: Placeholder data detected for pathogen: \$PATHOGEN" >> ${projID}_data_quality.log
-                    PATHOGEN_WARNINGS="\$PATHOGEN_WARNINGS\n- \$PATHOGEN: Uses placeholder data (results NOT suitable for production use)"
+                    # Add warning - safely handle variable
+                    if [ -n "\$PATHOGEN" ]; then
+                        echo "WARNING: Placeholder data detected for pathogen: \$PATHOGEN" >> ${projID}_data_quality.log
+                        PATHOGEN_WARNINGS="\$PATHOGEN_WARNINGS\n- \$PATHOGEN: Uses placeholder data (results NOT suitable for production use)"
+                    else
+                        echo "WARNING: Placeholder data detected in unidentified file" >> ${projID}_data_quality.log
+                        PATHOGEN_WARNINGS="\$PATHOGEN_WARNINGS\n- UNKNOWN: Uses placeholder data (results NOT suitable for production use)"
+                    fi
                     DATA_QUALITY_WARNINGS=\$((DATA_QUALITY_WARNINGS + 1))
                     PLACEHOLDER_DATA_FOUND=1
                 fi
