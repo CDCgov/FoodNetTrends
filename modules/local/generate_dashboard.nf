@@ -196,9 +196,10 @@ EOFTEMPLATE
 <p>The dashboard generation script was not found. This is a simplified fallback dashboard.</p>
 ERRORTEMPLATE
 
-        # Add dynamic content separately
+        # Add dynamic content separately - avoid direct command substitution
+        CURRENT_DATE=\$(date)
         echo "<p>Project ID: ${projID}</p>" >> ${projID}_dashboard.html
-        echo "<p>Analysis completed at: $(date)</p>" >> ${projID}_dashboard.html
+        echo "<p>Analysis completed at: \$CURRENT_DATE</p>" >> ${projID}_dashboard.html
         
         # Close the HTML
         cat >> ${projID}_dashboard.html << 'ERRORTEMPLATE'
@@ -276,8 +277,9 @@ ERROR_TEMPLATE
             # Add the dynamic project ID separately
             echo "    <p><strong>Project ID:</strong> ${projID}</p>" >> ${projID}_dashboard.html
             
-            # Get and add the date separately
-            echo "    <p><strong>Analysis time:</strong> $(date)</p>" >> ${projID}_dashboard.html
+            # Get and add the date separately - store date in a variable first
+            ANALYSIS_DATE=\$(date)
+            echo "    <p><strong>Analysis time:</strong> \$ANALYSIS_DATE</p>" >> ${projID}_dashboard.html
             
             # Continue with static content
             cat >> ${projID}_dashboard.html << 'ERROR_TEMPLATE'    
@@ -345,8 +347,10 @@ ERROR_TEMPLATE
 ERRORTEMPLATE
 
         # Add the dynamic parts separately to avoid shell expansion issues
+        # Store current date in a variable first
+        COMPLETED_AT=\$(date)
         echo "    <p><strong>Project ID:</strong> ${projID}</p>" >> ${projID}_dashboard.html
-        echo "    <p><strong>Analysis completed at:</strong> $(date)</p>" >> ${projID}_dashboard.html
+        echo "    <p><strong>Analysis completed at:</strong> \$COMPLETED_AT</p>" >> ${projID}_dashboard.html
         
         # Complete the HTML structure
         cat >> ${projID}_dashboard.html << 'ERRORTEMPLATE'    
@@ -372,7 +376,8 @@ ERRORTEMPLATE
         fi
     fi
     
-    # Final note
-    echo "Dashboard generation completed at \$(date)" >> ${projID}_data_quality.log
+    # Final note - store date in a variable first
+    COMPLETION_TIME=\$(date)
+    echo "Dashboard generation completed at \$COMPLETION_TIME" >> ${projID}_data_quality.log
     """
 }
