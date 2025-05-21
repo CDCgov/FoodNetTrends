@@ -62,8 +62,8 @@ process PREPROCESS {
     """
     set -e  # Exit on error to prevent silent failures
     
-    current_date=$(date)
-    echo "Starting preprocessing at $current_date" | tee ${outputBase}_process.log
+    current_date=`date`
+    echo "Starting preprocessing at \$current_date" | tee ${outputBase}_process.log
     echo "Input file: ${mmwrFile}" | tee -a ${outputBase}_process.log
     echo "Census file (bacterial): ${censusFileB}" | tee -a ${outputBase}_process.log
     echo "Census file (parasitic): ${censusFileP}" | tee -a ${outputBase}_process.log
@@ -88,7 +88,7 @@ process PREPROCESS {
             echo "WARNING: Census \${pathogen_type} file missing or empty: \${file_path}" >> \${log_file}
             echo "Creating standardized placeholder for census \${pathogen_type} file" >> \${log_file}
             
-            # Create directory for placeholder file safely
+            # Create directory for placeholder file safely using parameter expansion
             placeholder_dir=\${placeholder_file%/*}
             mkdir -p "\${placeholder_dir}"
             
@@ -126,11 +126,11 @@ process PREPROCESS {
         echo "\${output_path}"
     }
     
-    # Handle census bacterial file
-    CENSUS_B=\$(handle_census_file "${censusFileB}" "bacterial" "${PWD}/placeholder_census_bacterial.csv" "${outputBase}_warnings.log")
+    # Handle census bacterial file - using backticks instead of $()
+    CENSUS_B=`handle_census_file "${censusFileB}" "bacterial" "${PWD}/placeholder_census_bacterial.csv" "${outputBase}_warnings.log"`
     
-    # Handle census parasitic file 
-    CENSUS_P=\$(handle_census_file "${censusFileP}" "parasitic" "${PWD}/placeholder_census_parasitic.csv" "${outputBase}_warnings.log")
+    # Handle census parasitic file - using backticks instead of $()
+    CENSUS_P=`handle_census_file "${censusFileP}" "parasitic" "${PWD}/placeholder_census_parasitic.csv" "${outputBase}_warnings.log"`
     
     # Execute the R preprocessing script with output capturing and proper argument handling
     echo "Using census bacterial file: \${CENSUS_B}" | tee -a ${outputBase}_process.log
@@ -151,7 +151,7 @@ process PREPROCESS {
         exit 1
     fi
     
-    end_date=$(date)
-    echo "Preprocessing completed at $end_date" | tee -a ${outputBase}_process.log
+    end_date=`date`
+    echo "Preprocessing completed at \$end_date" | tee -a ${outputBase}_process.log
     """
 }
