@@ -212,16 +212,14 @@ workflow SPLINE {
     // Extract outputs for downstream use
     model = TRENDY.out.model
     summary = TRENDY.out.summary
-    ir_outputs = TRENDY.out.ir_outputs
-    plots = TRENDY.out.plots
-    irr_outputs = TRENDY.out.irr_outputs
-    dashboard_trendy = TRENDY.out.dashboard
-    logs = TRENDY.out.logs
+    results = TRENDY.out.results
+    figures = TRENDY.out.figures
+    log_files = TRENDY.out.log
     
     // Run dashboard generation after all modeling is complete
     if (params.enable_dashboard) {
         GENERATE_DASHBOARD(
-            ir_outputs.collect(),
+            results.collect(),
             ".",
             projID,
             dashboardTemplateVal,
