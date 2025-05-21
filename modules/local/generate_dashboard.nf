@@ -250,7 +250,12 @@ ERRORTEMPLATE
         echo "Incidence rate files available:" >> ${projID}_data_quality.log
         find . -name "*_IRCatch.csv" -ls >> ${projID}_data_quality.log 2>/dev/null || echo "  None found" >> ${projID}_data_quality.log
         
-        # Run script with error handling and detailed logging - use optimized version
+        # Run script with error handling and detailed logging - use enhanced version
+        echo "About to run enhanced dashboard generator..." >> ${projID}_data_quality.log
+        echo "Script path: ${workflow.projectDir}/bin/generate_dashboard_enhanced.R" >> ${projID}_data_quality.log
+        echo "Working directory: \$(pwd)" >> ${projID}_data_quality.log
+        echo "Available files: \$(ls -la)" >> ${projID}_data_quality.log
+        
         set +e
         Rscript \\
           "${workflow.projectDir}/bin/generate_dashboard_enhanced.R" \\
@@ -261,10 +266,14 @@ ERRORTEMPLATE
           --templateFile="\$TEMPLATE_TO_USE" \\
           --qualityDataPath="${projID}_data_quality.json" \\
           --memoryLimit=14 \\
-          --theme="${params.dashboard_theme}" 2>&1 | tee -a dashboard_generation.log
+          --theme="${params.dashboard_theme}" \\
+          --debug 2>&1 | tee -a dashboard_generation.log
           
         SCRIPT_EXIT_CODE=\$?
         set -e
+        
+        echo "R script exit code: \$SCRIPT_EXIT_CODE" >> ${projID}_data_quality.log
+        echo "Files after R script: \$(ls -la *.html 2>/dev/null || echo 'No HTML files')" >> ${projID}_data_quality.log
         
         # Handle script errors
         if [ \$SCRIPT_EXIT_CODE -ne 0 ]; then
@@ -274,7 +283,7 @@ ERRORTEMPLATE
             
             # Create a more informative fallback dashboard - using a safer approach with multiple parts
             # First create the basic HTML structure
-            cat > ${projID}_dashboard.html << 'ERROR_TEMPLATE'
+            cat > ${projID}_dashboard.html << 'ERRORTEMPLATE'
 <!DOCTYPE html>
 <html>
 <head>
@@ -297,7 +306,7 @@ ERROR_TEMPLATE
             echo "    <p>The dashboard generation script failed with exit code \$SCRIPT_EXIT_CODE.</p>" >> ${projID}_dashboard.html
             
             # Continue with the rest of the template
-            cat >> ${projID}_dashboard.html << 'ERROR_TEMPLATE'
+            cat >> ${projID}_dashboard.html << 'ERRORTEMPLATE'
   </div>
   
   <div class="debug-info">
@@ -311,7 +320,7 @@ ERROR_TEMPLATE
             echo "    <p><strong>Analysis time:</strong> ${currentDate}</p>" >> ${projID}_dashboard.html
             
             # Continue with static content
-            cat >> ${projID}_dashboard.html << 'ERROR_TEMPLATE'    
+            cat >> ${projID}_dashboard.html << 'ERRORTEMPLATE'    
     <h4>Possible solutions:</h4>
     <ul>
       <li>Check that all required result files exist</li>
@@ -329,11 +338,11 @@ ERROR_TEMPLATE
             fi
             
             # Close the HTML structure
-            cat >> ${projID}_dashboard.html << 'ERROR_TEMPLATE'
+            cat >> ${projID}_dashboard.html << 'ERRORTEMPLATE'
   </div>
 </body>
 </html>
-ERROR_TEMPLATE
+ERRORTEMPLATE
         fi
     fi
     
