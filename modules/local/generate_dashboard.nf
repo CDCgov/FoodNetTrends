@@ -1,4 +1,7 @@
 process GENERATE_DASHBOARD {
+    // Add error retry strategy to handle transient failures
+    errorStrategy 'retry'
+    maxRetries 2
     tag "Generate dashboard"
     label 'process_medium'
     shell "/bin/bash"
@@ -15,7 +18,7 @@ process GENERATE_DASHBOARD {
     path "${projID}_dashboard.html", emit: dashboard
     path "${projID}_data_quality.log", optional: true, emit: quality_log
     path "${projID}_data_quality.json", optional: true, emit: quality_json
-    publishDir "${params.outdir}/${params.projID}", mode: params.publish_dir_mode
+    publishDir "${params.outdir}/${projID}", mode: params.publish_dir_mode
 
     script:
     """

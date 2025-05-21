@@ -278,10 +278,19 @@ workflow SPLINE {
         log.info "Generating dashboard in ${dashboardDir}"
         new File(dashboardDir).mkdirs()
         
-        // Pass the TRENDY output channel directly to GENERATE_DASHBOARD
-        // to avoid collecting in the workflow context
+        // Collect all results first and wait until they're all available
+        // This ensures dashboard only runs after ALL TRENDY processes complete
+        TRENDY.out.results
+            .collect()  // This waits for all outputs before proceeding
+            .map { results -> 
+                log.info "All analyses complete (${results.size()} result files). Generating dashboard."
+                return results
+            }
+            .set { all_results }  // Store in a new channel
+            
+        // Now pass the collected results to the dashboard
         GENERATE_DASHBOARD(
-            TRENDY.out.results,  // Pass the channel directly
+            all_results,  // This will wait for ALL results before starting
             dashboardDir,
             projID,
             dashboardTemplateVal,
