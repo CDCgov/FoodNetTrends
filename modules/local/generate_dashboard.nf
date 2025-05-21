@@ -127,6 +127,25 @@ EOF
     # Add to JSON
     sed -i "s/\"dataConsistency\": {}/\"dataConsistency\": {\\n      \\\"incidenceRateFiles\\\": \$IR_FILE_COUNT,\\n      \\\"dataQualityWarnings\\\": \$DATA_QUALITY_WARNINGS\\n    }/" ${projID}_data_quality.json
     
+    # Create temporary debug info for troubleshooting
+    echo "Creating debug information for dashboard generation" >> ${projID}_data_quality.log
+    mkdir -p debuginfo
+    ls -la > debuginfo/directory_listing.txt
+    ls -la ${resultDir} > debuginfo/resultdir_listing.txt 2>/dev/null || echo "Could not list result directory" > debuginfo/resultdir_listing.txt
+    
+    # Collect info about input and result files
+    find . -name "*_IRCatch.csv" -o -name "*_summary.txt" -o -name "*EstIRRCatch*.csv" > debuginfo/result_files.txt
+    echo "Found $(wc -l < debuginfo/result_files.txt) result files" >> ${projID}_data_quality.log
+    
+    # Check for common result files that should exist
+    for PATHOGEN in CAMPYLOBACTER CYCLOSPORA SALMONELLA SHIGELLA; do
+        if ls ${PATHOGEN}_*_IRCatch.csv 1>/dev/null 2>&1; then
+            echo "Found IR files for ${PATHOGEN}" >> debuginfo/file_checks.txt
+        else
+            echo "Missing IR files for ${PATHOGEN}" >> debuginfo/file_checks.txt
+        fi
+    done
+    
     # Generate the dashboard with improved error handling
     echo "Generating dashboard with template: \$TEMPLATE_TO_USE" >> ${projID}_data_quality.log
     
@@ -148,7 +167,22 @@ EOF
 </html>
 EOF
     else
-        # Run script with error handling
+        # Run script with debugging environment and error handling
+        echo "Preparing dashboard data..." >> ${projID}_data_quality.log
+        
+        # Set environment variables to help R script with debugging
+        export R_DEBUG_LEVEL=1
+        export R_LIBS_USER="${params.outdir}/Rlibs"
+        export TRENDY_DEBUG=1
+        
+        # Create directory for R libs if it doesn't exist (helps with permissions)
+        mkdir -p "${params.outdir}/Rlibs" 2>/dev/null
+        
+        # Log which result files we have before running R
+        echo "Incidence rate files available:" >> ${projID}_data_quality.log
+        find . -name "*_IRCatch.csv" -ls >> ${projID}_data_quality.log 2>/dev/null || echo "  None found" >> ${projID}_data_quality.log
+        
+        # Run script with error handling and detailed logging
         set +e
         Rscript \\
           "${dashboardScript}" \\
@@ -157,7 +191,7 @@ EOF
           --outputFile="${projID}_dashboard.html" \\
           --title="FoodNet Trends Analysis: ${projID}" \\
           --templateFile="\$TEMPLATE_TO_USE" \\
-          --qualityDataPath="${projID}_data_quality.json"
+          --qualityDataPath="${projID}_data_quality.json" 2>&1 | tee -a dashboard_generation.log
           
         SCRIPT_EXIT_CODE=\$?
         set -e
@@ -165,40 +199,114 @@ EOF
         # Handle script errors
         if [ \$SCRIPT_EXIT_CODE -ne 0 ]; then
             echo "ERROR: Dashboard generation script failed with exit code \$SCRIPT_EXIT_CODE" >> ${projID}_data_quality.log
-            # Create fallback dashboard
+            # Save the log file for debugging
+            cp dashboard_generation.log debuginfo/
+            
+            # Create a more informative fallback dashboard
             cat > ${projID}_dashboard.html << EOF
 <!DOCTYPE html>
 <html>
-<head><title>FoodNet Trends Dashboard - Error</title></head>
+<head>
+  <title>FoodNet Trends Dashboard - Error</title>
+  <style>
+    body { font-family: Arial, sans-serif; line-height: 1.6; padding: 20px; max-width: 1000px; margin: 0 auto; }
+    .error-banner { background-color: #f8d7da; color: #721c24; padding: 15px; border-radius: 5px; }
+    .debug-info { background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin-top: 20px; }
+    h1 { color: #0066cc; }
+    pre { background-color: #f1f1f1; padding: 10px; overflow-x: auto; }
+  </style>
+</head>
 <body>
-<h1>FoodNet Trends Analysis Dashboard</h1>
-<h2>Error: Script Failed</h2>
-<p>The dashboard generation script failed with exit code \$SCRIPT_EXIT_CODE.</p>
-<p>Analysis completed at: `date`</p>
-<p>Project ID: ${projID}</p>
+  <h1>FoodNet Trends Analysis Dashboard</h1>
+  <div class="error-banner">
+    <h2>Error: Dashboard Generation Failed</h2>
+    <p>The dashboard generation script failed with exit code \$SCRIPT_EXIT_CODE.</p>
+  </div>
+  
+  <div class="debug-info">
+    <h3>Debug Information</h3>
+    <p><strong>Analysis completed at:</strong> `date`</p>
+    <p><strong>Project ID:</strong> ${projID}</p>
+    
+    <h4>Script Errors (Last 10 lines):</h4>
+    <pre>$(tail -n 10 dashboard_generation.log)</pre>
+    
+    <h4>Available Result Files:</h4>
+    <pre>$(find . -name "*_IRCatch.csv" | sort)</pre>
+    
+    <p>Full log information is available in the 'debuginfo' directory.</p>
+    
+    <h4>Possible solutions:</h4>
+    <ul>
+      <li>Check that all required result files exist</li>
+      <li>Verify that the census files are properly formatted</li>
+      <li>Run the workflow with proper input files instead of placeholders</li>
+    </ul>
+  </div>
 </body>
 </html>
 EOF
         fi
     fi
     
-    # Verify dashboard was created
+    # Verify dashboard was created and collect debug info
     if [ ! -f "${projID}_dashboard.html" ]; then
         echo "ERROR: Dashboard file was not created" >> ${projID}_data_quality.log
-        # Create a simple fallback dashboard
+        
+        # Collect diagnostic information
+        echo "Collecting diagnostic information for troubleshooting" >> ${projID}_data_quality.log
+        R --version > debuginfo/r_version.txt 2>&1 || echo "R not available" > debuginfo/r_version.txt
+        env > debuginfo/environment.txt
+        df -h > debuginfo/disk_space.txt
+        
+        # Save R package info if possible
+        Rscript -e "installed.packages()[,c('Package', 'Version')]" > debuginfo/r_packages.txt 2>/dev/null || echo "Cannot list R packages" > debuginfo/r_packages.txt
+        
+        # Create a simple fallback dashboard with diagnostic info
         cat > ${projID}_dashboard.html << EOF
 <!DOCTYPE html>
 <html>
-<head><title>FoodNet Trends Dashboard - Error</title></head>
+<head>
+  <title>FoodNet Trends Dashboard - Error</title>
+  <style>
+    body { font-family: Arial, sans-serif; line-height: 1.6; padding: 20px; max-width: 1000px; margin: 0 auto; }
+    .error-banner { background-color: #f8d7da; color: #721c24; padding: 15px; border-radius: 5px; }
+    .debug-info { background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin-top: 20px; }
+    h1 { color: #0066cc; }
+  </style>
+</head>
 <body>
-<h1>FoodNet Trends Analysis Dashboard</h1>
-<h2>Error: Missing Output</h2>
-<p>The dashboard output file was not created properly.</p>
-<p>Analysis completed at: `date`</p>
-<p>Project ID: ${projID}</p>
+  <h1>FoodNet Trends Analysis Dashboard</h1>
+  <div class="error-banner">
+    <h2>Error: Missing Dashboard Output</h2>
+    <p>The dashboard HTML file was not created properly.</p>
+  </div>
+  
+  <div class="debug-info">
+    <h3>Analysis Information</h3>
+    <p><strong>Analysis completed at:</strong> `date`</p>
+    <p><strong>Project ID:</strong> ${projID}</p>
+    
+    <h4>Diagnostic Information</h4>
+    <p>Diagnostic information has been saved to the 'debuginfo' directory.</p>
+    
+    <h4>Possible solutions:</h4>
+    <ul>
+      <li>Check that all required input files are available</li>
+      <li>Verify that the analysis produced valid result files</li>
+      <li>Run the workflow with proper input files instead of placeholders if applicable</li>
+      <li>Check the disk space and permissions in the output directory</li>
+    </ul>
+  </div>
 </body>
 </html>
 EOF
+    else
+        # Dashboard was created, copy debug info if available
+        if [ -d "debuginfo" ]; then
+            mkdir -p "${params.outdir}/${projID}/debuginfo"
+            cp -r debuginfo/* "${params.outdir}/${projID}/debuginfo/" 2>/dev/null
+        fi
     fi
     
     # Final note
