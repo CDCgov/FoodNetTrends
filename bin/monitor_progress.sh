@@ -26,6 +26,7 @@ MONITOR_DIR="."
 SPECIFIC_PATHOGEN=""
 FOLLOW_MODE=false
 REFRESH_INTERVAL=5
+USE_COLORS=1  # Default to using colors
 
 # Parse command line arguments
 while [[ $# -gt 0 ]]; do
@@ -46,6 +47,20 @@ while [[ $# -gt 0 ]]; do
       REFRESH_INTERVAL="$2"
       shift 2
       ;;
+    --no-color)
+      USE_COLORS=0
+      # Redefine all color variables to be empty
+      RED=''
+      GREEN=''
+      YELLOW=''
+      BLUE=''
+      MAGENTA=''
+      CYAN=''
+      GRAY=''
+      BOLD=''
+      RESET=''
+      shift
+      ;;
     -h|--help)
       echo -e "${BOLD}FoodNet Trends Progress Monitor${RESET}"
       echo
@@ -56,6 +71,7 @@ while [[ $# -gt 0 ]]; do
       echo "  -p, --pathogen NAME Only show progress for specific pathogen"
       echo "  -f, --follow        Continuously update (like 'tail -f')"
       echo "  -i, --interval SEC  Refresh interval in seconds (default: 5)"
+      echo "  --no-color          Disable colored output (useful for non-interactive terminals)"
       echo "  -h, --help          Show this help message"
       echo
       echo "Example:"
@@ -87,6 +103,23 @@ CYAN='\033[0;36m'
 GRAY='\033[0;37m'
 BOLD='\033[1m'
 RESET='\033[0m'
+
+# Check if we're in a terminal that supports colors
+if [ -t 1 ]; then
+  USE_COLORS=1
+else
+  USE_COLORS=0
+  # Redefine all color variables to be empty if not in a terminal
+  RED=''
+  GREEN=''
+  YELLOW=''
+  BLUE=''
+  MAGENTA=''
+  CYAN=''
+  GRAY=''
+  BOLD=''
+  RESET=''
+fi
 
 # Function to get progress color based on percentage
 get_progress_color() {
@@ -133,7 +166,7 @@ display_progress() {
     echo "════════════════════════════════════════════════════════════════════════"
   fi
   
-  # Find all progress files
+  # Find all progress files - use safer approach with pathname expansion
   local progress_files=()
   if [ -n "$SPECIFIC_PATHOGEN" ]; then
     # Look for specific pathogen progress file
@@ -141,8 +174,41 @@ display_progress() {
       progress_files=("$MONITOR_DIR/${SPECIFIC_PATHOGEN}_progress.txt")
     fi
   else
-    # Find all progress files
-    progress_files=($(find "$MONITOR_DIR" -maxdepth 1 -name "*_progress.txt" 2>/dev/null | sort))
+    # Find all progress files using pathname expansion instead of find
+    # This is safer across different environments
+    shopt -s nullglob  # Handle case where no files match
+    progress_files=("$MONITOR_DIR"/*_progress.txt)
+    shopt -u nullglob
+    
+    # Also look in subdirectories (some work dirs have nested structure)
+    if [ "${#progress_files[@]}" -eq 0 ]; then
+      echo "No progress files in current directory, checking subdirectories..."
+      # Try progressive deeper searches until we find something
+      for depth in 2 3 4 5; do
+        echo "Searching with depth $depth..."
+        progress_files=($(find "$MONITOR_DIR" -maxdepth $depth -name "*_progress.txt" 2>/dev/null | sort))
+        if [ "${#progress_files[@]}" -gt 0 ]; then
+          echo "Found ${#progress_files[@]} progress files at depth $depth"
+          break
+        fi
+      done
+      
+      # If still not found, try alternate directories like /tmp and work directories
+      if [ "${#progress_files[@]}" -eq 0 ]; then
+        echo "Checking alternate locations..."
+        for alt_dir in "$MONITOR_DIR/work" "$MONITOR_DIR/*/work" "$MONITOR_DIR/*/*/work" "/tmp"; do
+          if [ -d "$alt_dir" ]; then
+            echo "Checking $alt_dir..."
+            alt_files=($(find "$alt_dir" -maxdepth 2 -name "*_progress.txt" 2>/dev/null | sort))
+            if [ "${#alt_files[@]}" -gt 0 ]; then
+              progress_files=("${alt_files[@]}")
+              echo "Found ${#progress_files[@]} progress files in $alt_dir"
+              break
+            fi
+          fi
+        done
+      fi
+    fi
   fi
   
   # Check if we found any progress files

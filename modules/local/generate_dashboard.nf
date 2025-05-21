@@ -33,12 +33,14 @@ process GENERATE_DASHBOARD {
     echo "" >> ${projID}_data_quality.log
     
     # Initialize JSON structure for data quality metadata
-    # Get ISO date safely with direct assignment
-    ISO_DATE=\$(date -Iseconds)
-    cat > ${projID}_data_quality.json << 'JSONEOF'
+    # Create timestamp for JSON generation date (must be defined outside heredoc)
+    DATETIME=\$(date -Iseconds)
+    
+    # Create the JSON file with a heredoc that allows variable interpolation
+    cat > ${projID}_data_quality.json << EOF
     {
       "projectId": "${projID}",
-      "generationDate": "$ISO_DATE",
+      "generationDate": "\$DATETIME",
       "dataQuality": {
         "usesPlaceholderData": false,
         "affectedPathogens": [],
@@ -46,10 +48,7 @@ process GENERATE_DASHBOARD {
         "dataConsistency": {}
       }
     }
-    JSONEOF
-    
-    # Fix the variables that need to be expanded in the JSON
-    sed -i "s/\$ISO_DATE/\$ISO_DATE/g" ${projID}_data_quality.json
+    EOF
     
     # Check for placeholder data warnings in any result files
     echo "Checking for data quality issues..." >> ${projID}_data_quality.log

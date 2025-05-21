@@ -137,8 +137,47 @@ log_progress <- function(stage, message=NULL, milestone=NULL, ...) {
   elapsed_seconds <- as.numeric(difftime(Sys.time(), progress_state$start_time, units = "secs"))
   elapsed_str <- format_elapsed_time(elapsed_seconds)
   
-  # Create progress file path in the current directory
-  progress_file <- file.path(".", paste0(progress_state$pathogen, "_progress.txt"))
+  # Try multiple directory paths to find a writable location
+  # We'll try current directory, then work subdirectories
+  directories_to_try <- c(
+    ".",                # Try current directory first
+    "./work",          # Try work subdirectory
+    "./logs",          # Try logs subdirectory
+    "/tmp"             # Try temporary directory as last resort
+  )
+  
+  # Try to write to the first writable directory
+  progress_file <- NULL
+  for (dir in directories_to_try) {
+    # Create test filename in this directory
+    test_file <- file.path(dir, paste0("test_", Sys.getpid(), ".txt"))
+    
+    # Check if we can write to this directory
+    can_write <- tryCatch({
+      # Try to write a test file
+      writeLines("test", test_file)
+      # If successful, clean it up
+      if (file.exists(test_file)) file.remove(test_file)
+      TRUE
+    }, error = function(e) {
+      FALSE
+    })
+    
+    if (can_write) {
+      # Use this directory for our progress files
+      progress_file <- file.path(dir, paste0(progress_state$pathogen, "_progress.txt"))
+      log_file <- file.path(dir, paste0(progress_state$pathogen, "_progress_log.txt"))
+      percent_file <- file.path(dir, paste0(progress_state$pathogen, "_percent.txt"))
+      break
+    }
+  }
+  
+  # If we couldn't find a writable directory, default to current directory
+  if (is.null(progress_file)) {
+    progress_file <- paste0(progress_state$pathogen, "_progress.txt")
+    log_file <- paste0(progress_state$pathogen, "_progress_log.txt")
+    percent_file <- paste0(progress_state$pathogen, "_percent.txt")
+  }
   
   # Create progress string if we have a percentage
   progress_str <- ""
@@ -178,9 +217,11 @@ log_progress <- function(stage, message=NULL, milestone=NULL, ...) {
       writeLines(progress_data, progress_file)
       
       # Also write a simple progress status file - only contains percentage (easy to monitor)
-      writeLines(as.character(progress_pct), paste0(progress_state$pathogen, "_percent.txt"))
+      writeLines(as.character(progress_pct), percent_file)
     }, error = function(e) {
-      warning("Could not write progress file: ", e$message)
+      # Silent failure - we don't want to disrupt processing if writing progress fails
+      # Just log to console in case of debugging
+      cat("Note: Could not write progress file: ", e$message, "\n")
     })
   }
   

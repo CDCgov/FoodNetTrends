@@ -414,12 +414,46 @@ workflow SPLINE {
     dashboardTemplateVal = file("${workflow.projectDir}/assets/dashboard_template.html", checkIfExists: false)
     dashboardScriptVal = file("${workflow.projectDir}/bin/generate_dashboard.R", checkIfExists: false)
     
-    // Verify dashboard files exist
+    // Verify dashboard files exist and set fallbacks if needed
     if (!dashboardTemplateVal.exists()) {
         log.warn "Dashboard template file not found: ${dashboardTemplateVal}"
+        // Try alternate locations for template
+        def altTemplates = [
+            file("${workflow.projectDir}/templates/dashboard_template.html", checkIfExists: false),
+            file("${workflow.projectDir}/bin/dashboard_template.html", checkIfExists: false)
+        ]
+        
+        // Use first alternate that exists
+        for (alt in altTemplates) {
+            if (alt.exists()) {
+                log.info "Using alternate dashboard template: ${alt}"
+                dashboardTemplateVal = alt
+                break
+            }
+        }
+        
+        // If still not found, we'll rely on the fallback in generate_dashboard.nf
+        if (!dashboardTemplateVal.exists()) {
+            log.warn "No dashboard template found in any location. Will use built-in fallback."
+        }
     }
+    
     if (!dashboardScriptVal.exists()) {
         log.warn "Dashboard script file not found: ${dashboardScriptVal}"
+        // Try alternate locations for script
+        def altScripts = [
+            file("${workflow.projectDir}/scripts/generate_dashboard.R", checkIfExists: false),
+            file("${workflow.launchDir}/bin/generate_dashboard.R", checkIfExists: false)
+        ]
+        
+        // Use first alternate that exists
+        for (alt in altScripts) {
+            if (alt.exists()) {
+                log.info "Using alternate dashboard script: ${alt}"
+                dashboardScriptVal = alt
+                break
+            }
+        }
     }
     
     // projID was already defined at the top of the workflow to avoid scope issues

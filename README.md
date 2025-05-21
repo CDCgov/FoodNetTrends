@@ -430,6 +430,35 @@ In HPC environments where direct terminal access might be limited, the progress 
 
 The file-based progress tracking ensures visibility into analysis progress regardless of the execution environment.
 
+### Troubleshooting Progress Monitoring
+
+If you're having trouble seeing progress information:
+
+1. **Check Work Directories**: Progress files are created in the Nextflow work directories. Use:
+   ```bash
+   find $(pwd) -name "*_progress.txt" -o -name "*_percent.txt"
+   ```
+   
+2. **Monitor Multiple Directories**: On HPC systems, specify multiple directories to monitor:
+   ```bash
+   ./bin/monitor_progress.sh -d /scicomp/scratch/username/nextflow/work
+   ```
+   
+3. **Increase Search Depth**: Use the recursive option in find command:
+   ```bash
+   find /scicomp/scratch/username/nextflow/work -maxdepth 5 -name "*_progress.txt"
+   ```
+
+4. **Check Permissions**: Ensure that progress files are being created with appropriate permissions:
+   ```bash
+   ls -la $(find . -name "*_progress.txt" | head -1)
+   ```
+
+5. **Terminal Compatibility**: If progress bars appear garbled, use the `--no-color` option to disable colored output.
+   ```bash
+   ./bin/monitor_progress.sh --dir /path/to/work --no-color
+   ```
+
 ## Troubleshooting
 
 | Issue | Solution |
