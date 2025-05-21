@@ -412,7 +412,7 @@ workflow SPLINE {
     // Dashboard templates - required files
     def dashboardTemplateVal, dashboardScriptVal
     dashboardTemplateVal = file("${workflow.projectDir}/assets/dashboard_template.html", checkIfExists: false)
-    dashboardScriptVal = file("${workflow.projectDir}/bin/generate_dashboard.R", checkIfExists: false)
+    dashboardScriptVal = file("${workflow.projectDir}/bin/generate_dashboard_enhanced.R", checkIfExists: false)
     
     // Verify dashboard files exist and set fallbacks if needed
     if (!dashboardTemplateVal.exists()) {
