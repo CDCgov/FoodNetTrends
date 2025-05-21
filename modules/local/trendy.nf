@@ -69,24 +69,60 @@ process TRENDY {
     #!/usr/bin/env bash
     set -e  # Exit immediately if a command exits with non-zero status
     
-    # Setup error handling
+    # Enhanced error handling with logging
     error_exit() {
-        echo "ERROR: \$1" >> ${pathogen}_trendy.log
+        echo "ERROR: \$1" | tee -a "${pathogen}_trendy.log"
+        echo "$(date): Error in TRENDY process for ${pathogen}: \$1" >> "${pathogen}_error_summary.txt"
+        # Create a basic summary file to prevent "missing output" errors in the workflow
+        echo "Error processing ${pathogen}" > "${pathogen}_summary.txt"
+        echo "Error occurred at $(date)" >> "${pathogen}_summary.txt"
+        echo "Error message: \$1" >> "${pathogen}_summary.txt"
         exit 1
     }
+    
+    trap 'error_exit "Command failed with exit code \$?: \$BASH_COMMAND"' ERR
+    
+    # Log start time and resource information
+    echo "Starting TRENDY analysis for ${pathogen} at $(date)" | tee -a "${pathogen}_trendy.log"
+    echo "CPU cores: ${task.cpus}, Memory: ${task.memory}" | tee -a "${pathogen}_trendy.log"
     
     # Initialize variable defaults to ensure they're always defined
     CENSUS_B_ARG="--censusFileB=empty_census_bact.csv"
     CENSUS_P_ARG="--censusFileP=empty_census_para.csv"
     PREPROC_ARG=""
     
-    # Log start of analysis
+    # Log start of analysis with enhanced file checking
     echo "Starting analysis for pathogen: ${pathogen}" > ${pathogen}_trendy.log
-    echo "Using MMWR data file: ${mmwrFile} (${mmwrFile.extension} format)" >> ${pathogen}_trendy.log
     
-    # Make a local copy of the MMWR file to handle path issues
-    cp -v "${mmwrFile}" ./input_data.${mmwrFile.extension} || error_exit "Failed to copy MMWR file"
-    echo "Created local copy of MMWR file as: input_data.${mmwrFile.extension}" >> ${pathogen}_trendy.log
+    # Verify MMWR file exists before proceeding
+    if [ ! -f "${mmwrFile}" ]; then
+        error_exit "MMWR data file does not exist: ${mmwrFile}"
+    fi
+    
+    # Get file extension safely
+    MMWR_FILE_EXT=""
+    if [[ "${mmwrFile}" == *.csv ]]; then
+        MMWR_FILE_EXT="csv"
+    elif [[ "${mmwrFile}" == *.sas7bdat ]]; then
+        MMWR_FILE_EXT="sas7bdat"
+    else
+        # Default to csv if no recognized extension
+        MMWR_FILE_EXT="csv"
+    fi
+    
+    echo "Using MMWR data file: ${mmwrFile} (${MMWR_FILE_EXT} format)" | tee -a ${pathogen}_trendy.log
+    
+    # Make a local copy of the MMWR file to handle path issues - with better error reporting
+    if ! cp -v "${mmwrFile}" "./input_data.${MMWR_FILE_EXT}"; then
+        error_exit "Failed to copy MMWR file - check file permissions and path"
+    fi
+    
+    echo "Created local copy of MMWR file as: input_data.${MMWR_FILE_EXT}" | tee -a ${pathogen}_trendy.log
+    
+    # Validate file is not empty
+    if [ ! -s "./input_data.${MMWR_FILE_EXT}" ]; then
+        error_exit "MMWR data file is empty"
+    fi
     
     # Handle census bacterial file
     if [ -f "${censusBFile}" ] && [ -s "${censusBFile}" ]; then

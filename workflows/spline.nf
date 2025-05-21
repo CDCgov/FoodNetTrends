@@ -136,15 +136,15 @@ workflow SPLINE {
     dashboardTemplateVal = file("${workflow.projectDir}/assets/dashboard_template.html", checkIfExists: false)
     dashboardScriptVal = file("${workflow.projectDir}/bin/generate_dashboard.R", checkIfExists: false)
     
-    // Set default projID if not specified
-    projID = params.projID ?: new Date().format('yyyyMMdd_HHmmss')
+    // Set default projID if not specified - properly declare with def
+    def projID = params.projID ?: new Date().format('yyyyMMdd_HHmmss')
     
     // Create pathogen channel with validated MMWR file
     pathogens = Channel.fromList(pathogenList)
         .map { pathogen -> tuple(pathogen, mmwrFileVal) }
     
-    // Flag for preprocessed data
-    isPreprocessed = params.preprocessed ?: false
+    // Flag for preprocessed data - properly declare with def
+    def isPreprocessed = params.preprocessed ?: false
     
     // Scripts directory path with validation
     def scripts_pathVal
@@ -161,17 +161,17 @@ workflow SPLINE {
     FoodNet Trends Spline Analysis
     ==============================================
     Project ID    : ${projID}
-    MMWR File     : ${mmwrFileVal} (exists: ${mmwrFileVal.exists()})
+    MMWR File     : ${mmwrFileVal} (exists: ${mmwrFileVal?.exists() ?: 'unknown'})
     Preprocessed  : ${isPreprocessed}
     Census Files  : 
-      Bacterial   : ${censusFileBVal} (exists: ${censusFileBVal?.exists()})
-      Parasitic   : ${censusFilePVal} (exists: ${censusFilePVal?.exists()})
-    Travel        : ${params.travel}
-    CIDT          : ${params.cidt}
-    Pathogens     : ${pathogenList.join(', ')}
+      Bacterial   : ${censusFileBVal} (exists: ${censusFileBVal?.exists() ?: 'unknown'})
+      Parasitic   : ${censusFilePVal} (exists: ${censusFilePVal?.exists() ?: 'unknown'})
+    Travel        : ${params.travel ?: 'default'}
+    CIDT          : ${params.cidt ?: 'default'}
+    Pathogens     : ${pathogenList?.join(', ') ?: 'none specified'}
     States        : ${params.states ?: 'all'}
     Output Dir    : ${params.outdir}/${projID}
-    Scripts Dir   : ${scripts_pathVal}
+    Scripts Dir   : ${scripts_pathVal ?: 'unknown'}
     Nextflow Ver  : ${nextflow.version}
     Starting time : ${new Date()}
     ==============================================
@@ -189,15 +189,32 @@ workflow SPLINE {
             true  // Generate metadata
         )
         
-        // Use the preprocessed file for downstream analysis
-        processedFile = PREPROCESS.out.cleanedData.first()
-        metadataFromProcess = PREPROCESS.out.metadata.first()
+        // Use the preprocessed file for downstream analysis with proper error handling
+        def processedFile
+        try {
+            processedFile = PREPROCESS.out.cleanedData.first()
+        } catch (Exception e) {
+            error "Failed to obtain cleaned data file from preprocessing step: ${e.message}"
+        }
         
-        // Create new channel for downstream processes
-        pathogens = Channel.fromList(pathogenList)
-            .map { pathogen -> tuple(pathogen, processedFile) }
+        def metadataFromProcess
+        try {
+            metadataFromProcess = PREPROCESS.out.metadata.first()
+            log.info "Preprocessing generated metadata file: ${metadataFromProcess}"
+        } catch (Exception e) {
+            log.warn "No metadata file produced from preprocessing step: ${e.message}"
+            metadataFromProcess = null
+        }
         
-        log.info "Raw data preprocessing complete, proceeding to analysis"
+        // Create new channel for downstream processes (only if we have valid data)
+        if (processedFile) {
+            pathogens = Channel.fromList(pathogenList)
+                .map { pathogen -> tuple(pathogen, processedFile) }
+            
+            log.info "Raw data preprocessing complete, proceeding to analysis"
+        } else {
+            error "Preprocessing did not produce a valid output file"
+        }
     }
     
     // Run TRENDY with input data - properly separate pathogen and mmwrFile
@@ -228,17 +245,22 @@ workflow SPLINE {
         dashboard = GENERATE_DASHBOARD.out.dashboard
     }
     
-    // Handle workflow completion
-    workflow.onComplete {
+    // Handle workflow completion - using null-safe syntax to avoid NPE
+    workflow.onComplete = {
+        def w = workflow
+        def success = w?.success ?: false
+        def status = success ? 'COMPLETED' : 'FAILED'
+        def now = new Date()
+
         log.info """
         ==============================================
-        FoodNet Trends Analysis: ${workflow.success ? 'COMPLETED' : 'FAILED'}
+        FoodNet Trends Analysis: ${status}
         ==============================================
-        Completed at     : ${new Date()}
-        Duration         : ${workflow.duration}
-        Success          : ${workflow.success}
-        Work directory   : ${workflow.workDir}
-        Exit status      : ${workflow.exitStatus}
+        Completed at     : ${now}
+        Duration         : ${w?.duration ?: 'unknown'}
+        Success          : ${success}
+        Work directory   : ${w?.workDir ?: 'unknown'}
+        Exit status      : ${w?.exitStatus ?: 'unknown'}
         Output directory : ${params.outdir}/${projID}
         ==============================================
         """

@@ -127,17 +127,23 @@ workflow PREPROCESS_WORKFLOW {
         throw e
     }
     
-    // Handle workflow completion
-    workflow.onComplete {
+    // Handle workflow completion - using null-safe syntax to avoid NPE
+    workflow.onComplete = {
+        def w = workflow
+        def success = w?.success ?: false
+        def status = success ? 'COMPLETED' : 'FAILED'
+        def now = new Date()
+
         log.info """
         ==============================================
-        FoodNet Trends Preprocessing: ${workflow.success ? 'COMPLETED' : 'FAILED'}
+        FoodNet Trends Preprocessing: ${status}
         ==============================================
-        Completed at     : ${new Date()}
-        Duration         : ${workflow.duration}
-        Success          : ${workflow.success}
-        Work directory   : ${workflow.workDir}
-        Exit status      : ${workflow.exitStatus}
+        Completed at     : ${now}
+        Duration         : ${w?.duration ?: 'unknown'}
+        Success          : ${success}
+        Work directory   : ${w?.workDir ?: 'unknown'}
+        Exit status      : ${w?.exitStatus ?: 'unknown'}
+        Output path      : ${params.outdir}
         ==============================================
         """
     }

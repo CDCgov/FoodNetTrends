@@ -136,6 +136,12 @@ workflow {
     }
 }
 
+// Add a global onComplete handler with null-safe check
+workflow.onComplete = { 
+    def status = workflow?.success ? 'completed successfully' : 'failed'
+    log.info "FoodNet Trends workflow $status"
+}
+
 // PREPROCESS_ONLY workflow entry point
 workflow PREPROCESS_ONLY {
     try {

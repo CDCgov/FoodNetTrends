@@ -239,7 +239,7 @@ if [[ "$workflow_mode" == "1" ]]; then
     esac
     
     # Run the preprocessing workflow with HPC optimization
-    preprocess_cmd="nextflow run main.nf -profile singularity,production -entry PREPROCESS_WORKFLOW ${preproc_resume_flag} \
+    preprocess_cmd="nextflow run main.nf -profile singularity,production -entry PREPROCESS_ONLY ${preproc_resume_flag} \
       --mmwrFile \"${mmwrFile}\" \
       --censusFileB \"${censusFileB}\" \
       --censusFileP \"${censusFileP}\" \
