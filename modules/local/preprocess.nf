@@ -62,7 +62,7 @@ process PREPROCESS {
     """
     set -e  # Exit on error to prevent silent failures
     
-    echo "Starting preprocessing at \$(date)" | tee ${outputBase}_process.log
+    echo "Starting preprocessing at \\\$(date)" | tee ${outputBase}_process.log
     echo "Input file: ${mmwrFile}" | tee -a ${outputBase}_process.log
     echo "Census file (bacterial): ${censusFileB}" | tee -a ${outputBase}_process.log
     echo "Census file (parasitic): ${censusFileP}" | tee -a ${outputBase}_process.log
@@ -88,7 +88,7 @@ process PREPROCESS {
             echo "Creating standardized placeholder for census \${pathogen_type} file" >> \${log_file}
             
             # Create directory if it doesn't exist
-            mkdir -p "\$(dirname "\${placeholder_file}")"
+            mkdir -p "\\\$(dirname "\${placeholder_file}")"
             
             # Create standardized placeholder file
             echo "state,population,year,pathogentype" > "\${placeholder_file}"
@@ -129,10 +129,10 @@ process PREPROCESS {
     source handle_census_file.sh
     
     # Handle census bacterial file
-    CENSUS_B=\$(handle_census_file "${censusFileB}" "bacterial" "${PWD}/placeholder_census_bacterial.csv" "${outputBase}_warnings.log")
+    CENSUS_B=\\\$(handle_census_file "${censusFileB}" "bacterial" "${PWD}/placeholder_census_bacterial.csv" "${outputBase}_warnings.log")
     
     # Handle census parasitic file 
-    CENSUS_P=\$(handle_census_file "${censusFileP}" "parasitic" "${PWD}/placeholder_census_parasitic.csv" "${outputBase}_warnings.log")
+    CENSUS_P=\\\$(handle_census_file "${censusFileP}" "parasitic" "${PWD}/placeholder_census_parasitic.csv" "${outputBase}_warnings.log")
     
     # Execute the R preprocessing script with output capturing and proper argument handling
     echo "Using census bacterial file: \${CENSUS_B}" | tee -a ${outputBase}_process.log
@@ -153,6 +153,6 @@ process PREPROCESS {
         exit 1
     fi
     
-    echo "Preprocessing completed at \$(date)" | tee -a ${outputBase}_process.log
+    echo "Preprocessing completed at \\\$(date)" | tee -a ${outputBase}_process.log
     """
 }

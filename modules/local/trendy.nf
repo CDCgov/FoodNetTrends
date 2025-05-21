@@ -72,10 +72,10 @@ process TRENDY {
     # Enhanced error handling with logging
     error_exit() {
         echo "ERROR: \$1" | tee -a "${pathogen}_trendy.log"
-        echo "\$(date): Error in TRENDY process for ${pathogen}: \$1" >> "${pathogen}_error_summary.txt"
+        echo "\\\$(date): Error in TRENDY process for ${pathogen}: \$1" >> "${pathogen}_error_summary.txt"
         # Create a basic summary file to prevent "missing output" errors in the workflow
         echo "Error processing ${pathogen}" > "${pathogen}_summary.txt"
-        echo "Error occurred at \$(date)" >> "${pathogen}_summary.txt"
+        echo "Error occurred at \\\$(date)" >> "${pathogen}_summary.txt"
         echo "Error message: \$1" >> "${pathogen}_summary.txt"
         exit 1
     }
@@ -83,7 +83,7 @@ process TRENDY {
     trap 'error_exit "Command failed with exit code \$?: \$BASH_COMMAND"' ERR
     
     # Log start time and resource information
-    echo "Starting TRENDY analysis for ${pathogen} at \$(date)" | tee -a "${pathogen}_trendy.log"
+    echo "Starting TRENDY analysis for ${pathogen} at \\\$(date)" | tee -a "${pathogen}_trendy.log"
     echo "CPU cores: ${task.cpus}, Memory: ${task.memory}" | tee -a "${pathogen}_trendy.log"
     
     # Initialize variable defaults to ensure they're always defined
@@ -130,7 +130,7 @@ process TRENDY {
         echo "Census bacterial file exists: ${censusBFile}" >> ${pathogen}_trendy.log
         
         # Get file extension from basename
-        CENSUS_B_BASENAME=\$(basename "${censusBFile}")
+        CENSUS_B_BASENAME=\\\$(basename "${censusBFile}")
         CENSUS_B_EXT="\${CENSUS_B_BASENAME##*.}"
         echo "Census bacterial file extension: \${CENSUS_B_EXT}" >> ${pathogen}_trendy.log
         
@@ -176,7 +176,7 @@ process TRENDY {
         echo "Census parasitic file exists: ${censusPFile}" >> ${pathogen}_trendy.log
         
         # Get file extension from basename
-        CENSUS_P_BASENAME=\$(basename "${censusPFile}")
+        CENSUS_P_BASENAME=\\\$(basename "${censusPFile}")
         CENSUS_P_EXT="\${CENSUS_P_BASENAME##*.}"
         echo "Census parasitic file extension: \${CENSUS_P_EXT}" >> ${pathogen}_trendy.log
         
@@ -233,7 +233,7 @@ process TRENDY {
         echo "New script not found, falling back to legacy script" >> ${pathogen}_trendy.log
         SCRIPT_PATH="${bin_dir}/trendy.R"
         if [ ! -f "\${SCRIPT_PATH}" ]; then
-            error_exit "R script not found at \${SCRIPT_PATH}. Directory contents of ${bin_dir}: \$(ls -la ${bin_dir})"
+            error_exit "R script not found at \${SCRIPT_PATH}. Directory contents of ${bin_dir}: \\\$(ls -la ${bin_dir})"
         fi
     fi
     
@@ -258,7 +258,7 @@ process TRENDY {
     
     # Check that our local data file copy exists and is readable
     if [ ! -f "./input_data.${mmwrFile.extension}" ] || [ ! -r "./input_data.${mmwrFile.extension}" ]; then
-        error_exit "Local MMWR data file copy not found or not readable. Original file: ${mmwrFile}, Local copy attempt: ./input_data.${mmwrFile.extension}, Current directory contents: \$(ls -la ./)"
+        error_exit "Local MMWR data file copy not found or not readable. Original file: ${mmwrFile}, Local copy attempt: ./input_data.${mmwrFile.extension}, Current directory contents: \\\$(ls -la ./)"
     fi
     
     # Add preprocessed flag based on file extension
@@ -380,7 +380,7 @@ process TRENDY {
     fi
     
     # Check for figures
-    png_count=\$(ls -1 ${pathogen}_*.png 2>/dev/null | wc -l)
+    png_count=\\\$(ls -1 ${pathogen}_*.png 2>/dev/null | wc -l)
     if [ \$png_count -gt 0 ]; then
         echo "SUCCESS: Generated \$png_count visualization files" >> ${pathogen}_data_summary.txt
         ls -la ${pathogen}_*.png >> ${pathogen}_data_summary.txt

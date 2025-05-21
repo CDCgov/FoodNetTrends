@@ -23,7 +23,7 @@ process GENERATE_DASHBOARD {
     echo "=========================================" > ${projID}_data_quality.log
     echo "  FoodNet Trends Data Quality Assessment" >> ${projID}_data_quality.log
     echo "  Project ID: ${projID}" >> ${projID}_data_quality.log
-    echo "  Generated: \$(date)" >> ${projID}_data_quality.log
+    echo "  Generated: \\\$(date)" >> ${projID}_data_quality.log
     echo "=========================================" >> ${projID}_data_quality.log
     echo "" >> ${projID}_data_quality.log
     
@@ -31,7 +31,7 @@ process GENERATE_DASHBOARD {
     cat > ${projID}_data_quality.json << EOF
     {
       "projectId": "${projID}",
-      "generationDate": "\$(date -Iseconds)",
+      "generationDate": "\\\$(date -Iseconds)",
       "dataQuality": {
         "usesPlaceholderData": false,
         "affectedPathogens": [],
@@ -50,7 +50,7 @@ process GENERATE_DASHBOARD {
         find . -maxdepth 1 -name "*.$ext" -type f -exec grep -l "PLACEHOLDER DATA\\|placeholder data\\|SYNTHETIC DATA" {} \\; >> placeholder_files.txt 2>/dev/null || true
     done
     if [ -s placeholder_files.txt ]; then
-        placeholder_files=$(cat placeholder_files.txt)
+        placeholder_files=\\\$(cat placeholder_files.txt)
     fi
     data_quality_warnings=0
     
@@ -61,7 +61,7 @@ process GENERATE_DASHBOARD {
     find . -maxdepth 1 -name "*_data_summary.txt" > summary_files.txt
     while IFS= read -r summary_file; do
         if [ -f "\$summary_file" ]; then
-            pathogen=\$(echo "\$summary_file" | sed 's/_data_summary.txt//')
+            pathogen=\\\$(echo "\$summary_file" | sed 's/_data_summary.txt//')
             if grep -q "PLACEHOLDER DATA\\|placeholder data\\|SYNTHETIC DATA" "\$summary_file"; then
                 if [ -z "\$affected_pathogens" ]; then
                     affected_pathogens="\\\"\$pathogen\\\""
@@ -100,9 +100,22 @@ process GENERATE_DASHBOARD {
             echo "" >> ${projID}_data_quality.log
         fi
         
-        # Create a detailed warning banner for the dashboard with pathogen-specific info
+        # Create a warning banner with simplified approach
         if [ -n "\$pathogen_warnings" ]; then
-            warning_details="<ul style='margin-top:10px;text-align:left;'>\$(echo -e "\$pathogen_warnings" | sed 's/- /<li>/g' | sed 's/\$//<\\/li>/g')</ul>"
+            # Create a temporary HTML file for warnings
+            echo "<ul style='margin-top:10px;text-align:left;'>" > warnings.html
+            # For each warning line, convert to HTML list item
+            echo -e "\$pathogen_warnings" | while read line; do
+                if [ -n "\$line" ]; then
+                    # Remove leading dash if present
+                    clean_line=\${line#- }
+                    # Add as list item
+                    echo "<li>\$clean_line</li>" >> warnings.html
+                fi
+            done
+            echo "</ul>" >> warnings.html
+            # Read the formatted HTML
+            warning_details=\\\$(cat warnings.html)
         else
             warning_details=""
         fi
@@ -154,7 +167,7 @@ EOF
     echo "Checking data consistency..." >> ${projID}_data_quality.log
     
     # Count IR files
-    ir_files=\$(ls -1 *_IRCatch.csv 2>/dev/null | wc -l)
+    ir_files=\\\$(ls -1 *_IRCatch.csv 2>/dev/null | wc -l)
     echo "Found \$ir_files incidence rate files." >> ${projID}_data_quality.log
     
     # Add to JSON
@@ -176,7 +189,7 @@ EOF
 <h1>FoodNet Trends Analysis Dashboard</h1>
 <h2>Error: Script Not Found</h2>
 <p>The dashboard generation script was not found. This is a simplified fallback dashboard.</p>
-<p>Analysis completed at: \$(date)</p>
+<p>Analysis completed at: \\\$(date)</p>
 <p>Project ID: ${projID}</p>
 </body>
 </html>
@@ -212,7 +225,7 @@ EOF
 <h1>FoodNet Trends Analysis Dashboard</h1>
 <h2>Error: Script Failed</h2>
 <p>The dashboard generation script failed with exit code \$r_exit_code.</p>
-<p>Analysis completed at: \$(date)</p>
+<p>Analysis completed at: \\\$(date)</p>
 <p>Project ID: ${projID}</p>
 </body>
 </html>
@@ -235,7 +248,7 @@ EOF
 <h1>FoodNet Trends Analysis Dashboard</h1>
 <h2>Error: Missing Output</h2>
 <p>The dashboard output file was not created properly.</p>
-<p>Analysis completed at: \$(date)</p>
+<p>Analysis completed at: \\\$(date)</p>
 <p>Project ID: ${projID}</p>
 </body>
 </html>
@@ -245,6 +258,6 @@ EOF
     
     # Add note to quality log
     echo "" >> ${projID}_data_quality.log
-    echo "Dashboard generation completed at \$(date)" >> ${projID}_data_quality.log
+    echo "Dashboard generation completed at \\\$(date)" >> ${projID}_data_quality.log
     """
 }
