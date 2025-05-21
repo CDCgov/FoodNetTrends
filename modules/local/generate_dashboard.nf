@@ -250,12 +250,13 @@ EOF
 </html>
 EOF
 
-            # Add runtime information separately to avoid potential issues with command substitution
-            echo "<script>document.getElementsByClassName('debug-info')[0].insertAdjacentHTML('afterbegin', '<p><strong>Analysis time:</strong> $(date)</p>');</script>" >> ${projID}_dashboard.html
+            # Add runtime information separately - properly escaped for Nextflow
+            CURRENT_DATE=\$(date)
+            echo "<script>document.getElementsByClassName('debug-info')[0].insertAdjacentHTML('afterbegin', '<p><strong>Analysis time:</strong> \$CURRENT_DATE</p>');</script>" >> ${projID}_dashboard.html
             
-            # Add error log information
+            # Add error log information - properly escaped for Nextflow
             ERROR_LOG=\$(tail -n 10 dashboard_generation.log 2>/dev/null || echo "No log file available")
-            echo "<script>document.getElementsByClassName('debug-info')[0].insertAdjacentHTML('beforeend', '<h4>Script Errors:</h4><pre>$ERROR_LOG</pre>');</script>" >> ${projID}_dashboard.html
+            echo "<script>document.getElementsByClassName('debug-info')[0].insertAdjacentHTML('beforeend', '<h4>Script Errors:</h4><pre>\$ERROR_LOG</pre>');</script>" >> ${projID}_dashboard.html
         fi
     fi
     
