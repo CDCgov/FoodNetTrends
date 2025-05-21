@@ -29,6 +29,7 @@ if (params.help) {
         --adapt_delta           Adaptation parameter for MCMC
         --max_treedepth         Maximum tree depth for MCMC
         --seed                  Random seed for reproducibility
+        --debug                 Enable debug mode in R scripts (flag parameter)
     """
     System.exit(0)
 }

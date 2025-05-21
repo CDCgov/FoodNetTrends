@@ -239,7 +239,7 @@ process TRENDY {
         --adapt_delta=${params.adapt_delta} \\
         --max_treedepth=${params.max_treedepth} \\
         --seed=${params.seed} \\
-        --debug=${params.debug}
+        ${params.debug ? '--debug' : ''}
     
     # Check return code from R script
     R_STATUS=\$?
