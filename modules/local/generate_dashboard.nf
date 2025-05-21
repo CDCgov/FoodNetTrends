@@ -24,6 +24,8 @@ process GENERATE_DASHBOARD {
 
     script:
     def timestamp = new java.text.SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date())
+    def currentDate = new Date().toString()
+    def isoDate = new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX").format(new Date())
     """
     # Use Nextflow-provided timestamp
     TIMESTAMP='${timestamp}'
@@ -37,13 +39,13 @@ process GENERATE_DASHBOARD {
     echo "  FoodNet Trends Data Quality Assessment" >> ${projID}_data_quality.log
     echo "  Project ID: ${projID}" >> ${projID}_data_quality.log
     # Use Nextflow-provided date
-    echo "  Generated: $(date)" >> ${projID}_data_quality.log
+    echo "  Generated: ${currentDate}" >> ${projID}_data_quality.log
     echo "=========================================" >> ${projID}_data_quality.log
     echo "" >> ${projID}_data_quality.log
     
     # Initialize JSON structure for data quality metadata
-    # Create timestamp for JSON using a simpler format
-    DATETIME="$(date +%Y-%m-%dT%H:%M:%S%z)"
+    # Use Nextflow-provided ISO date format
+    DATETIME="${isoDate}"
     
     # Create the JSON file with a heredoc that allows variable interpolation
     cat > ${projID}_data_quality.json << EOF
@@ -74,8 +76,9 @@ process GENERATE_DASHBOARD {
         while read -r SUMMARY_FILE; do
             if [ -f "\$SUMMARY_FILE" ]; then
                 # Extract pathogen name
-                BASE_NAME=$(basename "\$SUMMARY_FILE")
-                PATHOGEN=$(echo "\$BASE_NAME" | sed 's/_data_summary.txt//')
+                # Extract pathogen name more safely without command substitution
+                BASE_NAME=\${SUMMARY_FILE##*/}
+                PATHOGEN=\${BASE_NAME%_data_summary.txt}
                 
                 # Check for placeholders
                 if grep -q "PLACEHOLDER DATA\\|placeholder data\\|SYNTHETIC DATA" "\$SUMMARY_FILE"; then
@@ -94,7 +97,8 @@ process GENERATE_DASHBOARD {
                         echo "WARNING: Placeholder data detected in unidentified file" >> ${projID}_data_quality.log
                         PATHOGEN_WARNINGS="\$PATHOGEN_WARNINGS\n- UNKNOWN: Uses placeholder data (results NOT suitable for production use)"
                     fi
-                    DATA_QUALITY_WARNINGS=$((DATA_QUALITY_WARNINGS + 1))
+                    # Increment counter without command substitution
+                    DATA_QUALITY_WARNINGS=\`expr \$DATA_QUALITY_WARNINGS + 1\`
                     PLACEHOLDER_DATA_FOUND=1
                 fi
             fi
@@ -152,7 +156,11 @@ EOFTEMPLATE
     # Count IR files for data consistency
     echo "" >> ${projID}_data_quality.log
     echo "Checking data consistency..." >> ${projID}_data_quality.log
-    IR_FILE_COUNT=$(ls -1 *_IRCatch.csv 2>/dev/null | wc -l)
+    # Count files more safely
+    set +e  # Don't fail if no files found
+    ls -1 *_IRCatch.csv > ir_files_list.txt 2>/dev/null
+    IR_FILE_COUNT=\`wc -l < ir_files_list.txt 2>/dev/null || echo 0\`
+    set -e
     echo "Found \$IR_FILE_COUNT incidence rate files." >> ${projID}_data_quality.log
     
     # Add to JSON
@@ -179,7 +187,8 @@ EOFTEMPLATE
     
     # Read the count safely, ensuring the file exists
     if [ -f "debuginfo/result_files.txt" ]; then
-        RESULT_COUNT=$(wc -l < debuginfo/result_files.txt 2>/dev/null || echo 0)
+        # Count files more safely
+        RESULT_COUNT=\`wc -l < debuginfo/result_files.txt 2>/dev/null || echo 0\`
         echo "Found \$RESULT_COUNT result files" >> ${projID}_data_quality.log
     else
         echo "Warning: result_files.txt not created properly" >> ${projID}_data_quality.log
@@ -211,9 +220,9 @@ EOFTEMPLATE
 <p>The dashboard generation script was not found. This is a simplified fallback dashboard.</p>
 ERRORTEMPLATE
 
-        # Add dynamic content directly
+        # Add dynamic content with Nextflow-provided date
         echo "<p>Project ID: ${projID}</p>" >> ${projID}_dashboard.html
-        echo "<p>Analysis completed at: $(date)</p>" >> ${projID}_dashboard.html
+        echo "<p>Analysis completed at: ${currentDate}</p>" >> ${projID}_dashboard.html
         
         # Close the HTML
         cat >> ${projID}_dashboard.html << 'ERRORTEMPLATE'
@@ -292,8 +301,8 @@ ERROR_TEMPLATE
             # Add the dynamic project ID separately
             echo "    <p><strong>Project ID:</strong> ${projID}</p>" >> ${projID}_dashboard.html
             
-            # Add date directly
-            echo "    <p><strong>Analysis time:</strong> $(date)</p>" >> ${projID}_dashboard.html
+            # Add date from Nextflow variable
+            echo "    <p><strong>Analysis time:</strong> ${currentDate}</p>" >> ${projID}_dashboard.html
             
             # Continue with static content
             cat >> ${projID}_dashboard.html << 'ERROR_TEMPLATE'    
@@ -361,9 +370,9 @@ ERROR_TEMPLATE
 ERRORTEMPLATE
 
         # Add the dynamic parts separately to avoid shell expansion issues
-        # Add date directly
+        # Add date from Nextflow variable
         echo "    <p><strong>Project ID:</strong> ${projID}</p>" >> ${projID}_dashboard.html
-        echo "    <p><strong>Analysis completed at:</strong> $(date)</p>" >> ${projID}_dashboard.html
+        echo "    <p><strong>Analysis completed at:</strong> ${currentDate}</p>" >> ${projID}_dashboard.html
         
         # Complete the HTML structure
         cat >> ${projID}_dashboard.html << 'ERRORTEMPLATE'    
@@ -389,8 +398,8 @@ ERRORTEMPLATE
         fi
     fi
     
-    # Final note with direct date
-    echo "Dashboard generation completed at $(date)" >> ${projID}_data_quality.log
+    # Final note with Nextflow-provided date
+    echo "Dashboard generation completed at ${currentDate}" >> ${projID}_data_quality.log
     
     # Make sure the output dashboard exists even if it failed to generate properly
     # Create dashboard with both timestamp and projID to ensure it matches the expected pattern
