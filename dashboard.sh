@@ -24,9 +24,9 @@ echo "Project ID:     $PROJECT_ID"
 echo "Output Directory: $OUTPUT_DIR/$PROJECT_ID"
 echo "Generated at:   $(date)"
 echo "============================================================"
-echo "This script will generate a dashboard for the analysis results"
-echo "located in $OUTPUT_DIR/$PROJECT_ID. It can be used after the"
-echo "main analysis is complete to regenerate or update the dashboard."
+echo "This script will generate an ENHANCED dashboard with interactive"
+echo "visualizations, trend charts, and data tables for the analysis"
+echo "results located in $OUTPUT_DIR/$PROJECT_ID."
 echo "============================================================"
 echo
 
@@ -72,6 +72,7 @@ nextflow run main.nf -entry DASHBOARD_GEN \
   --outdir "$OUTPUT_DIR" \
   --enable_dashboard true \
   --dashboard_title "FoodNet Trends Analysis: $PROJECT_ID" \
+  --dashboard_theme "modern" \
   --publish_dir_mode copy
 
 # Check if dashboard was created

@@ -244,11 +244,7 @@ ERRORTEMPLATE
         
         # Set environment variables to help R script with debugging
         export R_DEBUG_LEVEL=1
-        export R_LIBS_USER="${params.outdir}/Rlibs"
         export TRENDY_DEBUG=1
-        
-        # Create directory for R libs if it doesn't exist (helps with permissions)
-        mkdir -p "${params.outdir}/Rlibs" 2>/dev/null
         
         # Log which result files we have before running R
         echo "Incidence rate files available:" >> ${projID}_data_quality.log
@@ -257,14 +253,15 @@ ERRORTEMPLATE
         # Run script with error handling and detailed logging - use optimized version
         set +e
         Rscript \\
-          "${workflow.projectDir}/bin/generate_dashboard_optimized.R" \\
+          "${workflow.projectDir}/bin/generate_dashboard_enhanced.R" \\
           --outDir="${resultDir}" \\
           --resultDir="${resultDir}" \\
           --outputFile="${projID}_dashboard.html" \\
           --title="FoodNet Trends Analysis: ${projID}" \\
           --templateFile="\$TEMPLATE_TO_USE" \\
           --qualityDataPath="${projID}_data_quality.json" \\
-          --memoryLimit=14 2>&1 | tee -a dashboard_generation.log
+          --memoryLimit=14 \\
+          --theme="${params.dashboard_theme}" 2>&1 | tee -a dashboard_generation.log
           
         SCRIPT_EXIT_CODE=\$?
         set -e
