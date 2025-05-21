@@ -167,13 +167,86 @@ if [[ "$workflow_mode" == "1" ]]; then
     
     echo "Running preprocessing..."
     
-    # Run the preprocessing workflow
-    preprocess_cmd="nextflow run main.nf -profile singularity -entry PREPROCESS_WORKFLOW \
+    # Ask about preprocessing resource allocation
+    echo ""
+    echo "======== Preprocessing Resource Allocation ========"
+    echo "Select resource level for preprocessing:"
+    echo "1) Standard resources (4 cores, 8GB memory)"
+    echo "2) High-performance resources (16 cores, 32GB memory)"
+    echo "3) Maximum resources (32 cores, 64GB memory)"
+    echo "4) Auto-select based on data size"
+    read -p "Enter selection [4]: " preproc_resource
+    preproc_resource=${preproc_resource:-4}
+    
+    # If auto-select, check file size to determine resource allocation
+    if [[ "$preproc_resource" == "4" ]]; then
+        mmwr_size=$(stat -c%s "${mmwrFile}" 2>/dev/null || stat -f%z "${mmwrFile}" 2>/dev/null || echo "0")
+        # Convert to MB
+        mmwr_size_mb=$((mmwr_size / 1024 / 1024))
+        echo "Detected MMWR file size: ${mmwr_size_mb}MB"
+        
+        if [[ $mmwr_size_mb -lt 100 ]]; then
+            # Small file (<100MB)
+            preproc_resource=1
+            echo "Auto-selected: Standard resources for small dataset"
+        elif [[ $mmwr_size_mb -lt 500 ]]; then
+            # Medium file (100MB-500MB)
+            preproc_resource=2
+            echo "Auto-selected: High-performance resources for medium dataset"
+        else
+            # Large file (>500MB)
+            preproc_resource=3
+            echo "Auto-selected: Maximum resources for large dataset"
+        fi
+    fi
+    
+    # Ask if preprocessing should resume a previous run
+    echo ""
+    echo "Resume previous preprocessing if it exists?"
+    echo "1) No, start preprocessing from scratch"
+    echo "2) Yes, resume from last successful step"
+    read -p "Enter selection [1]: " preproc_resume
+    preproc_resume=${preproc_resume:-1}
+    
+    preproc_resume_flag=""
+    if [[ "$preproc_resume" == "2" ]]; then
+        preproc_resume_flag="-resume"
+        echo "Preprocessing will resume from last successful step if possible"
+    fi
+    
+    # Set preprocessing resources based on selection
+    case $preproc_resource in
+        1)  # Standard resources
+            preproc_cores=4
+            preproc_memory="8.GB"
+            echo "Using standard resources for preprocessing"
+            ;;
+        2)  # High-performance resources
+            preproc_cores=16
+            preproc_memory="32.GB"
+            echo "Using high-performance resources for preprocessing"
+            ;;
+        3)  # Maximum resources
+            preproc_cores=32
+            preproc_memory="64.GB"
+            echo "Using maximum resources for preprocessing"
+            ;;
+        *)  # Default to high-performance
+            preproc_cores=16
+            preproc_memory="32.GB"
+            echo "Using high-performance resources for preprocessing"
+            ;;
+    esac
+    
+    # Run the preprocessing workflow with HPC optimization
+    preprocess_cmd="nextflow run main.nf -profile singularity,production -entry PREPROCESS_WORKFLOW ${preproc_resume_flag} \
       --mmwrFile \"${mmwrFile}\" \
       --censusFileB \"${censusFileB}\" \
       --censusFileP \"${censusFileP}\" \
       --outdir \"${preprocessedDir}\" \
       --outputBase \"${outputBase}\" \
+      --cores ${preproc_cores} \
+      -process.memory ${preproc_memory} \
       ${metadata_param}"
     
     echo "$(date): Running preprocessing command: ${preprocess_cmd}" >> "$error_log"
@@ -629,6 +702,11 @@ case $performance_profile in
     5) # Custom Configuration
         echo ""
         echo "======== Custom Resource Configuration ========"
+        echo "IMPORTANT: For optimal performance in HPC environments, ensure:"
+        echo "- Cores should be divisible by chains for optimal parallelization"
+        echo "- Memory allocation should account for Stan's overhead (~0.5-1GB per chain)"
+        echo "- Consider setting higher adapt_delta values (0.95-0.99) for complex models"
+        echo ""
         
         # Get MCMC parameters
         echo "Recommended settings based on pathogen count ($pathogen_count pathogens):"
@@ -666,8 +744,22 @@ case $performance_profile in
         read -p "Number of cores [$default_cores]: " cores
         cores=${cores:-$default_cores}
         
-        # Suggest memory based on cores
-        suggested_memory=$((cores * 2))
+        # Calculate optimal memory based on cores, chains, and iterations
+        optimal_memory=$((cores * 2))
+        chains_memory=$((chains * 1))
+        iterations_factor=$(echo "scale=2; ${iterations}/1000" | bc 2>/dev/null || echo "1")
+        iterations_memory=$(echo "scale=0; ${iterations_factor} * 4" | bc 2>/dev/null || echo "4")
+        
+        # Ensure iterations_memory is a number even if bc fails
+        if ! [[ "$iterations_memory" =~ ^[0-9]+$ ]]; then
+            iterations_memory=4
+        fi
+        
+        # Use the larger of the memory calculations with a minimum of cores*2
+        suggested_memory=$((optimal_memory > chains_memory ? optimal_memory : chains_memory))
+        suggested_memory=$((suggested_memory > iterations_memory ? suggested_memory : iterations_memory))
+        
+        echo "Memory recommendation: Based on cores, chains, and iterations, recommend at least ${suggested_memory}GB"
         read -p "Memory in GB [${suggested_memory}]: " memory_gb
         memory_gb=${memory_gb:-$suggested_memory}
         memory="${memory_gb}.GB"
@@ -729,14 +821,43 @@ dashboard_params="--enable_dashboard true --dashboard_title \"$dashboard_title\"
 # Tell the user what's happening
 echo "Dashboard will be created with title: \"$dashboard_title\""
 
+# Add warning about resource usage for heavy analyses
+if [[ $pathogen_count -gt 4 || $chains -gt 8 || $iterations -gt 3000 ]]; then
+    echo ""
+    echo "====== PERFORMANCE WARNING ======"
+    echo "You have selected a resource-intensive configuration:"
+    echo "- Pathogens: $pathogen_count"
+    echo "- Chains: $chains"
+    echo "- Iterations: $iterations"
+    echo "- Memory: $memory"
+    echo ""
+    echo "This analysis may take considerable time and resources."
+    echo "Consider submitting as a background job and checking logs periodically."
+    echo "==============================="
+    
+    # Default to background mode for very heavy analyses
+    if [[ $background == false && ($chains -gt 12 || $iterations -gt 5000) ]]; then
+        echo "Recommending background execution for this heavy analysis."
+        read -p "Run in background? (y/n) [y]: " bg_recommendation
+        bg_recommendation=${bg_recommendation:-y}
+        if [[ "$bg_recommendation" =~ ^[Yy]$ ]]; then
+            background=true
+            echo "Running in background mode enabled."
+        fi
+    fi
+fi
+
 # Build the command
 cmd="nextflow run main.nf -profile singularity,production"
 if [[ -n "$resume_flag" ]]; then
     cmd="$cmd $resume_flag"
 fi
 
-# Add HPC memory config
+# Add HPC configuration optimizations
 cmd="$cmd -process.memory $memory"
+cmd="$cmd -process.cpus $cores"
+cmd="$cmd -executor.queueSize 100"
+cmd="$cmd -executor.submitRateLimit '10/1min'"
 
 # Only include census file parameters if they have non-empty values
 if [[ -n "${censusFileB}" && "${censusFileB}" != "true" ]]; then
@@ -846,6 +967,51 @@ read -p "Execute command? (y/n) [y]: " execute
 execute=${execute:-y}
 
 if [[ "$execute" =~ ^[Yy]$ ]]; then
+    # Final HPC resource optimization check
+    echo ""
+    echo "========== HPC Resource Validation =========="
+    
+    # Check if cores are divisible by chains for optimal performance
+    if [ $((cores % chains)) -ne 0 ]; then
+        echo "WARNING: Number of cores ($cores) is not divisible by chains ($chains)."
+        echo "For optimal parallelization, consider using a multiple of chains."
+        suggested_cores=$((chains * (cores / chains + 1)))
+        if [ $suggested_cores -le $cores ]; then
+            suggested_cores=$cores
+        fi
+        echo "Suggested correction: $suggested_cores cores"
+        
+        read -p "Adjust cores to $suggested_cores? (y/n) [y]: " adjust_cores
+        adjust_cores=${adjust_cores:-y}
+        if [[ "$adjust_cores" =~ ^[Yy]$ ]]; then
+            cores=$suggested_cores
+            cmd=$(echo "$cmd" | sed "s/--cores [0-9]*/--cores $cores/")
+            echo "Adjusted cores to $cores"
+        fi
+    else
+        echo "OPTIMAL: Cores ($cores) are perfectly divisible by chains ($chains)."
+    fi
+    
+    # Check for optimal memory-to-core ratio on HPC
+    mem_per_core=$(echo "scale=2; ${memory_gb}/${cores}" | bc 2>/dev/null || echo "0")
+    if (( $(echo "$mem_per_core < 1.5" | bc -l 2>/dev/null) )); then
+        echo "WARNING: Memory-to-core ratio may be low (${mem_per_core}GB per core)."
+        echo "HPC environments typically perform best with 2-4GB per core."
+        suggested_memory=$((cores * 2))
+        echo "Suggested memory: ${suggested_memory}GB"
+        
+        read -p "Adjust memory to ${suggested_memory}GB? (y/n) [y]: " adjust_memory
+        adjust_memory=${adjust_memory:-y}
+        if [[ "$adjust_memory" =~ ^[Yy]$ ]]; then
+            memory_gb=$suggested_memory
+            memory="${memory_gb}.GB"
+            cmd=$(echo "$cmd" | sed "s/-process.memory [0-9]*\.[G|M]B/-process.memory $memory/")
+            echo "Adjusted memory to $memory"
+        fi
+    else
+        echo "OPTIMAL: Memory-to-core ratio is good (${mem_per_core}GB per core)."
+    fi
+    
     echo "Starting analysis..."
     echo "$(date): Executing command: $cmd" >> "$error_log"
     
