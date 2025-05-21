@@ -241,39 +241,27 @@ workflow SPLINE {
     figures = TRENDY.out.figures
     log_files = TRENDY.out.log
     
-    // Run dashboard generation after all modeling is complete with better error handling
+    // Run dashboard generation after all modeling is complete
     if (params.enable_dashboard) {
-        // Create a real path for resultDir
-        def resultDirPath = "${params.outdir}/${projID}"
+        // Create the output directory path
+        def dashboardDir = "${params.outdir}/${projID}"
         
         // Make sure output directory exists
-        new File(resultDirPath).mkdirs()
+        log.info "Generating dashboard in ${dashboardDir}"
+        new File(dashboardDir).mkdirs()
         
-        log.info "Generating dashboard in ${resultDirPath}"
+        // Pass the TRENDY output channel directly to GENERATE_DASHBOARD
+        // to avoid collecting in the workflow context
+        GENERATE_DASHBOARD(
+            TRENDY.out.results,  // Pass the channel directly
+            dashboardDir,
+            projID,
+            dashboardTemplateVal,
+            dashboardScriptVal
+        )
         
-        // Collect and handle results in a safe way
-        def resultsList = results.collect()
-        log.info "Found ${resultsList.size()} result files for the dashboard"
-        
-        // Create a check file to verify data is available
-        new File("${resultDirPath}/dashboard.ready").text = "Dashboard data ready for processing: ${new Date()}"
-        
-        // Run the dashboard generator with all available outputs
-        if (resultsList.size() > 0) {
-            GENERATE_DASHBOARD(
-                resultsList,
-                resultDirPath,
-                projID,
-                dashboardTemplateVal,
-                dashboardScriptVal
-            )
-            dashboard = GENERATE_DASHBOARD.out.dashboard
-            
-            // Verify dashboard was created
-            log.info "Dashboard generation process completed, output: ${dashboard}"
-        } else {
-            log.warn "No result files found for dashboard generation - skipping"
-        }
+        // Get dashboard output
+        dashboard = GENERATE_DASHBOARD.out.dashboard
     } else {
         log.info "Dashboard generation disabled, skipping"
     }

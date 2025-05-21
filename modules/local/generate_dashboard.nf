@@ -23,14 +23,15 @@ process GENERATE_DASHBOARD {
     echo "=========================================" > ${projID}_data_quality.log
     echo "  FoodNet Trends Data Quality Assessment" >> ${projID}_data_quality.log
     echo "  Project ID: ${projID}" >> ${projID}_data_quality.log
-    echo "  Generated: `date`" >> ${projID}_data_quality.log
+    # Get date safely with shell function
+    DATE_NOW=\$(date)
+    echo "  Generated: \$DATE_NOW" >> ${projID}_data_quality.log
     echo "=========================================" >> ${projID}_data_quality.log
     echo "" >> ${projID}_data_quality.log
     
     # Initialize JSON structure for data quality metadata
-    # Get ISO date format safely - avoid command substitution issues
-    date -Iseconds > date_iso_format.txt
-    ISO_DATE=`cat date_iso_format.txt`
+    # Get ISO date safely with direct assignment
+    ISO_DATE=\$(date -Iseconds)
     cat > ${projID}_data_quality.json << EOF
     {
       "projectId": "${projID}",
@@ -59,8 +60,8 @@ process GENERATE_DASHBOARD {
         while read -r SUMMARY_FILE; do
             if [ -f "\$SUMMARY_FILE" ]; then
                 # Extract pathogen name
-                BASE_NAME=`basename "\$SUMMARY_FILE"`
-                PATHOGEN=`echo "\$BASE_NAME" | sed 's/_data_summary.txt//'`
+                BASE_NAME=\$(basename "\$SUMMARY_FILE")
+                PATHOGEN=\$(echo "\$BASE_NAME" | sed 's/_data_summary.txt//')
                 
                 # Check for placeholders
                 if grep -q "PLACEHOLDER DATA\\|placeholder data\\|SYNTHETIC DATA" "\$SUMMARY_FILE"; then
@@ -123,7 +124,7 @@ EOF
     # Count IR files for data consistency
     echo "" >> ${projID}_data_quality.log
     echo "Checking data consistency..." >> ${projID}_data_quality.log
-    IR_FILE_COUNT=`ls -1 *_IRCatch.csv 2>/dev/null | wc -l`
+    IR_FILE_COUNT=\$(ls -1 *_IRCatch.csv 2>/dev/null | wc -l)
     echo "Found \$IR_FILE_COUNT incidence rate files." >> ${projID}_data_quality.log
     
     # Add to JSON
@@ -137,7 +138,7 @@ EOF
     
     # Collect info about input and result files
     find . -name "*_IRCatch.csv" -o -name "*_summary.txt" -o -name "*EstIRRCatch*.csv" > debuginfo/result_files.txt
-    RESULT_COUNT=`wc -l < debuginfo/result_files.txt`
+    RESULT_COUNT=\$(wc -l < debuginfo/result_files.txt)
     echo "Found \$RESULT_COUNT result files" >> ${projID}_data_quality.log
     
     # Check for common result files that should exist without using shell variables
@@ -162,7 +163,7 @@ EOF
 <h1>FoodNet Trends Analysis Dashboard</h1>
 <h2>Error: Script Not Found</h2>
 <p>The dashboard generation script was not found. This is a simplified fallback dashboard.</p>
-<p>Analysis completed at: `date`</p>
+<p>Analysis completed at: \$(date)</p>
 <p>Project ID: ${projID}</p>
 </body>
 </html>
@@ -226,14 +227,14 @@ EOF
   
   <div class="debug-info">
     <h3>Debug Information</h3>
-    <p><strong>Analysis completed at:</strong> `date`</p>
+    <p><strong>Analysis completed at:</strong> \$(date)</p>
     <p><strong>Project ID:</strong> ${projID}</p>
     
     <h4>Script Errors (Last 10 lines):</h4>
-    <pre>`tail -n 10 dashboard_generation.log`</pre>
+    <pre>\$(tail -n 10 dashboard_generation.log 2>/dev/null || echo "No log file available")</pre>
     
     <h4>Available Result Files:</h4>
-    <pre>`find . -name "*_IRCatch.csv" | sort`</pre>
+    <pre>\$(find . -name "*_IRCatch.csv" | sort 2>/dev/null || echo "No IR files found")</pre>
     
     <p>Full log information is available in the 'debuginfo' directory.</p>
     
@@ -285,7 +286,7 @@ EOF
   
   <div class="debug-info">
     <h3>Analysis Information</h3>
-    <p><strong>Analysis completed at:</strong> `date`</p>
+    <p><strong>Analysis completed at:</strong> \$(date)</p>
     <p><strong>Project ID:</strong> ${projID}</p>
     
     <h4>Diagnostic Information</h4>
@@ -311,6 +312,6 @@ EOF
     fi
     
     # Final note
-    echo "Dashboard generation completed at `date`" >> ${projID}_data_quality.log
+    echo "Dashboard generation completed at \$(date)" >> ${projID}_data_quality.log
     """
 }
