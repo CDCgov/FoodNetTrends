@@ -50,51 +50,64 @@ workflow SPLINE {
     // Set default projID if not specified - define this FIRST to fix scope issues
     def projID = params.projID ?: new Date().format('yyyyMMdd_HHmmss')
     
-    // Set up census file handling with NO placeholder fallbacks
+    // Set up census file handling with direct parameter priority
     def censusFileBVal = null
     def censusFilePVal = null
     
     // Check for census bacterial file - REQUIRED
     log.info "Checking for census bacterial file"
     
-    // First check if metadata file is available to get census file paths
-    def metadataFile = file("${params.outdir}/${projID}/preprocessed/${projID}_metadata.json", checkIfExists: false)
-    if (metadataFile.exists()) {
-        try {
-            def metadataJson = groovy.json.JsonSlurper().parse(metadataFile)
-            if (metadataJson.census_file_bacterial) {
-                def bacterialPath = metadataJson.census_file_bacterial
-                def bacterialFile = file(bacterialPath, checkIfExists: false)
-                if (bacterialFile.exists()) {
-                    censusFileBVal = bacterialFile
-                    log.info "Using bacterial census file from metadata: ${censusFileBVal}"
-                } else {
-                    log.warn "Bacterial census file in metadata doesn't exist: ${bacterialPath}"
-                }
-            } else {
-                log.warn "Metadata doesn't contain bacterial census file path"
-            }
-        } catch (Exception e) {
-            log.warn "Could not parse metadata file: ${e.message}"
-        }
-    }
-    
-    // If not found in metadata, check for standard preprocessed file
-    if (censusFileBVal == null) {
-        def preprocessedBacterialFile = file("${params.outdir}/${projID}/preprocessed/census_bacterial.csv", checkIfExists: false)
-        if (preprocessedBacterialFile.exists()) {
-            censusFileBVal = preprocessedBacterialFile
-            log.info "Using preprocessed bacterial census file: ${censusFileBVal}"
-        }
-    }
-    // Next check direct user-provided path
-    else if (params.censusFileB && !(params.censusFileB instanceof Boolean) && params.censusFileB.toString().trim()) {
+    // First priority: Direct user-provided path from params
+    if (params.censusFileB && !(params.censusFileB instanceof Boolean) && params.censusFileB.toString().trim()) {
         // Valid string path provided
         censusFileBVal = file(params.censusFileB.toString(), checkIfExists: false)
         if (censusFileBVal.exists()) {
             log.info "Using user-provided bacterial census file: ${censusFileBVal}"
         } else {
-            error "Census bacterial file not found: ${params.censusFileB}"
+            log.warn "User-provided census bacterial file not found: ${params.censusFileB}"
+            censusFileBVal = null
+        }
+    }
+    
+    // Second priority: Check metadata file for census file paths
+    if (censusFileBVal == null) {
+        // First check if user provided a metadata path
+        def metadataFile = null
+        if (params.metadata && !(params.metadata instanceof Boolean) && params.metadata.toString().trim()) {
+            metadataFile = file(params.metadata.toString(), checkIfExists: false)
+            log.info "Using user-provided metadata file: ${metadataFile}"
+        } else {
+            // Otherwise check default location
+            metadataFile = file("${params.outdir}/${projID}/preprocessed/${projID}_metadata.json", checkIfExists: false)
+        }
+        
+        if (metadataFile?.exists()) {
+            try {
+                def metadataJson = groovy.json.JsonSlurper().parse(metadataFile)
+                if (metadataJson.census_file_bacterial) {
+                    def bacterialPath = metadataJson.census_file_bacterial
+                    def bacterialFile = file(bacterialPath, checkIfExists: false)
+                    if (bacterialFile.exists()) {
+                        censusFileBVal = bacterialFile
+                        log.info "Using bacterial census file from metadata: ${censusFileBVal}"
+                    } else {
+                        log.warn "Bacterial census file in metadata doesn't exist: ${bacterialPath}"
+                    }
+                } else {
+                    log.warn "Metadata doesn't contain bacterial census file path"
+                }
+            } catch (Exception e) {
+                log.warn "Could not parse metadata file: ${e.message}"
+            }
+        }
+    }
+    
+    // Third priority: Check for standard preprocessed file
+    if (censusFileBVal == null) {
+        def preprocessedBacterialFile = file("${params.outdir}/${projID}/preprocessed/census_bacterial.csv", checkIfExists: false)
+        if (preprocessedBacterialFile.exists()) {
+            censusFileBVal = preprocessedBacterialFile
+            log.info "Using preprocessed bacterial census file: ${censusFileBVal}"
         }
     }
     // Try standard locations
@@ -132,43 +145,57 @@ workflow SPLINE {
     // Check for parasitic census file - REQUIRED
     log.info "Checking for census parasitic file"
     
-    // First check if metadata file is available to get census file paths
-    if (metadataFile?.exists()) {
-        try {
-            def metadataJson = groovy.json.JsonSlurper().parse(metadataFile)
-            if (metadataJson.census_file_parasitic) {
-                def parasiticPath = metadataJson.census_file_parasitic
-                def parasiticFile = file(parasiticPath, checkIfExists: false)
-                if (parasiticFile.exists()) {
-                    censusFilePVal = parasiticFile
-                    log.info "Using parasitic census file from metadata: ${censusFilePVal}"
-                } else {
-                    log.warn "Parasitic census file in metadata doesn't exist: ${parasiticPath}"
-                }
-            } else {
-                log.warn "Metadata doesn't contain parasitic census file path"
-            }
-        } catch (Exception e) {
-            log.warn "Could not parse metadata file for parasitic census: ${e.message}"
-        }
-    }
-    
-    // If not found in metadata, check for standard preprocessed file
-    if (censusFilePVal == null) {
-        def preprocessedParasiticFile = file("${params.outdir}/${projID}/preprocessed/census_parasitic.csv", checkIfExists: false)
-        if (preprocessedParasiticFile.exists()) {
-            censusFilePVal = preprocessedParasiticFile
-            log.info "Using preprocessed parasitic census file: ${censusFilePVal}"
-        }
-    }
-    // Next check direct user-provided path
-    else if (params.censusFileP && !(params.censusFileP instanceof Boolean) && params.censusFileP.toString().trim()) {
+    // First priority: Direct user-provided path from params
+    if (params.censusFileP && !(params.censusFileP instanceof Boolean) && params.censusFileP.toString().trim()) {
         // Valid string path provided
         censusFilePVal = file(params.censusFileP.toString(), checkIfExists: false)
         if (censusFilePVal.exists()) {
             log.info "Using user-provided parasitic census file: ${censusFilePVal}"
         } else {
-            error "Census parasitic file not found: ${params.censusFileP}"
+            log.warn "User-provided census parasitic file not found: ${params.censusFileP}"
+            censusFilePVal = null
+        }
+    }
+    
+    // Second priority: Check metadata file for census file paths
+    if (censusFilePVal == null) {
+        // First check if user provided a metadata path
+        def metadataFile = null
+        if (params.metadata && !(params.metadata instanceof Boolean) && params.metadata.toString().trim()) {
+            metadataFile = file(params.metadata.toString(), checkIfExists: false)
+            log.info "Using user-provided metadata file for parasitic census: ${metadataFile}"
+        } else {
+            // Otherwise check default location
+            metadataFile = file("${params.outdir}/${projID}/preprocessed/${projID}_metadata.json", checkIfExists: false)
+        }
+        
+        if (metadataFile?.exists()) {
+            try {
+                def metadataJson = groovy.json.JsonSlurper().parse(metadataFile)
+                if (metadataJson.census_file_parasitic) {
+                    def parasiticPath = metadataJson.census_file_parasitic
+                    def parasiticFile = file(parasiticPath, checkIfExists: false)
+                    if (parasiticFile.exists()) {
+                        censusFilePVal = parasiticFile
+                        log.info "Using parasitic census file from metadata: ${censusFilePVal}"
+                    } else {
+                        log.warn "Parasitic census file in metadata doesn't exist: ${parasiticPath}"
+                    }
+                } else {
+                    log.warn "Metadata doesn't contain parasitic census file path"
+                }
+            } catch (Exception e) {
+                log.warn "Could not parse metadata file for parasitic census: ${e.message}"
+            }
+        }
+    }
+    
+    // Third priority: Check for standard preprocessed file
+    if (censusFilePVal == null) {
+        def preprocessedParasiticFile = file("${params.outdir}/${projID}/preprocessed/census_parasitic.csv", checkIfExists: false)
+        if (preprocessedParasiticFile.exists()) {
+            censusFilePVal = preprocessedParasiticFile
+            log.info "Using preprocessed parasitic census file: ${censusFilePVal}"
         }
     }
     // Try standard locations
@@ -273,6 +300,10 @@ workflow SPLINE {
             metadataFromProcess = PREPROCESS.out.metadata.first()
             log.info "Preprocessing generated metadata file: ${metadataFromProcess}"
             
+            // Store metadata path for future reference
+            params.metadata = metadataFromProcess.toString()
+            log.info "Setting metadata parameter to: ${params.metadata}"
+            
             // If we have metadata from preprocessing, extract census file paths if available
             try {
                 def metadataJson = groovy.json.JsonSlurper().parse(metadataFromProcess)
@@ -314,6 +345,19 @@ workflow SPLINE {
             error "Preprocessing did not produce a valid output file"
         }
     }
+    
+    // Validate census files before proceeding
+    if (censusFileBVal == null || !censusFileBVal.exists()) {
+        error "A valid bacterial census file (censusFileB) is required but was not found. Please check your parameters."
+    }
+    
+    if (censusFilePVal == null || !censusFilePVal.exists()) {
+        error "A valid parasitic census file (censusFileP) is required but was not found. Please check your parameters."
+    }
+    
+    log.info "Validated census files for analysis:"
+    log.info "  Bacterial census: ${censusFileBVal}"
+    log.info "  Parasitic census: ${censusFilePVal}"
     
     // Run TRENDY with input data - properly separate pathogen and mmwrFile
     TRENDY(
