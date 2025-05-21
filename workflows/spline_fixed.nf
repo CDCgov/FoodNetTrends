@@ -353,6 +353,8 @@ workflow SPLINE {
         } catch (Exception e) {
             log.warn "Exception in dashboard generation section: ${e.getMessage()}"
             log.warn "Using pre-created fallback dashboard"
+            log.warn "To regenerate the dashboard after pipeline completion, run:"
+            log.warn "./dashboard.sh ${projID}"
         }
     } else {
         log.info "Dashboard generation disabled, skipping"

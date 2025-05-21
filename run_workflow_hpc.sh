@@ -860,6 +860,12 @@ dashboard_params="--enable_dashboard true --dashboard_title \"$dashboard_title\"
 
 # Tell the user what's happening
 echo "Dashboard will be created with title: \"$dashboard_title\""
+echo "Project ID: ${timestamp} (use this if you need to regenerate the dashboard later)"
+
+# Provide instructions for fallback dashboard generation if needed
+echo ""
+echo "NOTE: If dashboard generation fails, you can regenerate it after completion with:"
+echo "  ./dashboard.sh ${timestamp}"
 
 # Add warning about resource usage for heavy analyses
 if [[ $pathogen_count -gt 4 || $chains -gt 8 || $iterations -gt 3000 ]]; then

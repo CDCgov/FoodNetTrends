@@ -103,6 +103,7 @@ def validateFilePaths() {
 
 // Include the workflows
 include { SPLINE } from './workflows/spline_fixed.nf'
+include { DASHBOARD_ONLY } from './workflows/dashboard.nf'
 include { PREPROCESS_WORKFLOW } from './workflows/preprocess.nf'
 
 // Default workflow
@@ -170,6 +171,17 @@ workflow PREPROCESS_ONLY {
             ==========================================
             """
         }
+        System.exit(1)
+    }
+}
+
+// DASHBOARD_ONLY workflow entry point
+workflow DASHBOARD_GEN {
+    try {
+        // Run dashboard generation only
+        DASHBOARD_ONLY()
+    } catch (Exception e) {
+        log.error "Error in DASHBOARD_ONLY: ${e.message}"
         System.exit(1)
     }
 }
