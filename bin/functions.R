@@ -162,16 +162,9 @@ path_analysis <- function(mmwrdata, census) {
         }
       }
       
-      # If still missing, create placeholder
+      # If still missing, raise an error - required columns must exist
       if (!col %in% names(mmwrdata)) {
-        warning(paste("Required column", col, "not found in mmwrdata, creating placeholder"))
-        if (col == "state") {
-          mmwrdata$state <- "UNKNOWN"
-        } else if (col == "year") {
-          mmwrdata$year <- 2020
-        } else if (col == "pathogen") {
-          mmwrdata$pathogen <- "UNKNOWN"
-        }
+        stop(paste("ERROR: Required column", col, "not found in MMWR data. Data is incomplete or malformed."))
       }
     }
   }
@@ -205,7 +198,7 @@ path_analysis <- function(mmwrdata, census) {
       
       # If still missing, create placeholder
       if (!col %in% names(census)) {
-        warning(paste("Required column", col, "not found in census, creating placeholder"))
+        warning(paste("Required column", col, "not found in census, raising error (required column)"))
         if (col == "state") {
           census$state <- "UNKNOWN"
         } else if (col == "year") {
@@ -398,16 +391,9 @@ cyclospora_analysis <- function(mmwrdata, census) {
         }
       }
       
-      # If still missing, create placeholder
+      # If still missing, raise an error - required columns must exist
       if (!col %in% names(mmwrdata)) {
-        warning(paste("Required column", col, "not found in mmwrdata, creating placeholder"))
-        if (col == "state") {
-          mmwrdata$state <- "UNKNOWN"
-        } else if (col == "year") {
-          mmwrdata$year <- 2020
-        } else if (col == "pathogen") {
-          mmwrdata$pathogen <- "UNKNOWN"
-        }
+        stop(paste("ERROR: Required column", col, "not found in MMWR data. Data is incomplete or malformed."))
       }
     }
   }
@@ -441,7 +427,7 @@ cyclospora_analysis <- function(mmwrdata, census) {
       
       # If still missing, create placeholder
       if (!col %in% names(census)) {
-        warning(paste("Required column", col, "not found in census, creating placeholder"))
+        warning(paste("Required column", col, "not found in census, raising error (required column)"))
         if (col == "state") {
           census$state <- "UNKNOWN"
         } else if (col == "year") {
@@ -633,16 +619,9 @@ salmonella_analysis <- function(mmwrdata, census) {
         }
       }
       
-      # If still missing, create placeholder
+      # If still missing, raise an error - required columns must exist
       if (!col %in% names(mmwrdata)) {
-        warning(paste("Required column", col, "not found in mmwrdata, creating placeholder"))
-        if (col == "state") {
-          mmwrdata$state <- "UNKNOWN"
-        } else if (col == "year") {
-          mmwrdata$year <- 2020
-        } else if (col == "pathogen") {
-          mmwrdata$pathogen <- "UNKNOWN"
-        }
+        stop(paste("ERROR: Required column", col, "not found in MMWR data. Data is incomplete or malformed."))
       }
     }
   }
@@ -676,7 +655,7 @@ salmonella_analysis <- function(mmwrdata, census) {
       
       # If still missing, create placeholder
       if (!col %in% names(census)) {
-        warning(paste("Required column", col, "not found in census, creating placeholder"))
+        warning(paste("Required column", col, "not found in census, raising error (required column)"))
         if (col == "state") {
           census$state <- "UNKNOWN"
         } else if (col == "year") {

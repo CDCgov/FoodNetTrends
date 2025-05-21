@@ -189,7 +189,8 @@ process TRENDY {
     elif [ -f "./census_bact.csv" ] && [ -s "./census_bact.csv" ]; then
         echo "VALID: Using real bacterial census data (CSV format)" >> ${pathogen}_trendy.log
     else 
-        echo "WARNING: Using PLACEHOLDER bacterial census data - results will NOT be valid for production" >> ${pathogen}_trendy.log
+        echo "ERROR: No valid bacterial census data found" >> ${pathogen}_trendy.log
+        error_exit "ERROR: Bacterial census file required but not found or empty"
     fi
     
     if [ -f "./census_para.sas7bdat" ] && [ -s "./census_para.sas7bdat" ]; then
@@ -197,7 +198,8 @@ process TRENDY {
     elif [ -f "./census_para.csv" ] && [ -s "./census_para.csv" ]; then
         echo "VALID: Using real parasitic census data (CSV format)" >> ${pathogen}_trendy.log
     else
-        echo "WARNING: Using PLACEHOLDER parasitic census data - results will NOT be valid for production" >> ${pathogen}_trendy.log
+        echo "ERROR: No valid parasitic census data found" >> ${pathogen}_trendy.log
+        error_exit "ERROR: Parasitic census file required but not found or empty"
     fi
     echo "===================================" >> ${pathogen}_trendy.log
     
@@ -239,7 +241,7 @@ process TRENDY {
         echo "    REAL DATA (CSV format)" >> ${pathogen}_data_summary.txt
         ls -la "./census_bact.csv" >> ${pathogen}_data_summary.txt
     elif [ -f "./empty_census_bact.csv" ] && [ -s "./empty_census_bact.csv" ]; then
-        echo "    *** PLACEHOLDER DATA *** (Results are NOT suitable for production use)" >> ${pathogen}_data_summary.txt
+        echo "    *** ERROR: Invalid census file *** (Real census data is required)" >> ${pathogen}_data_summary.txt
         ls -la "./empty_census_bact.csv" >> ${pathogen}_data_summary.txt
     else
         echo "    *** NO CENSUS FILE FOUND ***" >> ${pathogen}_data_summary.txt
@@ -253,7 +255,7 @@ process TRENDY {
         echo "    REAL DATA (CSV format)" >> ${pathogen}_data_summary.txt
         ls -la "./census_para.csv" >> ${pathogen}_data_summary.txt
     elif [ -f "./empty_census_para.csv" ] && [ -s "./empty_census_para.csv" ]; then
-        echo "    *** PLACEHOLDER DATA *** (Results are NOT suitable for production use)" >> ${pathogen}_data_summary.txt
+        echo "    *** ERROR: Invalid census file *** (Real census data is required)" >> ${pathogen}_data_summary.txt
         ls -la "./empty_census_para.csv" >> ${pathogen}_data_summary.txt
     else
         echo "    *** NO CENSUS FILE FOUND ***" >> ${pathogen}_data_summary.txt

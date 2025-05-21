@@ -360,35 +360,15 @@ if (!is.null(args$censusFileP) && file.exists(args$censusFileP)) {
   })
 }
 
-# Create placeholder census data if needed
+# Census data is required - error if missing
 if (is.null(censusBdata)) {
-  log_message("WARNING", "Creating placeholder bacterial census data")
-  states <- c("CA", "CO", "CT", "GA", "MD", "MN", "NM", "NY", "OR", "TN")
-  years <- unique(mmwrdata$year)
-  if (length(years) == 0) years <- 2016:2022
-  
-  censusBdata <- expand.grid(
-    state = states,
-    year = years,
-    stringsAsFactors = FALSE
-  )
-  censusBdata$population <- 5000000
-  censusBdata$pathogentype <- "Bacterial"
+  log_message("ERROR", "Required bacterial census data is missing")
+  stop("ERROR: Bacterial census data is required for rate calculations. Please provide a valid census file using --censusFileB parameter.")
 }
 
 if (is.null(censusPdata)) {
-  log_message("WARNING", "Creating placeholder parasitic census data")
-  states <- c("CA", "CO", "CT", "GA", "MD", "MN", "NM", "NY", "OR", "TN")
-  years <- unique(mmwrdata$year)
-  if (length(years) == 0) years <- 2016:2022
-  
-  censusPdata <- expand.grid(
-    state = states,
-    year = years,
-    stringsAsFactors = FALSE
-  )
-  censusPdata$population <- 5000000
-  censusPdata$pathogentype <- "Parasitic"
+  log_message("ERROR", "Required parasitic census data is missing")
+  stop("ERROR: Parasitic census data is required for rate calculations. Please provide a valid census file using --censusFileP parameter.")
 }
 
 # ---- Process Pathogen Data ----
@@ -978,21 +958,21 @@ for (period in periods) {
   }, error = function(e) {
     log_message("ERROR", paste("IRR calculation failed for period", period, ":", e$message))
     
-    # Create placeholder IRR data
-    placeholder_irr <- data.frame(
-      state = c("CA", "NY", "GA"),
-      year = rep(max(analysis_data$year, na.rm=TRUE), 3),
-      comparison_period = rep(period, 3),
-      current_incidence = c(0.5, 0.6, 0.4),
-      period_incidence = c(0.4, 0.5, 0.45),
-      relative_risk = c(1.25, 1.2, 0.89),
-      percent_change = c(25, 20, -11),
+    # Create error indicator IRR data
+    error_irr <- data.frame(
+      state = "ERROR",
+      year = max(analysis_data$year, na.rm=TRUE),
+      comparison_period = period,
+      current_incidence = NA,
+      period_incidence = NA,
+      relative_risk = NA,
+      percent_change = NA,
       stringsAsFactors = FALSE
     )
     
-    irr_file <- paste0(pathogen, "_EstIRRCatch_", period, ".csv")
-    write.csv(placeholder_irr, file = irr_file, row.names = FALSE)
-    log_message("OUTPUT", paste("Saved placeholder IRR data to", irr_file))
+    irr_file <- paste0(pathogen, "_EstIRRError_", period, ".csv")
+    write.csv(error_irr, file = irr_file, row.names = FALSE)
+    log_message("OUTPUT", paste("Saved error-state IRR data to", irr_file))
   })
 }
 
@@ -1057,20 +1037,23 @@ tryCatch({
 }, error = function(e) {
   log_message("ERROR", paste("Plot generation failed:", e$message))
   
-  # Create simple placeholder plots
-  png(paste0(pathogen, "_trend.png"), width = 800, height = 600)
-  plot(1:10, 1:10, type = "l", main = paste(pathogen, "Trend (Placeholder)"))
+  # Create error indicator plots
+  png(paste0(pathogen, "_trend_error.png"), width = 800, height = 600)
+  plot(1:10, 1:10, type = "n", main = paste(pathogen, "Trend (ERROR)"))
+  text(5, 5, "Error generating plot", col = "red", cex = 2)
   dev.off()
   
-  png(paste0(pathogen, "_state_trends.png"), width = 800, height = 600)
-  plot(1:10, 1:10, type = "l", main = paste(pathogen, "State Trends (Placeholder)"))
+  png(paste0(pathogen, "_state_trends_error.png"), width = 800, height = 600)
+  plot(1:10, 1:10, type = "n", main = paste(pathogen, "State Trends (ERROR)"))
+  text(5, 5, "Error generating plot", col = "red", cex = 2)
   dev.off()
   
-  png(paste0(pathogen, "_overall.png"), width = 800, height = 600)
-  plot(1:10, 1:10, type = "l", main = paste("Overall", pathogen, "(Placeholder)"))
+  png(paste0(pathogen, "_overall_error.png"), width = 800, height = 600)
+  plot(1:10, 1:10, type = "n", main = paste("Overall", pathogen, "(ERROR)"))
+  text(5, 5, "Error generating plot", col = "red", cex = 2)
   dev.off()
   
-  log_message("OUTPUT", "Created placeholder plot files")
+  log_message("OUTPUT", "Created error indicator plot files")
 })
 
 # ---- Generate Summary ----

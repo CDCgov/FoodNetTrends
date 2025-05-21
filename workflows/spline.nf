@@ -153,8 +153,9 @@ workflow SPLINE {
             log.info "Using preprocessed bacterial census file: ${censusFileBVal}"
         }
     }
-    // Final attempt: Try standard locations
-    else {
+    
+    // Final attempt: Try standard locations if not found yet
+    if (censusFileBVal == null) {
         log.info "Searching standard locations for bacterial census file..."
         // Look in all possible standard locations with both CSV and SAS formats
         def stdLocations = [
@@ -304,8 +305,9 @@ workflow SPLINE {
             log.info "Using preprocessed parasitic census file: ${censusFilePVal}"
         }
     }
-    // Final attempt: Try standard locations
-    else {
+    
+    // Final attempt: Try standard locations if not found yet
+    if (censusFilePVal == null) {
         log.info "Searching standard locations for parasitic census file..."
         // Look in all possible standard locations with both CSV and SAS formats
         def stdLocations = [
@@ -357,10 +359,18 @@ workflow SPLINE {
         }
     }
     
-    // Dashboard templates - handle with placeholders if missing
+    // Dashboard templates - required files
     def dashboardTemplateVal, dashboardScriptVal
     dashboardTemplateVal = file("${workflow.projectDir}/assets/dashboard_template.html", checkIfExists: false)
     dashboardScriptVal = file("${workflow.projectDir}/bin/generate_dashboard.R", checkIfExists: false)
+    
+    // Verify dashboard files exist
+    if (!dashboardTemplateVal.exists()) {
+        log.warn "Dashboard template file not found: ${dashboardTemplateVal}"
+    }
+    if (!dashboardScriptVal.exists()) {
+        log.warn "Dashboard script file not found: ${dashboardScriptVal}"
+    }
     
     // projID was already defined at the top of the workflow to avoid scope issues
     
@@ -517,31 +527,54 @@ workflow SPLINE {
     }
     
     // Verify that census file values are valid File objects
+    log.info "Final validation of census file paths..."
+    
     if (censusFileBVal != null) {
-        log.info "Verifying bacterial census file: ${censusFileBVal.getClass().getName()}, exists: ${censusFileBVal.exists()}"
         try {
-            // Ensure we have a real file path
-            def path = censusFileBVal.toString()
-            censusFileBVal = file(path, checkIfExists: false)
-            log.info "Normalized bacterial census file path: ${censusFileBVal}, exists: ${censusFileBVal.exists()}"
+            log.info "Verifying bacterial census file: ${censusFileBVal.getClass().getName()}"
+            if (censusFileBVal.exists()) {
+                log.info "Bacterial census file exists: ${censusFileBVal}"
+            } else {
+                log.warn "Bacterial census file doesn't exist: ${censusFileBVal}"
+                // Try one more normalize to be safe
+                def path = censusFileBVal.toString()
+                censusFileBVal = file(path, checkIfExists: false)
+                log.info "Normalized bacterial census file path: ${censusFileBVal}, exists: ${censusFileBVal.exists()}"
+                if (!censusFileBVal.exists()) {
+                    censusFileBVal = null
+                }
+            }
         } catch (Exception e) {
-            log.warn "Error normalizing bacterial census file: ${e.message}"
+            log.warn "Error validating bacterial census file: ${e.message}"
             censusFileBVal = null
         }
     }
     
     if (censusFilePVal != null) {
-        log.info "Verifying parasitic census file: ${censusFilePVal.getClass().getName()}, exists: ${censusFilePVal.exists()}"
         try {
-            // Ensure we have a real file path
-            def path = censusFilePVal.toString()
-            censusFilePVal = file(path, checkIfExists: false)
-            log.info "Normalized parasitic census file path: ${censusFilePVal}, exists: ${censusFilePVal.exists()}"
+            log.info "Verifying parasitic census file: ${censusFilePVal.getClass().getName()}"
+            if (censusFilePVal.exists()) {
+                log.info "Parasitic census file exists: ${censusFilePVal}"
+            } else {
+                log.warn "Parasitic census file doesn't exist: ${censusFilePVal}"
+                // Try one more normalize to be safe
+                def path = censusFilePVal.toString()
+                censusFilePVal = file(path, checkIfExists: false)
+                log.info "Normalized parasitic census file path: ${censusFilePVal}, exists: ${censusFilePVal.exists()}"
+                if (!censusFilePVal.exists()) {
+                    censusFilePVal = null
+                }
+            }
         } catch (Exception e) {
-            log.warn "Error normalizing parasitic census file: ${e.message}"
+            log.warn "Error validating parasitic census file: ${e.message}"
             censusFilePVal = null
         }
     }
+    
+    // Check final status of census files
+    log.info "Final census file status:"
+    log.info "  Bacterial census file: ${censusFileBVal?.exists() ? 'FOUND' : 'MISSING'}"
+    log.info "  Parasitic census file: ${censusFilePVal?.exists() ? 'FOUND' : 'MISSING'}"
     
     // Validate census files before proceeding and provide helpful error messages
     if (censusFileBVal == null || !censusFileBVal.exists()) {

@@ -25,12 +25,12 @@ workflow PREPROCESS_WORKFLOW {
     if (!params.mmwrFile) {
         error "Missing required parameter: --mmwrFile must be specified"
     }
-    // Census files are now optional with warnings
+    // Census files are required
     if (!params.censusFileB) {
-        log.warn "No census bacterial file specified. Using placeholder."
+        error "Census bacterial file is required. Please specify with --censusFileB parameter."
     }
     if (!params.censusFileP) {
-        log.warn "No census parasitic file specified. Using placeholder."
+        error "Census parasitic file is required. Please specify with --censusFileP parameter."
     }
     if (!params.outdir) {
         error "Missing required parameter: --outdir must be specified"
@@ -48,23 +48,19 @@ workflow PREPROCESS_WORKFLOW {
     if (params.censusFileB && params.censusFileB != "") {
         censusFileB = file(params.censusFileB, checkIfExists: false)
         if (!censusFileB.exists()) {
-            log.warn "WARNING: Census bacterial file does not exist: ${params.censusFileB}"
-            log.warn "Will proceed with placeholder census bacterial file"
+            error "ERROR: Census bacterial file does not exist: ${params.censusFileB}"
         }
     } else {
-        log.warn "WARNING: Census bacterial file parameter is empty"
-        log.warn "Will proceed with placeholder census bacterial file"
+        error "ERROR: Census bacterial file parameter is required but empty"
     }
     
     if (params.censusFileP && params.censusFileP != "") {
         censusFileP = file(params.censusFileP, checkIfExists: false)
         if (!censusFileP.exists()) {
-            log.warn "WARNING: Census parasitic file does not exist: ${params.censusFileP}"
-            log.warn "Will proceed with placeholder census parasitic file"
+            error "ERROR: Census parasitic file does not exist: ${params.censusFileP}"
         }
     } else {
-        log.warn "WARNING: Census parasitic file parameter is empty"
-        log.warn "Will proceed with placeholder census parasitic file"
+        error "ERROR: Census parasitic file parameter is required but empty"
     }
     
     // Set output base name (derived from file or parameter)

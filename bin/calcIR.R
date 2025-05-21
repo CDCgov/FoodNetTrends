@@ -287,18 +287,7 @@ main <- function() {
     }
     
     if (is.null(census_data)) {
-      cat(paste("Failed to read", pathogen_type, "census file, creating placeholder\n"))
-      # Create placeholder data
-      states <- c("CA", "CO", "CT", "GA", "MD", "MN", "NM", "NY", "OR", "TN")
-      years <- 2016:2023
-      
-      census_data <- expand.grid(
-        state = states,
-        year = years,
-        stringsAsFactors = FALSE
-      )
-      census_data$population <- 5000000
-      return(census_data %>% mutate(pathogentype = pathogen_type))
+      stop(paste("ERROR: Failed to read", pathogen_type, "census file. Census data is required for analysis."))
     }
     
     # Print column names to help with debugging
@@ -319,30 +308,24 @@ main <- function() {
       census_data$state <- toupper(as.character(census_data[[state_col]]))
     } else {
       cat(paste("WARNING: Could not find state column in", pathogen_type, "census file\n"))
-      # Create a placeholder state column from existing data if possible
-      if (!is.null(census_data) && nrow(census_data) > 0) {
-        census_data$state <- "UNKNOWN"
-      }
+      # Error: state column is required
+      stop(paste("ERROR: Could not find state column in", pathogen_type, "census file. Census data requires state column."))
     }
     
     if (!is.na(year_col)) {
       census_data$year <- as.numeric(as.character(census_data[[year_col]]))
     } else {
       cat(paste("WARNING: Could not find year column in", pathogen_type, "census file\n"))
-      # Create a placeholder year column from existing data if possible
-      if (!is.null(census_data) && nrow(census_data) > 0) {
-        census_data$year <- 2020
-      }
+      # Error: year column is required
+      stop(paste("ERROR: Could not find year column in", pathogen_type, "census file. Census data requires year column."))
     }
     
     if (!is.na(pop_col)) {
       census_data$population <- as.numeric(as.character(census_data[[pop_col]]))
     } else {
       cat(paste("WARNING: Could not find population column in", pathogen_type, "census file\n"))
-      # Create a placeholder population column from existing data if possible
-      if (!is.null(census_data) && nrow(census_data) > 0) {
-        census_data$population <- 5000000
-      }
+      # Error: population column is required
+      stop(paste("ERROR: Could not find population column in", pathogen_type, "census file. Census data requires population column."))
     }
     
     # Add pathogentype
