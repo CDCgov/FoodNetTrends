@@ -205,11 +205,7 @@ workflow SPLINE {
         pathogens,
         censusFileBVal,
         censusFilePVal,
-        projID,
-        scripts_pathVal,
-        params.travel,
-        params.cidt,
-        dashboardTemplateVal
+        scripts_pathVal
     )
     
     // Extract outputs for downstream use
