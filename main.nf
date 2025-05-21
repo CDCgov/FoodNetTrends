@@ -102,7 +102,7 @@ def validateFilePaths() {
 }
 
 // Include the workflows
-include { SPLINE } from './workflows/spline.nf'
+include { SPLINE } from './workflows/spline_fixed.nf'
 include { PREPROCESS_WORKFLOW } from './workflows/preprocess.nf'
 
 // Default workflow

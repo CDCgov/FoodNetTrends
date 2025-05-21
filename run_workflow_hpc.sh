@@ -9,6 +9,14 @@
 #   It provides resource tuning options and performance presets for maximum
 #   efficiency with large datasets and complex models.
 #
+# If --get-command-only is provided, just print the command that would be run
+if [[ "$1" == "--get-command-only" ]]; then
+    GET_COMMAND_ONLY=true
+    shift
+else
+    GET_COMMAND_ONLY=false
+fi
+#
 # Features:
 #   - All features from the standard run_workflow.sh
 #   - HPC-optimized resource profiles
@@ -993,6 +1001,12 @@ echo ""
 echo "Command to run:"
 echo "$cmd"
 echo ""
+
+# If we're just getting the command, print it and exit
+if [[ "$GET_COMMAND_ONLY" == "true" ]]; then
+    echo "$cmd"
+    exit 0
+fi
 
 # Get confirmation from user
 read -p "Execute command? (y/n) [y]: " execute

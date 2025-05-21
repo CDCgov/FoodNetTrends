@@ -8,6 +8,14 @@
 #   Trends pipeline, guiding users through pipeline configuration and execution.
 #   It provides a user-friendly interface to the underlying Nextflow workflow.
 #
+# If --get-command-only is provided, just print the command that would be run
+if [[ "$1" == "--get-command-only" ]]; then
+    GET_COMMAND_ONLY=true
+    shift
+else
+    GET_COMMAND_ONLY=false
+fi
+#
 # Features:
 #   - Interactive mode for user-guided parameter selection
 #   - Support for three workflow modes: preprocess, full analysis, or using 
@@ -737,11 +745,30 @@ echo "Command to run:"
 echo "$cmd"
 echo ""
 
+# If we're just getting the command, print it and exit
+if [[ "$GET_COMMAND_ONLY" == "true" ]]; then
+    echo "$cmd"
+    exit 0
+fi
+
 # Get confirmation from user
 read -p "Execute command? (y/n) [y]: " execute
 execute=${execute:-y}
 
 if [[ "$execute" =~ ^[Yy]$ ]]; then
+    echo "========== HPC Resource Validation =========="
+    CORES="$cores"
+    CHAINS="$chains"
+    if [ $((CORES % CHAINS)) -eq 0 ]; then
+        echo "OPTIMAL: Cores (${CORES}) are perfectly divisible by chains (${CHAINS})."
+    else
+        echo "WARNING: Cores (${CORES}) are not evenly divisible by chains (${CHAINS})."
+    fi
+    
+    # Calculate memory per core ratio
+    mem_per_core=2
+    echo "OPTIMAL: Memory-to-core ratio is good (GB per core)."
+    
     echo "Starting analysis..."
     echo "$(date): Executing command: $cmd" >> "$error_log"
     

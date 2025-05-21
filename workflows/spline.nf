@@ -770,7 +770,6 @@ workflow SPLINE {
     log_files = TRENDY.out.log
     
     // Run dashboard generation after all modeling is complete
-    def dashboardOutput = Channel.empty()
     if (params.enable_dashboard) {
         // Create the output directory path
         def dashboardDir = "${params.outdir}/${projID}"
@@ -814,15 +813,18 @@ workflow SPLINE {
                     dashboardScriptVal
                 )
                 
-                // Set dashboard output - use collectFile to ensure we get all files
-                dashboardOutput = GENERATE_DASHBOARD.out.dashboard.collect()
+                // Get dashboard output and handle fallbacks
+                def tempOutput = GENERATE_DASHBOARD.out.dashboard.collect()
                 
                 // Add a fallback mechanism to ensure we always have a dashboard
                 // even if the module failed to create one
-                dashboardOutput.ifEmpty { 
+                tempOutput.ifEmpty { 
                     log.warn "Dashboard output is empty, using pre-created fallback"
-                    dashboardOutput = Channel.fromPath(fallbackHtml.toString())
+                    tempOutput = Channel.fromPath(fallbackHtml.toString())
                 }
+                
+                // Assign to the outer variable
+                dashboardOutput = tempOutput
             } else {
                 log.warn "No analysis results found, using pre-created fallback dashboard"
                 dashboardOutput = Channel.fromPath(fallbackHtml.toString())
@@ -834,6 +836,11 @@ workflow SPLINE {
         }
     } else {
         log.info "Dashboard generation disabled, skipping"
+    }
+    
+    // Create a dummy empty channel for when dashboard is disabled
+    if (!binding.hasVariable('dashboardOutput')) {
+        dashboardOutput = Channel.empty()
     }
     
     // Handle workflow completion - using null-safe syntax to avoid NPE
