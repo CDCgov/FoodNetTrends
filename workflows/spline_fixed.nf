@@ -64,6 +64,21 @@ workflow SPLINE {
     // Set a consistent project ID for output naming
     def projID = params.projID ?: new java.text.SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date())
     
+    // Create pathogen channel with validated MMWR file
+    def pathogens_ch = Channel.fromList(pathogenList)
+        .map { pth -> tuple(pth, mmwrFile) }
+    
+    // Define path to scripts directory
+    def scripts_pathVal = file("${workflow.projectDir}/bin", checkIfExists: true)
+    if (!scripts_pathVal.exists()) {
+        log.warn "Scripts directory not found: ${scripts_pathVal}"
+        scripts_pathVal = file("${workflow.launchDir}/bin", checkIfExists: true)
+        if (!scripts_pathVal.exists()) {
+            log.error "Cannot find scripts directory in any location."
+            exit 1
+        }
+    }
+    
     log.info "Running FoodNet Trends Spline Analysis Workflow v1.0"
     log.info "Analyzing ${pathogenList.size()} pathogens: ${pathogenList.join(', ')}"
     
@@ -246,9 +261,8 @@ workflow SPLINE {
     def log_files = TRENDY.out.log
     
     // Dashboard templates - required files
-    def dashboardTemplateVal, dashboardScriptVal
-    dashboardTemplateVal = file("${workflow.projectDir}/assets/dashboard_template.html", checkIfExists: false)
-    dashboardScriptVal = file("${workflow.projectDir}/bin/generate_dashboard.R", checkIfExists: false)
+    def dashboardTemplateVal = file("${workflow.projectDir}/assets/dashboard_template.html", checkIfExists: false)
+    def dashboardScriptVal = file("${workflow.projectDir}/bin/generate_dashboard.R", checkIfExists: false)
     
     // Verify dashboard files exist and set fallbacks if needed
     if (!dashboardTemplateVal.exists()) {
@@ -291,24 +305,6 @@ workflow SPLINE {
             }
         }
     }
-    
-    // This is the correct location to safely define pathogen channel
-    // *********************************************************************
-    // Create pathogen channel with validated MMWR file
-    def pathogens_ch = Channel.fromList(pathogenList)
-        .map { pth -> tuple(pth, mmwrFile) }
-    
-    // Define path to scripts directory
-    def scripts_pathVal = file("${workflow.projectDir}/bin", checkIfExists: true)
-    if (!scripts_pathVal.exists()) {
-        log.warn "Scripts directory not found: ${scripts_pathVal}"
-        scripts_pathVal = file("${workflow.launchDir}/bin", checkIfExists: true)
-        if (!scripts_pathVal.exists()) {
-            log.error "Cannot find scripts directory in any location."
-            exit 1
-        }
-    }
-    // *********************************************************************
     
     // DASHBOARD HANDLING SECTION
     // Completely isolated to avoid variable scope issues
