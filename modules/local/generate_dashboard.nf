@@ -25,7 +25,7 @@ process GENERATE_DASHBOARD {
     script:
     """
     # Define timestamp for file naming
-    TIMESTAMP=\$(date +%Y%m%d_%H%M%S)
+    TIMESTAMP=\\\$(date +%Y%m%d_%H%M%S)
     
     # Memory optimization for R
     export R_MAX_VSIZE=12G
@@ -36,14 +36,14 @@ process GENERATE_DASHBOARD {
     echo "  FoodNet Trends Data Quality Assessment" >> ${projID}_data_quality.log
     echo "  Project ID: ${projID}" >> ${projID}_data_quality.log
     # Get date safely with shell function
-    DATE_NOW=\$(date)
+    DATE_NOW=\\\$(date)
     echo "  Generated: \$DATE_NOW" >> ${projID}_data_quality.log
     echo "=========================================" >> ${projID}_data_quality.log
     echo "" >> ${projID}_data_quality.log
     
     # Initialize JSON structure for data quality metadata
     # Create timestamp for JSON generation date (must be defined outside heredoc)
-    DATETIME=\$(date -Iseconds)
+    DATETIME=\\\$(date -Iseconds)
     
     # Create the JSON file with a heredoc that allows variable interpolation
     cat > ${projID}_data_quality.json << EOF
@@ -74,8 +74,8 @@ process GENERATE_DASHBOARD {
         while read -r SUMMARY_FILE; do
             if [ -f "\$SUMMARY_FILE" ]; then
                 # Extract pathogen name
-                BASE_NAME=\$(basename "\$SUMMARY_FILE")
-                PATHOGEN=\$(echo "\$BASE_NAME" | sed 's/_data_summary.txt//')
+                BASE_NAME=\\\$(basename "\$SUMMARY_FILE")
+                PATHOGEN=\\\$(echo "\$BASE_NAME" | sed 's/_data_summary.txt//')
                 
                 # Check for placeholders
                 if grep -q "PLACEHOLDER DATA\\|placeholder data\\|SYNTHETIC DATA" "\$SUMMARY_FILE"; then
@@ -94,7 +94,7 @@ process GENERATE_DASHBOARD {
                         echo "WARNING: Placeholder data detected in unidentified file" >> ${projID}_data_quality.log
                         PATHOGEN_WARNINGS="\$PATHOGEN_WARNINGS\n- UNKNOWN: Uses placeholder data (results NOT suitable for production use)"
                     fi
-                    DATA_QUALITY_WARNINGS=\$((DATA_QUALITY_WARNINGS + 1))
+                    DATA_QUALITY_WARNINGS=\\\$((DATA_QUALITY_WARNINGS + 1))
                     PLACEHOLDER_DATA_FOUND=1
                 fi
             fi
@@ -152,7 +152,7 @@ EOFTEMPLATE
     # Count IR files for data consistency
     echo "" >> ${projID}_data_quality.log
     echo "Checking data consistency..." >> ${projID}_data_quality.log
-    IR_FILE_COUNT=\$(ls -1 *_IRCatch.csv 2>/dev/null | wc -l)
+    IR_FILE_COUNT=\\\$(ls -1 *_IRCatch.csv 2>/dev/null | wc -l)
     echo "Found \$IR_FILE_COUNT incidence rate files." >> ${projID}_data_quality.log
     
     # Add to JSON
@@ -179,7 +179,7 @@ EOFTEMPLATE
     
     # Read the count safely, ensuring the file exists
     if [ -f "debuginfo/result_files.txt" ]; then
-        RESULT_COUNT=\$(wc -l < debuginfo/result_files.txt 2>/dev/null || echo 0)
+        RESULT_COUNT=\\\$(wc -l < debuginfo/result_files.txt 2>/dev/null || echo 0)
         echo "Found \$RESULT_COUNT result files" >> ${projID}_data_quality.log
     else
         echo "Warning: result_files.txt not created properly" >> ${projID}_data_quality.log
@@ -212,7 +212,7 @@ EOFTEMPLATE
 ERRORTEMPLATE
 
         # Add dynamic content separately - avoid direct command substitution
-        CURRENT_DATE=\$(date)
+        CURRENT_DATE=\\\$(date)
         echo "<p>Project ID: ${projID}</p>" >> ${projID}_dashboard.html
         echo "<p>Analysis completed at: \$CURRENT_DATE</p>" >> ${projID}_dashboard.html
         
@@ -294,7 +294,7 @@ ERROR_TEMPLATE
             echo "    <p><strong>Project ID:</strong> ${projID}</p>" >> ${projID}_dashboard.html
             
             # Get and add the date separately - store date in a variable first
-            ANALYSIS_DATE=\$(date)
+            ANALYSIS_DATE=\\\$(date)
             echo "    <p><strong>Analysis time:</strong> \$ANALYSIS_DATE</p>" >> ${projID}_dashboard.html
             
             # Continue with static content
@@ -364,7 +364,7 @@ ERRORTEMPLATE
 
         # Add the dynamic parts separately to avoid shell expansion issues
         # Store current date in a variable first
-        COMPLETED_AT=\$(date)
+        COMPLETED_AT=\\\$(date)
         echo "    <p><strong>Project ID:</strong> ${projID}</p>" >> ${projID}_dashboard.html
         echo "    <p><strong>Analysis completed at:</strong> \$COMPLETED_AT</p>" >> ${projID}_dashboard.html
         
@@ -393,7 +393,7 @@ ERRORTEMPLATE
     fi
     
     # Final note - store date in a variable first
-    COMPLETION_TIME=\$(date)
+    COMPLETION_TIME=\\\$(date)
     echo "Dashboard generation completed at \$COMPLETION_TIME" >> ${projID}_data_quality.log
     
     # Make sure the output dashboard exists even if it failed to generate properly
