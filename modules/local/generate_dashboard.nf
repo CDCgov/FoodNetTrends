@@ -140,14 +140,12 @@ EOF
     RESULT_COUNT=`wc -l < debuginfo/result_files.txt`
     echo "Found \$RESULT_COUNT result files" >> ${projID}_data_quality.log
     
-    # Check for common result files that should exist
-    for PATHOGEN in CAMPYLOBACTER CYCLOSPORA SALMONELLA SHIGELLA; do
-        if ls ${PATHOGEN}_*_IRCatch.csv 1>/dev/null 2>&1; then
-            echo "Found IR files for ${PATHOGEN}" >> debuginfo/file_checks.txt
-        else
-            echo "Missing IR files for ${PATHOGEN}" >> debuginfo/file_checks.txt
-        fi
-    done
+    # Check for common result files that should exist without using shell variables
+    # Use a simpler approach to check each pathogen individually
+    ls CAMPYLOBACTER_*_IRCatch.csv 1>/dev/null 2>&1 && echo "Found IR files for CAMPYLOBACTER" >> debuginfo/file_checks.txt || echo "Missing IR files for CAMPYLOBACTER" >> debuginfo/file_checks.txt
+    ls CYCLOSPORA_*_IRCatch.csv 1>/dev/null 2>&1 && echo "Found IR files for CYCLOSPORA" >> debuginfo/file_checks.txt || echo "Missing IR files for CYCLOSPORA" >> debuginfo/file_checks.txt
+    ls SALMONELLA_*_IRCatch.csv 1>/dev/null 2>&1 && echo "Found IR files for SALMONELLA" >> debuginfo/file_checks.txt || echo "Missing IR files for SALMONELLA" >> debuginfo/file_checks.txt
+    ls SHIGELLA_*_IRCatch.csv 1>/dev/null 2>&1 && echo "Found IR files for SHIGELLA" >> debuginfo/file_checks.txt || echo "Missing IR files for SHIGELLA" >> debuginfo/file_checks.txt
     
     # Generate the dashboard with improved error handling
     echo "Generating dashboard with template: \$TEMPLATE_TO_USE" >> ${projID}_data_quality.log

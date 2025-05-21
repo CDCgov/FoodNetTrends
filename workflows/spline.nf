@@ -47,100 +47,96 @@ workflow SPLINE {
         error "Error accessing MMWR file (${params.mmwrFile}): ${e.message}\nCheck path and permissions"
     }
     
-    // Set up census file handling with graceful fallbacks
+    // Set up census file handling with NO placeholder fallbacks
     def censusFileBVal = null
     def censusFilePVal = null
-    def placeholderContent = "state,population,year,pathogentype\nCA,10000000,2020,Bacterial\nCO,5000000,2020,Bacterial\nCT,3000000,2020,Bacterial\nGA,8000000,2020,Bacterial\nMD,5000000,2020,Bacterial\nMN,4000000,2020,Bacterial\nNM,2000000,2020,Bacterial\nNY,15000000,2020,Bacterial\nOR,3000000,2020,Bacterial\nTN,5000000,2020,Bacterial\n"
-    def parasiticPlaceholderContent = "state,population,year,pathogentype\nCA,10000000,2020,Parasitic\nCO,5000000,2020,Parasitic\nCT,3000000,2020,Parasitic\nGA,8000000,2020,Parasitic\nMD,5000000,2020,Parasitic\nMN,4000000,2020,Parasitic\nNM,2000000,2020,Parasitic\nNY,15000000,2020,Parasitic\nOR,3000000,2020,Parasitic\nTN,5000000,2020,Parasitic\n"
     
-    // Handle bacterial census file
-    try {
-        // First check if a valid census file path was provided and it exists
-        if (params.censusFileB && !(params.censusFileB instanceof Boolean) && params.censusFileB.toString().trim()) {
-            // Valid string path provided, try to use it first
-            censusFileBVal = file(params.censusFileB.toString(), checkIfExists: false)
-            if (censusFileBVal.exists()) {
-                log.info "Census bacterial file found: ${censusFileBVal}"
-            } else {
-                log.warn "Census bacterial file not found: ${params.censusFileB}, will use placeholder"
-                
-                // Create placeholder as fallback only when needed
-                def tempDir = new File("${workflow.launchDir}/work")
-                if (!tempDir.exists()) {
-                    tempDir.mkdirs()
-                }
-                
-                def placeholderFile = new File(tempDir, "placeholder_census_bacterial.csv")
-                placeholderFile.text = placeholderContent
-                censusFileBVal = file(placeholderFile.absolutePath)
-            }
+    // DIRECT APPROACH FOR BACTERIAL CENSUS FILE - NO PLACEHOLDERS
+    log.info "Checking for census bacterial file"
+    
+    // First check if a valid census file is available from preprocessing
+    def preprocessedBacterialFile = file("${params.outdir}/${projID}/preprocessed/census_bacterial.csv", checkIfExists: false)
+    if (preprocessedBacterialFile.exists()) {
+        censusFileBVal = preprocessedBacterialFile
+        log.info "Using preprocessed bacterial census file: ${censusFileBVal}"
+    }
+    // Next check direct user-provided path
+    else if (params.censusFileB && !(params.censusFileB instanceof Boolean) && params.censusFileB.toString().trim()) {
+        // Valid string path provided
+        censusFileBVal = file(params.censusFileB.toString(), checkIfExists: false)
+        if (censusFileBVal.exists()) {
+            log.info "Using user-provided bacterial census file: ${censusFileBVal}"
         } else {
-            log.warn "No valid census bacterial file path specified, using placeholder"
-            
-            // Create placeholder file since none was provided
-            def tempDir = new File("${workflow.launchDir}/work")
-            if (!tempDir.exists()) {
-                tempDir.mkdirs()
+            error "Census bacterial file not found: ${params.censusFileB} - PLACEHOLDERS DISABLED"
+        }
+    }
+    // Last option - check standard locations
+    else {
+        // Try standard locations
+        def stdLocations = [
+            "${workflow.projectDir}/data/census_bacterial.csv",
+            "${workflow.projectDir}/assets/census_bacterial.csv",
+            "${workflow.launchDir}/census_bacterial.csv"
+        ]
+        
+        boolean found = false
+        for (location in stdLocations) {
+            def stdFile = file(location, checkIfExists: false)
+            if (stdFile.exists()) {
+                censusFileBVal = stdFile
+                log.info "Using standard bacterial census file: ${censusFileBVal}"
+                found = true
+                break
             }
-            
-            def placeholderFile = new File(tempDir, "placeholder_census_bacterial.csv")
-            placeholderFile.text = placeholderContent
-            censusFileBVal = file(placeholderFile.absolutePath)
         }
         
-        log.info "Using census file (bacterial): ${censusFileBVal} (placeholder: ${!censusFileBVal.exists() || censusFileBVal.toString().contains('placeholder')})"
-    } catch (Exception e) {
-        log.warn "Error handling census bacterial file: ${e.message}, using in-memory placeholder"
-        // Use a relative path in the current working directory as last resort
-        def tempFile = new File("placeholder_census_bacterial.csv")
-        tempFile.text = placeholderContent
-        censusFileBVal = file(tempFile.absolutePath)
-        log.info "Created emergency placeholder: ${censusFileBVal}"
+        if (!found) {
+            error "ERROR: No bacterial census file found and placeholders disabled. Please provide a valid census file with --censusFileB"
+        }
     }
     
-    // Handle parasitic census file
-    try {
-        // First check if a valid census file path was provided and it exists
-        if (params.censusFileP && !(params.censusFileP instanceof Boolean) && params.censusFileP.toString().trim()) {
-            // Valid string path provided, try to use it first
-            censusFilePVal = file(params.censusFileP.toString(), checkIfExists: false)
-            if (censusFilePVal.exists()) {
-                log.info "Census parasitic file found: ${censusFilePVal}"
-            } else {
-                log.warn "Census parasitic file not found: ${params.censusFileP}, will use placeholder"
-                
-                // Create placeholder as fallback only when needed
-                def tempDir = new File("${workflow.launchDir}/work")
-                if (!tempDir.exists()) {
-                    tempDir.mkdirs()
-                }
-                
-                def placeholderFile = new File(tempDir, "placeholder_census_parasitic.csv")
-                placeholderFile.text = parasiticPlaceholderContent
-                censusFilePVal = file(placeholderFile.absolutePath)
-            }
+    // DIRECT APPROACH FOR PARASITIC CENSUS FILE - NO PLACEHOLDERS
+    log.info "Checking for census parasitic file"
+    
+    // First check if a valid parasitic census file is available from preprocessing
+    def preprocessedParasiticFile = file("${params.outdir}/${projID}/preprocessed/census_parasitic.csv", checkIfExists: false)
+    if (preprocessedParasiticFile.exists()) {
+        censusFilePVal = preprocessedParasiticFile
+        log.info "Using preprocessed parasitic census file: ${censusFilePVal}"
+    }
+    // Next check direct user-provided path
+    else if (params.censusFileP && !(params.censusFileP instanceof Boolean) && params.censusFileP.toString().trim()) {
+        // Valid string path provided
+        censusFilePVal = file(params.censusFileP.toString(), checkIfExists: false)
+        if (censusFilePVal.exists()) {
+            log.info "Using user-provided parasitic census file: ${censusFilePVal}"
         } else {
-            log.warn "No valid census parasitic file path specified, using placeholder"
-            
-            // Create placeholder file since none was provided
-            def tempDir = new File("${workflow.launchDir}/work")
-            if (!tempDir.exists()) {
-                tempDir.mkdirs()
+            error "Census parasitic file not found: ${params.censusFileP} - PLACEHOLDERS DISABLED"
+        }
+    }
+    // Last option - check standard locations
+    else {
+        // Try standard locations
+        def stdLocations = [
+            "${workflow.projectDir}/data/census_parasitic.csv",
+            "${workflow.projectDir}/assets/census_parasitic.csv",
+            "${workflow.launchDir}/census_parasitic.csv"
+        ]
+        
+        boolean found = false
+        for (location in stdLocations) {
+            def stdFile = file(location, checkIfExists: false)
+            if (stdFile.exists()) {
+                censusFilePVal = stdFile
+                log.info "Using standard parasitic census file: ${censusFilePVal}"
+                found = true
+                break
             }
-            
-            def placeholderFile = new File(tempDir, "placeholder_census_parasitic.csv")
-            placeholderFile.text = parasiticPlaceholderContent
-            censusFilePVal = file(placeholderFile.absolutePath)
         }
         
-        log.info "Using census file (parasitic): ${censusFilePVal} (placeholder: ${!censusFilePVal.exists() || censusFilePVal.toString().contains('placeholder')})"
-    } catch (Exception e) {
-        log.warn "Error handling census parasitic file: ${e.message}, using in-memory placeholder"
-        // Use a relative path in the current working directory as last resort
-        def tempFile = new File("placeholder_census_parasitic.csv")
-        tempFile.text = parasiticPlaceholderContent
-        censusFilePVal = file(tempFile.absolutePath)
-        log.info "Created emergency placeholder: ${censusFilePVal}"
+        if (!found) {
+            error "ERROR: No parasitic census file found and placeholders disabled. Please provide a valid census file with --censusFileP"
+        }
     }
     
     // Dashboard templates - handle with placeholders if missing
@@ -255,19 +251,29 @@ workflow SPLINE {
         
         log.info "Generating dashboard in ${resultDirPath}"
         
-        // Run the dashboard generator with all available outputs
-        // Pass the results channel directly to collect() inside the process call
-        GENERATE_DASHBOARD(
-            results.collect(), // This collects in the process context, not workflow context
-            resultDirPath,
-            projID,
-            dashboardTemplateVal,
-            dashboardScriptVal
-        )
-        dashboard = GENERATE_DASHBOARD.out.dashboard
+        // Collect and handle results in a safe way
+        def resultsList = results.collect()
+        log.info "Found ${resultsList.size()} result files for the dashboard"
         
-        // Verify dashboard was created
-        log.info "Dashboard generation process completed, output: ${dashboard}"
+        // Create a check file to verify data is available
+        new File("${resultDirPath}/dashboard.ready").text = "Dashboard data ready for processing: ${new Date()}"
+        
+        // Run the dashboard generator with all available outputs
+        if (resultsList.size() > 0) {
+            GENERATE_DASHBOARD(
+                resultsList,
+                resultDirPath,
+                projID,
+                dashboardTemplateVal,
+                dashboardScriptVal
+            )
+            dashboard = GENERATE_DASHBOARD.out.dashboard
+            
+            // Verify dashboard was created
+            log.info "Dashboard generation process completed, output: ${dashboard}"
+        } else {
+            log.warn "No result files found for dashboard generation - skipping"
+        }
     } else {
         log.info "Dashboard generation disabled, skipping"
     }
