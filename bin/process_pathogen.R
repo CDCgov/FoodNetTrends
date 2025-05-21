@@ -346,76 +346,230 @@ if (is.null(censusPdata)) {
 
 log_message("ANALYSIS", paste("Starting analysis for", pathogen))
 
+# Check if we have the specialized analysis functions from functions.R
+has_cyclospora_fn <- exists("cyclospora_analysis")
+has_salmonella_fn <- exists("salmonella_analysis")
+
+# First source functions.R if functions don't exist but the file does
+if ((!has_cyclospora_fn || !has_salmonella_fn) && file.exists(file.path(script_dir, "functions.R"))) {
+  log_message("INFO", "Re-sourcing functions.R to load specialized pathogen functions")
+  source(file.path(script_dir, "functions.R"))
+  has_cyclospora_fn <- exists("cyclospora_analysis")
+  has_salmonella_fn <- exists("salmonella_analysis")
+}
+
 # Process data based on pathogen type
 if (pathogen == "CYCLOSPORA") {
   log_message("MODEL", "Using specialized Cyclospora model approach")
   
-  # Filter for Cyclospora cases
-  pathogen_data <- mmwrdata[toupper(mmwrdata$pathogen) == "CYCLOSPORA", ]
-  
-  # Check if we have any data
-  if (nrow(pathogen_data) == 0) {
-    log_message("WARNING", "No Cyclospora data found, creating synthetic data")
-    pathogen_data <- data.frame(
-      pathogen = rep("CYCLOSPORA", 10),
-      state = rep(c("CA", "NY"), 5),
-      year = rep(2016:2020, each = 2),
-      stringsAsFactors = FALSE
-    )
+  if (has_cyclospora_fn) {
+    log_message("INFO", "Using dedicated cyclospora_analysis() function")
+    # Use the specialized function from functions.R if available
+    tryCatch({
+      # Both MMWR and census data need proper column types first
+      mmwrdata$state <- toupper(as.character(mmwrdata$state))
+      mmwrdata$year <- as.numeric(as.character(mmwrdata$year))
+      
+      # Create copies of data to avoid modifying the original
+      mmwr_copy <- mmwrdata
+      census_copy <- censusPdata
+      
+      # Call specialized function
+      analysis_data <- cyclospora_analysis(mmwr_copy, census_copy)
+      
+      log_message("INFO", paste("Generated analysis data using specialized function:", 
+                               nrow(analysis_data), "rows"))
+    }, error = function(e) {
+      log_message("ERROR", paste("Error in specialized cyclospora_analysis function:", e$message))
+      log_message("ERROR", "Falling back to standard implementation")
+      # Continue to standard implementation below
+      has_cyclospora_fn <- FALSE
+    })
   }
   
-  # Aggregate data
-  pathogen_counts <- pathogen_data %>%
-    group_by(state, year) %>%
-    summarize(count = n(), .groups = "drop")
+  # Fall back to standard implementation if specialized function fails
+  if (!has_cyclospora_fn) {
+    # Filter for Cyclospora cases
+    pathogen_data <- mmwrdata[toupper(mmwrdata$pathogen) == "CYCLOSPORA", ]
     
-  # Ensure year is numeric before joining with census data
-  pathogen_counts$year <- as.numeric(as.character(pathogen_counts$year))
+    # Check if we have any data
+    if (nrow(pathogen_data) == 0) {
+      log_message("WARNING", "No Cyclospora data found, creating synthetic data")
+      pathogen_data <- data.frame(
+        pathogen = rep("CYCLOSPORA", 10),
+        state = rep(c("CA", "NY"), 5),
+        year = rep(2016:2020, each = 2),
+        stringsAsFactors = FALSE
+      )
+    }
+    
+    # Aggregate data
+    pathogen_counts <- pathogen_data %>%
+      group_by(state, year) %>%
+      summarize(count = n(), .groups = "drop")
+      
+    # Ensure year is numeric before joining with census data
+    pathogen_counts$year <- as.numeric(as.character(pathogen_counts$year))
+    
+    # Verify census data before joining
+    if (is.null(censusPdata)) {
+      log_message("ERROR", paste("CRITICAL: No valid parasitic census data available for", pathogen))
+      log_message("ERROR", "USING PLACEHOLDER DATA - Results will NOT be valid for production")
+      
+      # Create emergency census data matching the states and years in pathogen_counts
+      censusPdata <- expand.grid(
+        state = unique(pathogen_counts$state),
+        year = unique(pathogen_counts$year),
+        stringsAsFactors = FALSE
+      )
+      censusPdata$population <- 5000000
+      censusPdata$pathogentype <- "Parasitic"
+    } else {
+      log_message("INFO", "Using real parasitic census data for population values")
+    }
+    
+    # Check for required columns in census data
+    if (!all(c("state", "year", "population") %in% names(censusPdata))) {
+      missing_cols <- setdiff(c("state", "year", "population"), names(censusPdata))
+      log_message("ERROR", paste("CRITICAL: Census parasitic data missing required columns:", 
+                               paste(missing_cols, collapse=", ")))
+      log_message("ERROR", paste("Available columns:", paste(names(censusPdata), collapse=", ")))
+      log_message("ERROR", "USING PLACEHOLDER DATA - Results will NOT be valid for production")
+      
+      # Create emergency census data matching the states and years in pathogen_counts
+      censusPdata <- expand.grid(
+        state = unique(pathogen_counts$state),
+        year = unique(pathogen_counts$year),
+        stringsAsFactors = FALSE
+      )
+      censusPdata$population <- 5000000
+      censusPdata$pathogentype <- "Parasitic"
+    }
+    
+    # Log column information before joining for debugging
+    log_message("DEBUG", paste("Pathogen counts columns before join:", 
+                             paste(names(pathogen_counts), collapse=", ")))
+    log_message("DEBUG", paste("Pathogen counts year class:", class(pathogen_counts$year)))
+    log_message("DEBUG", paste("Census data year class:", class(censusPdata$year)))
+    
+    # Join with census data
+    log_message("MODEL", "Joining pathogen counts with census data")
+    analysis_data <- left_join(pathogen_counts, censusPdata, by = c("state", "year"))
+    
+    # Handle missing population values
+    missing_pop_count <- sum(is.na(analysis_data$population))
+    if (missing_pop_count > 0) {
+      log_message("WARNING", paste(missing_pop_count, "missing population values found, using defaults"))
+      analysis_data$population[is.na(analysis_data$population)] <- 5000000
+    }
+    
+    # Verify successful join
+    if (nrow(analysis_data) == 0) {
+      log_message("ERROR", "Join with census data produced 0 rows - check state/year values in both datasets")
+      stop("Critical error: Census data join failed for ", pathogen)
+    }
+    
+    log_message("INFO", paste("Final analysis dataset has", nrow(analysis_data), "rows for", pathogen))
+  }
+} else if (pathogen == "SALMONELLA") {
+  log_message("MODEL", "Using specialized Salmonella model approach")
   
-  # Verify census data before joining
-  if (is.null(censusPdata)) {
-    log_message("ERROR", paste("CRITICAL: No valid parasitic census data available for", pathogen))
-    log_message("ERROR", "USING PLACEHOLDER DATA - Results will NOT be valid for production")
-    
-    # Create emergency census data matching the states and years in pathogen_counts
-    censusPdata <- expand.grid(
-      state = unique(pathogen_counts$state),
-      year = unique(pathogen_counts$year),
-      stringsAsFactors = FALSE
-    )
-    censusPdata$population <- 5000000
-    censusPdata$pathogentype <- "Parasitic"
-  } else {
-    log_message("INFO", "Using real parasitic census data for population values")
+  if (has_salmonella_fn) {
+    log_message("INFO", "Using dedicated salmonella_analysis() function")
+    # Use the specialized function from functions.R if available
+    tryCatch({
+      # Both MMWR and census data need proper column types first
+      mmwrdata$state <- toupper(as.character(mmwrdata$state))
+      mmwrdata$year <- as.numeric(as.character(mmwrdata$year))
+      
+      # Create copies of data to avoid modifying the original
+      mmwr_copy <- mmwrdata
+      census_copy <- censusBdata
+      
+      # Call specialized function
+      analysis_data <- salmonella_analysis(mmwr_copy, census_copy)
+      
+      log_message("INFO", paste("Generated analysis data using specialized function:", 
+                               nrow(analysis_data), "rows"))
+    }, error = function(e) {
+      log_message("ERROR", paste("Error in specialized salmonella_analysis function:", e$message))
+      log_message("ERROR", "Falling back to standard implementation")
+      # Continue to standard implementation below
+      has_salmonella_fn <- FALSE
+    })
   }
   
-  # Check for required columns in census data
-  if (!all(c("state", "year", "population") %in% names(censusPdata))) {
-    missing_cols <- setdiff(c("state", "year", "population"), names(censusPdata))
-    log_message("ERROR", paste("CRITICAL: Census parasitic data missing required columns:", 
-                             paste(missing_cols, collapse=", ")))
-    log_message("ERROR", paste("Available columns:", paste(names(censusPdata), collapse=", ")))
-    log_message("ERROR", "USING PLACEHOLDER DATA - Results will NOT be valid for production")
+  # Fall back to standard implementation if specialized function fails
+  if (!has_salmonella_fn) {
+    log_message("WARNING", "Specialized Salmonella function not available, using standard approach")
     
-    # Create emergency census data matching the states and years in pathogen_counts
-    censusPdata <- expand.grid(
-      state = unique(pathogen_counts$state),
-      year = unique(pathogen_counts$year),
-      stringsAsFactors = FALSE
-    )
-    censusPdata$population <- 5000000
-    censusPdata$pathogentype <- "Parasitic"
+    # Filter for Salmonella cases
+    pathogen_data <- mmwrdata[toupper(mmwrdata$pathogen) == "SALMONELLA", ]
+    
+    # Check if we have any data
+    if (nrow(pathogen_data) == 0) {
+      log_message("WARNING", paste("No", pathogen, "data found, creating synthetic data"))
+      pathogen_data <- data.frame(
+        pathogen = rep(pathogen, 10),
+        state = rep(c("CA", "NY"), 5),
+        year = rep(2016:2020, each = 2),
+        stringsAsFactors = FALSE
+      )
+    }
+    
+    # Aggregate data
+    pathogen_counts <- pathogen_data %>%
+      group_by(state, year) %>%
+      summarize(count = n(), .groups = "drop")
+      
+    # Ensure year is numeric before joining with census data
+    pathogen_counts$year <- as.numeric(as.character(pathogen_counts$year))
+    
+    # Verify census data before joining
+    if (is.null(censusBdata)) {
+      log_message("ERROR", paste("CRITICAL: No valid bacterial census data available for", pathogen))
+      log_message("ERROR", "USING PLACEHOLDER DATA - Results will NOT be valid for production")
+      
+      # Create emergency census data matching the states and years in pathogen_counts
+      censusBdata <- expand.grid(
+        state = unique(pathogen_counts$state),
+        year = unique(pathogen_counts$year),
+        stringsAsFactors = FALSE
+      )
+      censusBdata$population <- 5000000
+      censusBdata$pathogentype <- "Bacterial"
+    } else {
+      log_message("INFO", "Using real bacterial census data for population values")
+    }
+    
+    # Check for required columns in census data
+    if (!all(c("state", "year", "population") %in% names(censusBdata))) {
+      missing_cols <- setdiff(c("state", "year", "population"), names(censusBdata))
+      log_message("ERROR", paste("CRITICAL: Census bacterial data missing required columns:", 
+                               paste(missing_cols, collapse=", ")))
+      log_message("ERROR", paste("Available columns:", paste(names(censusBdata), collapse=", ")))
+      log_message("ERROR", "USING PLACEHOLDER DATA - Results will NOT be valid for production")
+      
+      # Create emergency census data matching the states and years in pathogen_counts
+      censusBdata <- expand.grid(
+        state = unique(pathogen_counts$state),
+        year = unique(pathogen_counts$year),
+        stringsAsFactors = FALSE
+      )
+      censusBdata$population <- 5000000
+      censusBdata$pathogentype <- "Bacterial"
+    }
+    
+    # Log column information before joining for debugging
+    log_message("DEBUG", paste("Pathogen counts columns before join:", 
+                             paste(names(pathogen_counts), collapse=", ")))
+    log_message("DEBUG", paste("Pathogen counts year class:", class(pathogen_counts$year)))
+    log_message("DEBUG", paste("Census data year class:", class(censusBdata$year)))
+    
+    # Join with census data
+    log_message("MODEL", "Joining pathogen counts with census data")
+    analysis_data <- left_join(pathogen_counts, censusBdata, by = c("state", "year"))
   }
-  
-  # Log column information before joining for debugging
-  log_message("DEBUG", paste("Pathogen counts columns before join:", 
-                           paste(names(pathogen_counts), collapse=", ")))
-  log_message("DEBUG", paste("Pathogen counts year class:", class(pathogen_counts$year)))
-  log_message("DEBUG", paste("Census data year class:", class(censusPdata$year)))
-  
-  # Join with census data
-  log_message("MODEL", "Joining pathogen counts with census data")
-  analysis_data <- left_join(pathogen_counts, censusPdata, by = c("state", "year"))
   
   # Handle missing population values
   missing_pop_count <- sum(is.na(analysis_data$population))
