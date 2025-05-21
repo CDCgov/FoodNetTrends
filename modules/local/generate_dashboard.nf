@@ -176,7 +176,7 @@ EOF
 <h1>FoodNet Trends Analysis Dashboard</h1>
 <h2>Error: Script Not Found</h2>
 <p>The dashboard generation script was not found. This is a simplified fallback dashboard.</p>
-<p>Analysis completed at: $(date)</p>
+<p>Analysis completed at: \$(date)</p>
 <p>Project ID: ${projID}</p>
 </body>
 </html>
@@ -212,7 +212,7 @@ EOF
 <h1>FoodNet Trends Analysis Dashboard</h1>
 <h2>Error: Script Failed</h2>
 <p>The dashboard generation script failed with exit code \$r_exit_code.</p>
-<p>Analysis completed at: $(date)</p>
+<p>Analysis completed at: \$(date)</p>
 <p>Project ID: ${projID}</p>
 </body>
 </html>
@@ -235,7 +235,7 @@ EOF
 <h1>FoodNet Trends Analysis Dashboard</h1>
 <h2>Error: Missing Output</h2>
 <p>The dashboard output file was not created properly.</p>
-<p>Analysis completed at: $(date)</p>
+<p>Analysis completed at: \$(date)</p>
 <p>Project ID: ${projID}</p>
 </body>
 </html>

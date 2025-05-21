@@ -72,10 +72,10 @@ process TRENDY {
     # Enhanced error handling with logging
     error_exit() {
         echo "ERROR: \$1" | tee -a "${pathogen}_trendy.log"
-        echo "$(date): Error in TRENDY process for ${pathogen}: \$1" >> "${pathogen}_error_summary.txt"
+        echo "\$(date): Error in TRENDY process for ${pathogen}: \$1" >> "${pathogen}_error_summary.txt"
         # Create a basic summary file to prevent "missing output" errors in the workflow
         echo "Error processing ${pathogen}" > "${pathogen}_summary.txt"
-        echo "Error occurred at $(date)" >> "${pathogen}_summary.txt"
+        echo "Error occurred at \$(date)" >> "${pathogen}_summary.txt"
         echo "Error message: \$1" >> "${pathogen}_summary.txt"
         exit 1
     }
@@ -83,7 +83,7 @@ process TRENDY {
     trap 'error_exit "Command failed with exit code \$?: \$BASH_COMMAND"' ERR
     
     # Log start time and resource information
-    echo "Starting TRENDY analysis for ${pathogen} at $(date)" | tee -a "${pathogen}_trendy.log"
+    echo "Starting TRENDY analysis for ${pathogen} at \$(date)" | tee -a "${pathogen}_trendy.log"
     echo "CPU cores: ${task.cpus}, Memory: ${task.memory}" | tee -a "${pathogen}_trendy.log"
     
     # Initialize variable defaults to ensure they're always defined
