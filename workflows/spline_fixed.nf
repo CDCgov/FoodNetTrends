@@ -231,19 +231,19 @@ workflow SPLINE {
     
     // Run TRENDY with input data - properly separate pathogen and mmwrFile
     TRENDY(
-        pathogens.map { pth, mmwr -> pth },  // Just extract pathogen
-        pathogens.map { pth, mmwr -> mmwr },  // Just extract mmwrFile
+        pathogens_ch.map { pth, mmwr -> pth },  // Just extract pathogen
+        pathogens_ch.map { pth, mmwr -> mmwr },  // Just extract mmwrFile
         censusFileBVal,
         censusFilePVal,
         scripts_pathVal
     )
     
     // Extract outputs for downstream use
-    model = TRENDY.out.model
-    summary = TRENDY.out.summary
-    results = TRENDY.out.results
-    figures = TRENDY.out.figures
-    log_files = TRENDY.out.log
+    def model = TRENDY.out.model
+    def summary = TRENDY.out.summary
+    def results = TRENDY.out.results
+    def figures = TRENDY.out.figures
+    def log_files = TRENDY.out.log
     
     // Dashboard templates - required files
     def dashboardTemplateVal, dashboardScriptVal
@@ -295,11 +295,11 @@ workflow SPLINE {
     // This is the correct location to safely define pathogen channel
     // *********************************************************************
     // Create pathogen channel with validated MMWR file
-    pathogens = Channel.fromList(pathogenList)
-        .map { pth -> tuple(pth, mmwrFileVal) }
+    def pathogens_ch = Channel.fromList(pathogenList)
+        .map { pth -> tuple(pth, mmwrFile) }
     
     // Define path to scripts directory
-    scripts_pathVal = file("${workflow.projectDir}/bin", checkIfExists: true)
+    def scripts_pathVal = file("${workflow.projectDir}/bin", checkIfExists: true)
     if (!scripts_pathVal.exists()) {
         log.warn "Scripts directory not found: ${scripts_pathVal}"
         scripts_pathVal = file("${workflow.launchDir}/bin", checkIfExists: true)
@@ -341,23 +341,19 @@ workflow SPLINE {
             
             // Collect all results first and wait until they're all available
             // This ensures dashboard only runs after ALL TRENDY processes complete
-            def all_results = TRENDY.out.results.collect()
+            def all_results = results.collect()
             
             // Verify we have results before proceeding
-            if (all_results.val.size() > 0) {
-                log.info "All analyses complete (${all_results.val.size()} result files). Generating dashboard."
-                
-                // Now pass the collected results to the dashboard
-                GENERATE_DASHBOARD(
-                    all_results,  // This will wait for ALL results before starting
-                    dashboardDir,
-                    projID,
-                    dashboardTemplateVal,
-                    dashboardScriptVal
-                )
-            } else {
-                log.warn "No analysis results found, using pre-created fallback dashboard"
-            }
+            log.info "All analyses complete. Generating dashboard."
+            
+            // Now pass the collected results to the dashboard
+            GENERATE_DASHBOARD(
+                all_results,  // This will wait for ALL results before starting
+                dashboardDir,
+                projID,
+                dashboardTemplateVal,
+                dashboardScriptVal
+            )
         } catch (Exception e) {
             log.warn "Exception in dashboard generation section: ${e.getMessage()}"
             log.warn "Using pre-created fallback dashboard"
