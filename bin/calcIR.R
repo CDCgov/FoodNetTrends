@@ -206,15 +206,19 @@ generate_metadata <- function(data, source_file, census_file_b = NULL, census_fi
     record_count = nrow(data)
   )
   
-  # Add census file paths to metadata if available
+  # Add census file paths to metadata if available - ensuring they are stored as strings
   if (!is.null(census_file_b)) {
     cat("Adding bacterial census file path to metadata:", census_file_b, "\n")
-    metadata$census_file_bacterial <- normalizePath(census_file_b, mustWork = FALSE)
+    # Ensure the path is stored as a simple string, not an array
+    metadata$census_file_bacterial <- as.character(normalizePath(census_file_b, mustWork = FALSE))
+    cat("Bacterial census path type:", class(metadata$census_file_bacterial), "\n")
   }
   
   if (!is.null(census_file_p)) {
     cat("Adding parasitic census file path to metadata:", census_file_p, "\n")
-    metadata$census_file_parasitic <- normalizePath(census_file_p, mustWork = FALSE)
+    # Ensure the path is stored as a simple string, not an array
+    metadata$census_file_parasitic <- as.character(normalizePath(census_file_p, mustWork = FALSE))
+    cat("Parasitic census path type:", class(metadata$census_file_parasitic), "\n")
   }
   
   # Add counts for basic statistics

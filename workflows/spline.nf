@@ -116,10 +116,35 @@ workflow SPLINE {
                     // Handle census_file_bacterial path safely
                     try {
                         if (metadataJson.containsKey('census_file_bacterial')) {
-                            log.info "Found census_file_bacterial in metadata: ${metadataJson.census_file_bacterial.getClass().getName()}"
+                            log.info "Found census_file_bacterial in metadata: ${metadataJson.census_file_bacterial?.getClass()?.getName() ?: 'null'}"
+                            
+                            // Handle census file path which might be a string or an array or other object
+                            def bacterialPath = null
                             if (metadataJson.census_file_bacterial instanceof String) {
-                                def bacterialPath = metadataJson.census_file_bacterial.toString()
-                                log.info "Found bacterial census file path in metadata: ${bacterialPath}"
+                                bacterialPath = metadataJson.census_file_bacterial.toString()
+                                log.info "Found bacterial census file path in metadata (as String): ${bacterialPath}"
+                            } else if (metadataJson.census_file_bacterial instanceof List) {
+                                // If it's an array/list, take the first element
+                                if (metadataJson.census_file_bacterial.size() > 0) {
+                                    bacterialPath = metadataJson.census_file_bacterial[0].toString()
+                                    log.info "Found bacterial census file path in metadata (as first element of List): ${bacterialPath}"
+                                } else {
+                                    log.warn "Census file bacterial in metadata is an empty List"
+                                }
+                            } else if (metadataJson.census_file_bacterial != null) {
+                                // For any other type, try toString
+                                try {
+                                    bacterialPath = metadataJson.census_file_bacterial.toString()
+                                    log.info "Found bacterial census file path in metadata (converted from ${metadataJson.census_file_bacterial.getClass().getName()}): ${bacterialPath}"
+                                } catch (Exception e) {
+                                    log.warn "Could not convert census_file_bacterial to string: ${e.message}"
+                                }
+                            } else {
+                                log.warn "Census file bacterial in metadata is null"
+                            }
+                            
+                            // Check if we obtained a valid path and use it
+                            if (bacterialPath) {
                                 def bacterialFile = file(bacterialPath, checkIfExists: false)
                                 if (bacterialFile.exists()) {
                                     censusFileBVal = bacterialFile
@@ -128,7 +153,7 @@ workflow SPLINE {
                                     log.warn "Bacterial census file in metadata doesn't exist: ${bacterialPath}"
                                 }
                             } else {
-                                log.warn "Census file bacterial in metadata is not a string: ${metadataJson.census_file_bacterial.getClass().getName()}"
+                                log.warn "No valid bacterial census file path found in metadata"
                             }
                         } else {
                             log.warn "Metadata doesn't contain census_file_bacterial key"
@@ -268,10 +293,35 @@ workflow SPLINE {
                     // Handle census_file_parasitic path safely
                     try {
                         if (metadataJson.containsKey('census_file_parasitic')) {
-                            log.info "Found census_file_parasitic in metadata: ${metadataJson.census_file_parasitic.getClass().getName()}"
+                            log.info "Found census_file_parasitic in metadata: ${metadataJson.census_file_parasitic?.getClass()?.getName() ?: 'null'}"
+                            
+                            // Handle census file path which might be a string or an array or other object
+                            def parasiticPath = null
                             if (metadataJson.census_file_parasitic instanceof String) {
-                                def parasiticPath = metadataJson.census_file_parasitic.toString()
-                                log.info "Found parasitic census file path in metadata: ${parasiticPath}"
+                                parasiticPath = metadataJson.census_file_parasitic.toString()
+                                log.info "Found parasitic census file path in metadata (as String): ${parasiticPath}"
+                            } else if (metadataJson.census_file_parasitic instanceof List) {
+                                // If it's an array/list, take the first element
+                                if (metadataJson.census_file_parasitic.size() > 0) {
+                                    parasiticPath = metadataJson.census_file_parasitic[0].toString()
+                                    log.info "Found parasitic census file path in metadata (as first element of List): ${parasiticPath}"
+                                } else {
+                                    log.warn "Census file parasitic in metadata is an empty List"
+                                }
+                            } else if (metadataJson.census_file_parasitic != null) {
+                                // For any other type, try toString
+                                try {
+                                    parasiticPath = metadataJson.census_file_parasitic.toString()
+                                    log.info "Found parasitic census file path in metadata (converted from ${metadataJson.census_file_parasitic.getClass().getName()}): ${parasiticPath}"
+                                } catch (Exception e) {
+                                    log.warn "Could not convert census_file_parasitic to string: ${e.message}"
+                                }
+                            } else {
+                                log.warn "Census file parasitic in metadata is null"
+                            }
+                            
+                            // Check if we obtained a valid path and use it
+                            if (parasiticPath) {
                                 def parasiticFile = file(parasiticPath, checkIfExists: false)
                                 if (parasiticFile.exists()) {
                                     censusFilePVal = parasiticFile
@@ -280,7 +330,7 @@ workflow SPLINE {
                                     log.warn "Parasitic census file in metadata doesn't exist: ${parasiticPath}"
                                 }
                             } else {
-                                log.warn "Census file parasitic in metadata is not a string: ${metadataJson.census_file_parasitic.getClass().getName()}"
+                                log.warn "No valid parasitic census file path found in metadata"
                             }
                         } else {
                             log.warn "Metadata doesn't contain census_file_parasitic key"
@@ -460,10 +510,35 @@ workflow SPLINE {
                     // Handle census_file_bacterial path safely
                     try {
                         if (metadataJson.containsKey('census_file_bacterial')) {
-                            log.info "Found census_file_bacterial in preprocessing metadata: ${metadataJson.census_file_bacterial.getClass().getName()}"
+                            log.info "Found census_file_bacterial in preprocessing metadata: ${metadataJson.census_file_bacterial?.getClass()?.getName() ?: 'null'}"
+                            
+                            // Handle census file path which might be a string or an array or other object
+                            def bacterialPath = null
                             if (metadataJson.census_file_bacterial instanceof String) {
-                                def bacterialPath = metadataJson.census_file_bacterial.toString()
-                                log.info "Found bacterial census file path in preprocessing metadata: ${bacterialPath}"
+                                bacterialPath = metadataJson.census_file_bacterial.toString()
+                                log.info "Found bacterial census file path in preprocessing metadata (as String): ${bacterialPath}"
+                            } else if (metadataJson.census_file_bacterial instanceof List) {
+                                // If it's an array/list, take the first element
+                                if (metadataJson.census_file_bacterial.size() > 0) {
+                                    bacterialPath = metadataJson.census_file_bacterial[0].toString()
+                                    log.info "Found bacterial census file path in preprocessing metadata (as first element of List): ${bacterialPath}"
+                                } else {
+                                    log.warn "Census file bacterial in preprocessing metadata is an empty List"
+                                }
+                            } else if (metadataJson.census_file_bacterial != null) {
+                                // For any other type, try toString
+                                try {
+                                    bacterialPath = metadataJson.census_file_bacterial.toString()
+                                    log.info "Found bacterial census file path in preprocessing metadata (converted from ${metadataJson.census_file_bacterial.getClass().getName()}): ${bacterialPath}"
+                                } catch (Exception e) {
+                                    log.warn "Could not convert census_file_bacterial to string: ${e.message}"
+                                }
+                            } else {
+                                log.warn "Census file bacterial in preprocessing metadata is null"
+                            }
+                            
+                            // Check if we obtained a valid path and use it
+                            if (bacterialPath) {
                                 def bacterialFile = file(bacterialPath, checkIfExists: false)
                                 if (bacterialFile.exists()) {
                                     censusFileBVal = bacterialFile
@@ -472,7 +547,7 @@ workflow SPLINE {
                                     log.warn "Bacterial census file in preprocessing metadata doesn't exist: ${bacterialPath}"
                                 }
                             } else {
-                                log.warn "Census file bacterial in preprocessing metadata is not a string: ${metadataJson.census_file_bacterial.getClass().getName()}"
+                                log.warn "No valid bacterial census file path found in preprocessing metadata"
                             }
                         } else {
                             log.warn "Preprocessing metadata doesn't contain census_file_bacterial key"
@@ -484,10 +559,35 @@ workflow SPLINE {
                     // Handle census_file_parasitic path safely
                     try {
                         if (metadataJson.containsKey('census_file_parasitic')) {
-                            log.info "Found census_file_parasitic in preprocessing metadata: ${metadataJson.census_file_parasitic.getClass().getName()}"
+                            log.info "Found census_file_parasitic in preprocessing metadata: ${metadataJson.census_file_parasitic?.getClass()?.getName() ?: 'null'}"
+                            
+                            // Handle census file path which might be a string or an array or other object
+                            def parasiticPath = null
                             if (metadataJson.census_file_parasitic instanceof String) {
-                                def parasiticPath = metadataJson.census_file_parasitic.toString()
-                                log.info "Found parasitic census file path in preprocessing metadata: ${parasiticPath}"
+                                parasiticPath = metadataJson.census_file_parasitic.toString()
+                                log.info "Found parasitic census file path in preprocessing metadata (as String): ${parasiticPath}"
+                            } else if (metadataJson.census_file_parasitic instanceof List) {
+                                // If it's an array/list, take the first element
+                                if (metadataJson.census_file_parasitic.size() > 0) {
+                                    parasiticPath = metadataJson.census_file_parasitic[0].toString()
+                                    log.info "Found parasitic census file path in preprocessing metadata (as first element of List): ${parasiticPath}"
+                                } else {
+                                    log.warn "Census file parasitic in preprocessing metadata is an empty List"
+                                }
+                            } else if (metadataJson.census_file_parasitic != null) {
+                                // For any other type, try toString
+                                try {
+                                    parasiticPath = metadataJson.census_file_parasitic.toString()
+                                    log.info "Found parasitic census file path in preprocessing metadata (converted from ${metadataJson.census_file_parasitic.getClass().getName()}): ${parasiticPath}"
+                                } catch (Exception e) {
+                                    log.warn "Could not convert census_file_parasitic to string: ${e.message}"
+                                }
+                            } else {
+                                log.warn "Census file parasitic in preprocessing metadata is null"
+                            }
+                            
+                            // Check if we obtained a valid path and use it
+                            if (parasiticPath) {
                                 def parasiticFile = file(parasiticPath, checkIfExists: false)
                                 if (parasiticFile.exists()) {
                                     censusFilePVal = parasiticFile
@@ -496,7 +596,7 @@ workflow SPLINE {
                                     log.warn "Parasitic census file in preprocessing metadata doesn't exist: ${parasiticPath}"
                                 }
                             } else {
-                                log.warn "Census file parasitic in preprocessing metadata is not a string: ${metadataJson.census_file_parasitic.getClass().getName()}"
+                                log.warn "No valid parasitic census file path found in preprocessing metadata"
                             }
                         } else {
                             log.warn "Preprocessing metadata doesn't contain census_file_parasitic key"

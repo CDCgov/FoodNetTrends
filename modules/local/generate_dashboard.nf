@@ -90,7 +90,10 @@ process GENERATE_DASHBOARD {
         done < summary_files.txt
     fi
     
-    # Update JSON if placeholder data found
+    # First set default template
+    TEMPLATE_TO_USE="${dashboardTemplate}"
+    
+    # Handle placeholder data - complete rewrite to avoid nested if statements
     if [ \$PLACEHOLDER_DATA_FOUND -eq 1 ]; then
         # Update JSON to indicate placeholder data is being used
         sed -i 's/"usesPlaceholderData": false/"usesPlaceholderData": true/' ${projID}_data_quality.json
@@ -105,30 +108,27 @@ process GENERATE_DASHBOARD {
         # Create a warning banner for HTML
         WARNING_BANNER="<div style='background-color: #f8d7da; color: #721c24; padding: 15px; margin: 20px 0; border: 1px solid #f5c6cb; border-radius: 5px;'><h3 style='margin-top:0'>⚠️ WARNING: Placeholder Data Detected</h3><p>This analysis contains placeholder data which may not represent real-world conditions.</p><p><strong>Results are NOT suitable for production or public health decision-making!</strong></p></div>"
         
-        # Insert warning into template - flattened the conditional for better syntax
-        TEMPLATE_TO_USE="fallback_template.html"
+        # Template handling - avoid nesting if statements
         if [ -f "${dashboardTemplate}" ]; then
             cp "${dashboardTemplate}" modified_template.html
             sed -i "s|<body>|<body>\\n\$WARNING_BANNER|" modified_template.html
             TEMPLATE_TO_USE="modified_template.html"
         else
-            # Fallback if template missing
-            cat > fallback_template.html << EOF
-<!DOCTYPE html>
-<html>
-<head><title>FoodNet Trends Dashboard - Fallback Template</title></head>
-<body>
-\$WARNING_BANNER
-<h1>FoodNet Trends Analysis</h1>
-<p>This is a fallback template due to missing template file.</p>
-</body>
-</html>
-EOF
+            # Create a simple fallback template
+            echo "<!DOCTYPE html>" > fallback_template.html
+            echo "<html>" >> fallback_template.html
+            echo "<head><title>FoodNet Trends Dashboard - Fallback Template</title></head>" >> fallback_template.html
+            echo "<body>" >> fallback_template.html
+            echo "\$WARNING_BANNER" >> fallback_template.html
+            echo "<h1>FoodNet Trends Analysis</h1>" >> fallback_template.html
+            echo "<p>This is a fallback template due to missing template file.</p>" >> fallback_template.html
+            echo "</body>" >> fallback_template.html
+            echo "</html>" >> fallback_template.html
+            TEMPLATE_TO_USE="fallback_template.html"
         fi
     else
         # No placeholder warnings
         echo "No placeholder data warnings detected." >> ${projID}_data_quality.log
-        TEMPLATE_TO_USE="${dashboardTemplate}"
     fi
     
     # Count IR files for data consistency
