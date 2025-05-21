@@ -57,11 +57,35 @@ workflow SPLINE {
     // Check for census bacterial file - REQUIRED
     log.info "Checking for census bacterial file"
     
-    // First check if a valid census file is available from preprocessing
-    def preprocessedBacterialFile = file("${params.outdir}/${projID}/preprocessed/census_bacterial.csv", checkIfExists: false)
-    if (preprocessedBacterialFile.exists()) {
-        censusFileBVal = preprocessedBacterialFile
-        log.info "Using preprocessed bacterial census file: ${censusFileBVal}"
+    // First check if metadata file is available to get census file paths
+    def metadataFile = file("${params.outdir}/${projID}/preprocessed/${projID}_metadata.json", checkIfExists: false)
+    if (metadataFile.exists()) {
+        try {
+            def metadataJson = groovy.json.JsonSlurper().parse(metadataFile)
+            if (metadataJson.census_file_bacterial) {
+                def bacterialPath = metadataJson.census_file_bacterial
+                def bacterialFile = file(bacterialPath, checkIfExists: false)
+                if (bacterialFile.exists()) {
+                    censusFileBVal = bacterialFile
+                    log.info "Using bacterial census file from metadata: ${censusFileBVal}"
+                } else {
+                    log.warn "Bacterial census file in metadata doesn't exist: ${bacterialPath}"
+                }
+            } else {
+                log.warn "Metadata doesn't contain bacterial census file path"
+            }
+        } catch (Exception e) {
+            log.warn "Could not parse metadata file: ${e.message}"
+        }
+    }
+    
+    // If not found in metadata, check for standard preprocessed file
+    if (censusFileBVal == null) {
+        def preprocessedBacterialFile = file("${params.outdir}/${projID}/preprocessed/census_bacterial.csv", checkIfExists: false)
+        if (preprocessedBacterialFile.exists()) {
+            censusFileBVal = preprocessedBacterialFile
+            log.info "Using preprocessed bacterial census file: ${censusFileBVal}"
+        }
     }
     // Next check direct user-provided path
     else if (params.censusFileB && !(params.censusFileB instanceof Boolean) && params.censusFileB.toString().trim()) {
@@ -108,11 +132,34 @@ workflow SPLINE {
     // Check for parasitic census file - REQUIRED
     log.info "Checking for census parasitic file"
     
-    // First check if a valid parasitic census file is available from preprocessing
-    def preprocessedParasiticFile = file("${params.outdir}/${projID}/preprocessed/census_parasitic.csv", checkIfExists: false)
-    if (preprocessedParasiticFile.exists()) {
-        censusFilePVal = preprocessedParasiticFile
-        log.info "Using preprocessed parasitic census file: ${censusFilePVal}"
+    // First check if metadata file is available to get census file paths
+    if (metadataFile?.exists()) {
+        try {
+            def metadataJson = groovy.json.JsonSlurper().parse(metadataFile)
+            if (metadataJson.census_file_parasitic) {
+                def parasiticPath = metadataJson.census_file_parasitic
+                def parasiticFile = file(parasiticPath, checkIfExists: false)
+                if (parasiticFile.exists()) {
+                    censusFilePVal = parasiticFile
+                    log.info "Using parasitic census file from metadata: ${censusFilePVal}"
+                } else {
+                    log.warn "Parasitic census file in metadata doesn't exist: ${parasiticPath}"
+                }
+            } else {
+                log.warn "Metadata doesn't contain parasitic census file path"
+            }
+        } catch (Exception e) {
+            log.warn "Could not parse metadata file for parasitic census: ${e.message}"
+        }
+    }
+    
+    // If not found in metadata, check for standard preprocessed file
+    if (censusFilePVal == null) {
+        def preprocessedParasiticFile = file("${params.outdir}/${projID}/preprocessed/census_parasitic.csv", checkIfExists: false)
+        if (preprocessedParasiticFile.exists()) {
+            censusFilePVal = preprocessedParasiticFile
+            log.info "Using preprocessed parasitic census file: ${censusFilePVal}"
+        }
     }
     // Next check direct user-provided path
     else if (params.censusFileP && !(params.censusFileP instanceof Boolean) && params.censusFileP.toString().trim()) {
@@ -225,6 +272,33 @@ workflow SPLINE {
         try {
             metadataFromProcess = PREPROCESS.out.metadata.first()
             log.info "Preprocessing generated metadata file: ${metadataFromProcess}"
+            
+            // If we have metadata from preprocessing, extract census file paths if available
+            try {
+                def metadataJson = groovy.json.JsonSlurper().parse(metadataFromProcess)
+                
+                // Check for bacterial census path
+                if (metadataJson.census_file_bacterial) {
+                    def bacterialPath = metadataJson.census_file_bacterial
+                    def bacterialFile = file(bacterialPath, checkIfExists: false)
+                    if (bacterialFile.exists()) {
+                        censusFileBVal = bacterialFile
+                        log.info "Updated bacterial census file from preprocessing metadata: ${censusFileBVal}"
+                    }
+                }
+                
+                // Check for parasitic census path
+                if (metadataJson.census_file_parasitic) {
+                    def parasiticPath = metadataJson.census_file_parasitic
+                    def parasiticFile = file(parasiticPath, checkIfExists: false)
+                    if (parasiticFile.exists()) {
+                        censusFilePVal = parasiticFile
+                        log.info "Updated parasitic census file from preprocessing metadata: ${censusFilePVal}"
+                    }
+                }
+            } catch (Exception e) {
+                log.warn "Could not extract census paths from metadata: ${e.message}"
+            }
         } catch (Exception e) {
             log.warn "No metadata file produced from preprocessing step: ${e.message}"
             metadataFromProcess = null

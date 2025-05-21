@@ -80,38 +80,44 @@ process PREPROCESS {
         exit 1
     fi
     
-    # Handle census bacterial file
+    # Handle census bacterial file - get absolute path
     if [ ! -f "${censusFileB}" ] || [ ! -s "${censusFileB}" ]; then
         echo "ERROR: Census bacterial file missing or empty" >> ${outputBase}_error.log
         echo "Census bacterial file is required for analysis" >> ${outputBase}_error.log
         exit 1
     else
         echo "Using provided bacterial census data: ${censusFileB}" >> ${outputBase}_process.log
-        CENSUS_B="${censusFileB}"
+        CENSUS_B_ABS=\$(readlink -f "${censusFileB}")
+        echo "Absolute path to bacterial census: \$CENSUS_B_ABS" >> ${outputBase}_process.log
     fi
     
-    # Handle census parasitic file
+    # Handle census parasitic file - get absolute path
     if [ ! -f "${censusFileP}" ] || [ ! -s "${censusFileP}" ]; then
         echo "ERROR: Census parasitic file missing or empty" >> ${outputBase}_error.log
         echo "Census parasitic file is required for analysis" >> ${outputBase}_error.log
         exit 1
     else
         echo "Using provided parasitic census data: ${censusFileP}" >> ${outputBase}_process.log
-        CENSUS_P="${censusFileP}"
+        CENSUS_P_ABS=\$(readlink -f "${censusFileP}")
+        echo "Absolute path to parasitic census: \$CENSUS_P_ABS" >> ${outputBase}_process.log
     fi
     
-    # Execute the R preprocessing script
+    # Create symbolic links with stable names for downstream steps
+    ln -sf "\$CENSUS_B_ABS" census_bacterial.csv
+    ln -sf "\$CENSUS_P_ABS" census_parasitic.csv
+    
+    # Execute the R preprocessing script with absolute paths
     echo "Running preprocessing script with:" >> ${outputBase}_process.log
     echo "  MMWR file: ${mmwrFile}" >> ${outputBase}_process.log
-    echo "  Census bacterial file: \$CENSUS_B" >> ${outputBase}_process.log
-    echo "  Census parasitic file: \$CENSUS_P" >> ${outputBase}_process.log
+    echo "  Census bacterial file: \$CENSUS_B_ABS" >> ${outputBase}_process.log
+    echo "  Census parasitic file: \$CENSUS_P_ABS" >> ${outputBase}_process.log
     echo "  Output file: ${outputBase}.csv" >> ${outputBase}_process.log
     echo "  Generate metadata: ${generateMetadata}" >> ${outputBase}_process.log
     
     Rscript ${workflow.projectDir}/bin/calcIR.R \\
       --mmwrFile="${mmwrFile}" \\
-      --censusFileB="\$CENSUS_B" \\
-      --censusFileP="\$CENSUS_P" \\
+      --censusFileB="\$CENSUS_B_ABS" \\
+      --censusFileP="\$CENSUS_P_ABS" \\
       --outputFile="${outputBase}.csv" \\
       --generate_metadata=${generateMetadata} \\
       2>&1 | tee ${outputBase}_R.log

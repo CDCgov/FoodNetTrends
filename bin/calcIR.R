@@ -189,8 +189,10 @@ clean_mmwr_data <- function(raw_data) {
 #' 
 #' @param data Cleaned MMWR data
 #' @param source_file Original source file path
+#' @param census_file_b Path to bacterial census file
+#' @param census_file_p Path to parasitic census file
 #' @return List with metadata information
-generate_metadata <- function(data, source_file) {
+generate_metadata <- function(data, source_file, census_file_b = NULL, census_file_p = NULL) {
   cat("Generating metadata from cleaned data...\n")
   
   # Extract key information for metadata
@@ -203,6 +205,17 @@ generate_metadata <- function(data, source_file) {
     source_file = source_file,
     record_count = nrow(data)
   )
+  
+  # Add census file paths to metadata if available
+  if (!is.null(census_file_b)) {
+    cat("Adding bacterial census file path to metadata:", census_file_b, "\n")
+    metadata$census_file_bacterial <- normalizePath(census_file_b, mustWork = FALSE)
+  }
+  
+  if (!is.null(census_file_p)) {
+    cat("Adding parasitic census file path to metadata:", census_file_p, "\n")
+    metadata$census_file_parasitic <- normalizePath(census_file_p, mustWork = FALSE)
+  }
   
   # Add counts for basic statistics
   metadata$counts <- list(
@@ -421,8 +434,13 @@ main <- function() {
     metadata_filename <- get_output_filename(output_base, "metadata", "json")
     metadata_file <- file.path(output_dir, metadata_filename)
     
-    # Generate metadata
-    metadata <- generate_metadata(cleaned_data, args$mmwrFile)
+    # Generate metadata with census file paths
+    metadata <- generate_metadata(
+      cleaned_data, 
+      args$mmwrFile,
+      args$censusFileB,  # Pass bacterial census file path
+      args$censusFileP   # Pass parasitic census file path
+    )
     
     # Write metadata JSON
     cat("Writing metadata to:", metadata_file, "\n")

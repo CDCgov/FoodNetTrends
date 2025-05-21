@@ -127,17 +127,19 @@ if [[ "$workflow_mode" == "1" ]]; then
     read -p "Census file (parasitic) [${defaultCensusFileP}]: " censusFileP
     censusFileP=${censusFileP:-$defaultCensusFileP}
     
-    # Check census files and warn if they don't exist (but don't exit)
+    # Check census files - required for analysis
     if [ ! -f "${censusFileB}" ]; then
-        echo "Warning: Census bacterial file does not exist: ${censusFileB}"
-        echo "$(date): Missing census bacterial file: ${censusFileB}" >> "$error_log"
-        echo "Continuing with placeholder file that will be created automatically."
+        echo "ERROR: Census bacterial file does not exist: ${censusFileB}"
+        echo "$(date): Missing required census bacterial file: ${censusFileB}" >> "$error_log"
+        echo "Census files are required for accurate rate calculations."
+        exit 1
     fi
     
     if [ ! -f "${censusFileP}" ]; then
-        echo "Warning: Census parasitic file does not exist: ${censusFileP}"
-        echo "$(date): Missing census parasitic file: ${censusFileP}" >> "$error_log"
-        echo "Continuing with placeholder file that will be created automatically."
+        echo "ERROR: Census parasitic file does not exist: ${censusFileP}"
+        echo "$(date): Missing required census parasitic file: ${censusFileP}" >> "$error_log"
+        echo "Census files are required for accurate rate calculations."
+        exit 1
     fi
     
     # Set output location
@@ -346,6 +348,9 @@ else
 
     # Set MMWR file to preprocessed data
     mmwrFile=$preprocessed_data
+    
+    # Census files will be discovered via metadata file later, but tell the user
+    echo "Census files can be automatically discovered from the metadata file"
 
     # Search for preprocessed JSON metadata files
     echo ""
@@ -408,8 +413,29 @@ if [[ -n "${preprocessed_metadata}" && -f "${preprocessed_metadata}" ]]; then
         echo "Metadata contains Salmonella serotype information."
     fi
     
-    # Extract pathogens from metadata if available
+    # Check if metadata contains census file paths for reuse
     if [[ "$have_jq" == true ]]; then
+        # Check for census bacterial file path
+        census_bacterial_path=$(jq -r '.census_file_bacterial // empty' "${preprocessed_metadata}" 2>/dev/null)
+        if [[ -n "$census_bacterial_path" && -f "$census_bacterial_path" ]]; then
+            echo "Found bacterial census file path in metadata: $census_bacterial_path"
+            if [[ -z "${censusFileB}" || ! -f "${censusFileB}" ]]; then
+                censusFileB="$census_bacterial_path"
+                echo "Using bacterial census file from metadata"
+            fi
+        fi
+        
+        # Check for census parasitic file path
+        census_parasitic_path=$(jq -r '.census_file_parasitic // empty' "${preprocessed_metadata}" 2>/dev/null)
+        if [[ -n "$census_parasitic_path" && -f "$census_parasitic_path" ]]; then
+            echo "Found parasitic census file path in metadata: $census_parasitic_path"
+            if [[ -z "${censusFileP}" || ! -f "${censusFileP}" ]]; then
+                censusFileP="$census_parasitic_path"
+                echo "Using parasitic census file from metadata"
+            fi
+        fi
+        
+        # Extract pathogens from metadata if available
         metadata_pathogens=$(jq -r '.pathogens | join(",")' "${preprocessed_metadata}" 2>/dev/null)
         if [ -n "$metadata_pathogens" ]; then
             echo "Pathogens in dataset: $metadata_pathogens"
@@ -421,6 +447,8 @@ if [[ -n "${preprocessed_metadata}" && -f "${preprocessed_metadata}" ]]; then
             echo "States in dataset: $metadata_states"
             ALL_STATES="$metadata_states"
         fi
+    else
+        echo "Note: jq not installed - cannot extract census file paths from metadata"
     fi
 fi
 
