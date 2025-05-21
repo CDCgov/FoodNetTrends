@@ -422,13 +422,18 @@ ERRORTEMPLATE
         echo "<!DOCTYPE html><html><head><title>FoodNet Dashboard Fallback</title></head><body><h1>FoodNet Analysis</h1><p>Dashboard generation failed. See logs for details.</p></body></html>" > \${MY_TIMESTAMP}_dashboard.html
     fi
     
-    # Create a symlink to ensure we have both formats available
-    if [ -f "${projID}_dashboard.html" ] && [ ! -f "\${MY_TIMESTAMP}_dashboard.html" ]; then
-        ln -sf "${projID}_dashboard.html" "\${MY_TIMESTAMP}_dashboard.html"
-        echo "Created symlink from ${projID}_dashboard.html to \${MY_TIMESTAMP}_dashboard.html" >> ${projID}_data_quality.log
-    elif [ ! -f "${projID}_dashboard.html" ] && [ -f "\${MY_TIMESTAMP}_dashboard.html" ]; then
-        ln -sf "\${MY_TIMESTAMP}_dashboard.html" "${projID}_dashboard.html"
-        echo "Created symlink from \${MY_TIMESTAMP}_dashboard.html to ${projID}_dashboard.html" >> ${projID}_data_quality.log
+    # Create both file formats to ensure Nextflow can find the expected output
+    if [ -f "${projID}_dashboard.html" ]; then
+        # Copy rather than symlink to ensure both files exist
+        cp "${projID}_dashboard.html" "\${MY_TIMESTAMP}_dashboard.html"
+        echo "Created copy from ${projID}_dashboard.html to \${MY_TIMESTAMP}_dashboard.html" >> ${projID}_data_quality.log
+    elif [ -f "\${MY_TIMESTAMP}_dashboard.html" ]; then
+        cp "\${MY_TIMESTAMP}_dashboard.html" "${projID}_dashboard.html"
+        echo "Created copy from \${MY_TIMESTAMP}_dashboard.html to ${projID}_dashboard.html" >> ${projID}_data_quality.log
     fi
+    
+    # Also create a file that matches the exact pattern Nextflow is looking for
+    echo "Creating additional dashboard file to match expected output pattern" >> ${projID}_data_quality.log
+    cp "${projID}_dashboard.html" "dashboard.html" 2>/dev/null || echo "<!DOCTYPE html><html><head><title>FoodNet Dashboard</title></head><body><h1>FoodNet Analysis</h1><p>Emergency fallback dashboard.</p></body></html>" > dashboard.html
     """
 }
