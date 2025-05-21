@@ -113,6 +113,7 @@ estimate_remaining_time <- function(percentage) {
 #'
 #' This function logs messages and displays a progress bar based on predefined
 #' milestones. It tracks the progression of analysis and shows estimated time.
+#' Enhanced to be environment-agnostic by writing to both console and file.
 #'
 #' @param stage The current processing stage label
 #' @param message Optional message to display
@@ -136,6 +137,9 @@ log_progress <- function(stage, message=NULL, milestone=NULL, ...) {
   elapsed_seconds <- as.numeric(difftime(Sys.time(), progress_state$start_time, units = "secs"))
   elapsed_str <- format_elapsed_time(elapsed_seconds)
   
+  # Create progress file path in the current directory
+  progress_file <- file.path(".", paste0(progress_state$pathogen, "_progress.txt"))
+  
   # Create progress string if we have a percentage
   progress_str <- ""
   if (!is.null(progress_pct)) {
@@ -145,12 +149,11 @@ log_progress <- function(stage, message=NULL, milestone=NULL, ...) {
     # Estimate remaining time
     eta <- estimate_remaining_time(progress_pct)
     
-    # Create the progress bar
+    # Create the progress bar - simpler ASCII version for cross-environment compatibility
     bar <- paste0(
       "\n[", 
-      strrep("=", filled),
-      if(filled < width) ">" else "",
-      strrep(" ", max(0, width - filled - 1)),
+      strrep("#", filled),
+      strrep(".", max(0, width - filled)),
       "] ", 
       sprintf("%3d%%", progress_pct),
       " | ", progress_state$pathogen,
@@ -158,16 +161,56 @@ log_progress <- function(stage, message=NULL, milestone=NULL, ...) {
       " | ETA: ", eta
     )
     progress_str <- bar
+    
+    # Write to progress file (overwrite previous content)
+    tryCatch({
+      # Write basic progress information to file - helps with monitoring
+      progress_data <- c(
+        paste0("PATHOGEN: ", progress_state$pathogen),
+        paste0("STAGE: ", stage),
+        paste0("PROGRESS: ", progress_pct, "%"),
+        paste0("MESSAGE: ", if(is.null(message)) "-" else message),
+        paste0("ELAPSED: ", elapsed_str),
+        paste0("REMAINING: ", eta),
+        paste0("TIMESTAMP: ", timestamp),
+        if(!is.null(milestone)) paste0("MILESTONE: ", milestone) else NULL
+      )
+      writeLines(progress_data, progress_file)
+      
+      # Also write a simple progress status file - only contains percentage (easy to monitor)
+      writeLines(as.character(progress_pct), paste0(progress_state$pathogen, "_percent.txt"))
+    }, error = function(e) {
+      warning("Could not write progress file: ", e$message)
+    })
   }
   
-  # Combine all parts and print
-  if (!is.null(message)) {
-    cat(sprintf("%s %s: %s%s\n", timestamp, stage, message, progress_str), ...)
+  # Create a clear headline message to stand out in logs
+  headline <- paste0(
+    "\n=========================================\n",
+    "  PATHOGEN: ", progress_state$pathogen, 
+    if(!is.null(progress_pct)) paste0(" [", progress_pct, "%]") else "",
+    "\n  STAGE: ", stage,
+    "\n  ", timestamp,
+    "\n=========================================")
+  
+  # Combine all parts and print - use multiple approaches for compatibility
+  full_message <- if (!is.null(message)) {
+    sprintf("%s\n%s: %s%s", headline, stage, message, progress_str)
   } else {
-    cat(sprintf("%s %s%s\n", timestamp, stage, progress_str), ...)
+    sprintf("%s\n%s%s", headline, stage, progress_str)
   }
   
+  # Print to console
+  cat(full_message, "\n", ...)
   flush.console()
+  
+  # Also write to a separate log file that can be monitored
+  tryCatch({
+    log_file <- paste0(progress_state$pathogen, "_progress_log.txt")
+    cat(full_message, "\n", file = log_file, append = TRUE)
+  }, error = function(e) {
+    # Silent fail - don't disrupt processing for logging
+  })
 }
 
 #' Standard log message function without progress tracking

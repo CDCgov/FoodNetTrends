@@ -35,10 +35,10 @@ process GENERATE_DASHBOARD {
     # Initialize JSON structure for data quality metadata
     # Get ISO date safely with direct assignment
     ISO_DATE=\$(date -Iseconds)
-    cat > ${projID}_data_quality.json << EOF
+    cat > ${projID}_data_quality.json << 'JSONEOF'
     {
       "projectId": "${projID}",
-      "generationDate": "\$ISO_DATE",
+      "generationDate": "$ISO_DATE",
       "dataQuality": {
         "usesPlaceholderData": false,
         "affectedPathogens": [],
@@ -46,7 +46,10 @@ process GENERATE_DASHBOARD {
         "dataConsistency": {}
       }
     }
-    EOF
+    JSONEOF
+    
+    # Fix the variables that need to be expanded in the JSON
+    sed -i "s/\$ISO_DATE/\$ISO_DATE/g" ${projID}_data_quality.json
     
     # Check for placeholder data warnings in any result files
     echo "Checking for data quality issues..." >> ${projID}_data_quality.log
@@ -153,13 +156,17 @@ EOFTEMPLATE
     # Ensure the debuginfo directory exists before trying to write to it
     mkdir -p debuginfo
     
+    # Create empty debug files to prevent missing file errors
+    touch debuginfo/directory_listing.txt
+    touch debuginfo/resultdir_listing.txt
+    touch debuginfo/result_files.txt
+    touch debuginfo/file_checks.txt
+    
     # Write directory listings safely with error handling
     { ls -la > debuginfo/directory_listing.txt; } 2>/dev/null || echo "Failed to create directory listing" >> ${projID}_data_quality.log
     { ls -la ${resultDir} > debuginfo/resultdir_listing.txt; } 2>/dev/null || echo "Could not list result directory: ${resultDir}" > debuginfo/resultdir_listing.txt
     
     # Collect info about input and result files with robust error handling
-    # First make sure the result_files.txt exists even if find fails
-    touch debuginfo/result_files.txt
     { find . -name "*_IRCatch.csv" -o -name "*_summary.txt" -o -name "*EstIRRCatch*.csv" > debuginfo/result_files.txt; } 2>/dev/null || echo "Warning: find command failed" >> ${projID}_data_quality.log
     
     # Read the count safely, ensuring the file exists
@@ -379,5 +386,11 @@ ERRORTEMPLATE
     # Final note - store date in a variable first
     COMPLETION_TIME=\$(date)
     echo "Dashboard generation completed at \$COMPLETION_TIME" >> ${projID}_data_quality.log
+    
+    # Make sure the output dashboard exists even if it failed to generate properly
+    if [ ! -f "${projID}_dashboard.html" ]; then
+        echo "<!DOCTYPE html><html><head><title>FoodNet Dashboard Fallback</title></head><body><h1>FoodNet Analysis</h1><p>Dashboard generation failed. See logs for details.</p></body></html>" > ${projID}_dashboard.html
+        echo "WARNING: Created emergency fallback dashboard due to missing output file" >> ${projID}_data_quality.log
+    fi
     """
 }

@@ -348,6 +348,88 @@ The MMWR file should contain the following key columns:
 - **Runtime**: From ~30 minutes (test) to several hours (full analysis)
 - **Parallelization**: Multiple pathogens are processed in parallel
 
+## Monitoring Progress
+
+The pipeline includes a robust, environment-agnostic progress tracking system that works reliably in any environment (local, HPC, containers, etc.):
+
+### Using the Progress Monitor Script
+
+A dedicated monitoring script provides real-time progress visualization:
+
+```bash
+# Basic usage - monitor current directory
+./bin/monitor_progress.sh
+
+# Monitor specific directory
+./bin/monitor_progress.sh -d /path/to/results
+
+# Monitor continuously, updating every 5 seconds
+./bin/monitor_progress.sh --follow
+
+# Monitor only a specific pathogen
+./bin/monitor_progress.sh --pathogen SALMONELLA
+
+# All options
+./bin/monitor_progress.sh --dir /path/to/results --pathogen CAMPYLOBACTER --follow --interval 10
+```
+
+**Script Options:**
+
+| Option | Description |
+|--------|-------------|
+| `-d, --dir DIR` | Directory to monitor for progress files (default: current dir) |
+| `-p, --pathogen NAME` | Only show progress for specific pathogen |
+| `-f, --follow` | Continuously update (like 'tail -f') |
+| `-i, --interval SEC` | Refresh interval in seconds (default: 5) |
+| `-h, --help` | Show help message |
+
+The monitor script provides a detailed, color-coded view of:
+- Overall progress percentage for each pathogen with visual progress bar
+- Current analysis stage and milestone
+- Elapsed time and estimated time remaining
+- Recent activity logs for context
+- Files generated so far
+
+### Progress File System
+
+The progress tracking system generates three types of files during pipeline execution:
+
+1. **`[PATHOGEN]_progress.txt`**: Structured progress information including:
+   - Current percentage completion
+   - Processing stage
+   - Status message
+   - Time elapsed and remaining
+   - Current milestone
+
+2. **`[PATHOGEN]_progress_log.txt`**: Comprehensive log with timestamps for all stages and milestones, useful for debugging or understanding the analysis process.
+
+3. **`[PATHOGEN]_percent.txt`**: Simple file containing only the percentage completion number, designed for easy polling by other monitoring systems.
+
+### Integration with Custom Monitoring Systems
+
+The progress files use a simple format that can be easily integrated with custom monitoring systems, dashboards, or notification scripts:
+
+```bash
+# Example: Simple script to send notification when analysis reaches 75%
+watch -n 60 'for f in *_percent.txt; do
+  pct=$(cat $f);
+  if [ "$pct" -ge 75 ] && [ "$pct" -lt 76 ]; then
+    pathogen=${f%_percent.txt};
+    echo "$pathogen analysis is 75% complete" | mail -s "Analysis Progress" user@example.com;
+  fi;
+done'
+```
+
+### Monitoring in HPC Environments
+
+In HPC environments where direct terminal access might be limited, the progress tracking system provides several options:
+
+1. **Scheduled Status Checks**: Set up a periodic job to run `monitor_progress.sh` and output to a file
+2. **File-Based Monitoring**: Check the progress files directly from a shared filesystem
+3. **Email Notifications**: Create a simple script to send email alerts at specific milestones
+
+The file-based progress tracking ensures visibility into analysis progress regardless of the execution environment.
+
 ## Troubleshooting
 
 | Issue | Solution |
@@ -358,6 +440,7 @@ The MMWR file should contain the following key columns:
 | **Failed jobs** | Use `-resume` flag to continue from point of failure |
 | **Container errors** | Rebuild container with `singularity build --force foodnet.sif foodnet.def` |
 | **R package errors** | Check `foodnet.yml` for package compatibility |
+| **No progress visible** | Use `./bin/monitor_progress.sh` to check progress files |
 
 ### Common Error Messages
 
