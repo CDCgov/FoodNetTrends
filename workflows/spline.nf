@@ -58,15 +58,27 @@ workflow SPLINE {
     log.info "Checking for census bacterial file"
     
     // Direct command-line parameter for census files takes priority
-    if (params.censusFileB && !(params.censusFileB instanceof Boolean) && params.censusFileB.toString().trim()) {
+    log.info "Checking for census bacterial file from command line parameters"
+    log.info "  Command line params: ${params.toString()}"
+    
+    if (params.censusFileB != null) {
+        log.info "  Found parameter censusFileB: ${params.censusFileB}"
         // Valid string path provided
         try {
             def bPath = params.censusFileB.toString().trim()
-            censusFileBVal = file(bPath)
-            if (censusFileBVal.exists()) {
-                log.info "Using user-provided bacterial census file: ${censusFileBVal}"
+            if (bPath && bPath != "true" && bPath != "false") {
+                log.info "  Checking file path: ${bPath}"
+                // Use more explicit file creation to see what's happening
+                def bFile = file(bPath)
+                if (bFile && bFile.exists()) {
+                    censusFileBVal = bFile
+                    log.info "Using user-provided bacterial census file: ${censusFileBVal} (exists: ${censusFileBVal.exists()})"
+                } else {
+                    log.warn "User-provided census bacterial file not found: ${bPath}"
+                    censusFileBVal = null
+                }
             } else {
-                log.warn "User-provided census bacterial file not found: ${bPath}"
+                log.warn "Census bacterial file parameter is empty or boolean value: ${bPath}"
                 censusFileBVal = null
             }
         } catch (Exception e) {
@@ -96,7 +108,7 @@ workflow SPLINE {
                 log.info "Metadata file size: ${metadataContent.size()} bytes"
                 
                 try {
-                    def slurper = new nextflow.util.JsonSlurper()
+                    def slurper = new groovy.json.JsonSlurper()
                     def metadataJson = slurper.parseText(metadataContent)
                     
                     log.info "Successfully parsed metadata JSON"
@@ -186,15 +198,26 @@ workflow SPLINE {
     log.info "Checking for census parasitic file"
     
     // Direct command-line parameter for census files takes priority
-    if (params.censusFileP && !(params.censusFileP instanceof Boolean) && params.censusFileP.toString().trim()) {
+    log.info "Checking for census parasitic file from command line parameters"
+    
+    if (params.censusFileP != null) {
+        log.info "  Found parameter censusFileP: ${params.censusFileP}"
         // Valid string path provided
         try {
             def pPath = params.censusFileP.toString().trim()
-            censusFilePVal = file(pPath)
-            if (censusFilePVal.exists()) {
-                log.info "Using user-provided parasitic census file: ${censusFilePVal}"
+            if (pPath && pPath != "true" && pPath != "false") {
+                log.info "  Checking file path: ${pPath}"
+                // Use more explicit file creation to see what's happening
+                def pFile = file(pPath)
+                if (pFile && pFile.exists()) {
+                    censusFilePVal = pFile
+                    log.info "Using user-provided parasitic census file: ${censusFilePVal} (exists: ${censusFilePVal.exists()})"
+                } else {
+                    log.warn "User-provided census parasitic file not found: ${pPath}"
+                    censusFilePVal = null
+                }
             } else {
-                log.warn "User-provided census parasitic file not found: ${pPath}"
+                log.warn "Census parasitic file parameter is empty or boolean value: ${pPath}"
                 censusFilePVal = null
             }
         } catch (Exception e) {
@@ -224,7 +247,7 @@ workflow SPLINE {
                 log.info "Metadata file size: ${metadataContent.size()} bytes"
                 
                 try {
-                    def slurper = new nextflow.util.JsonSlurper()
+                    def slurper = new groovy.json.JsonSlurper()
                     def metadataJson = slurper.parseText(metadataContent)
                     
                     log.info "Successfully parsed metadata JSON for parasitic census"
@@ -353,6 +376,11 @@ workflow SPLINE {
     Nextflow Ver  : ${nextflow.version}
     Starting time : ${new Date()}
     ==============================================
+    COMMAND LINE PARAMETERS:
+    censusFileB   : ${params.censusFileB}
+    censusFileP   : ${params.censusFileP}
+    metadata      : ${params.metadata}
+    ==============================================
     """
     
     // Preprocessing step if needed
@@ -391,7 +419,7 @@ workflow SPLINE {
                 log.info "Metadata file size: ${metadataContent.size()} bytes"
                 
                 try {
-                    def slurper = new nextflow.util.JsonSlurper()
+                    def slurper = new groovy.json.JsonSlurper()
                     def metadataJson = slurper.parseText(metadataContent)
                     
                     log.info "Successfully parsed metadata JSON from preprocessing"
