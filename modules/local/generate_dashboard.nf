@@ -28,7 +28,9 @@ process GENERATE_DASHBOARD {
     echo "" >> ${projID}_data_quality.log
     
     # Initialize JSON structure for data quality metadata
-    ISO_DATE=`date -Iseconds`
+    # Get ISO date format safely - avoid command substitution issues
+    date -Iseconds > date_iso_format.txt
+    ISO_DATE=`cat date_iso_format.txt`
     cat > ${projID}_data_quality.json << EOF
     {
       "projectId": "${projID}",
@@ -135,7 +137,8 @@ EOF
     
     # Collect info about input and result files
     find . -name "*_IRCatch.csv" -o -name "*_summary.txt" -o -name "*EstIRRCatch*.csv" > debuginfo/result_files.txt
-    echo "Found $(wc -l < debuginfo/result_files.txt) result files" >> ${projID}_data_quality.log
+    RESULT_COUNT=`wc -l < debuginfo/result_files.txt`
+    echo "Found \$RESULT_COUNT result files" >> ${projID}_data_quality.log
     
     # Check for common result files that should exist
     for PATHOGEN in CAMPYLOBACTER CYCLOSPORA SALMONELLA SHIGELLA; do
@@ -229,10 +232,10 @@ EOF
     <p><strong>Project ID:</strong> ${projID}</p>
     
     <h4>Script Errors (Last 10 lines):</h4>
-    <pre>$(tail -n 10 dashboard_generation.log)</pre>
+    <pre>`tail -n 10 dashboard_generation.log`</pre>
     
     <h4>Available Result Files:</h4>
-    <pre>$(find . -name "*_IRCatch.csv" | sort)</pre>
+    <pre>`find . -name "*_IRCatch.csv" | sort`</pre>
     
     <p>Full log information is available in the 'debuginfo' directory.</p>
     
