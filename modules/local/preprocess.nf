@@ -75,45 +75,64 @@ process PREPROCESS {
         exit 1
     fi
     
-    # Handle missing or empty census bacterial file
-    if [ ! -f "${censusFileB}" ] || [ ! -s "${censusFileB}" ]; then
-        echo "WARNING: Census bacterial file missing or empty: ${censusFileB}" >> ${outputBase}_warnings.log
-        echo "Creating standardized placeholder for census bacterial file" >> ${outputBase}_warnings.log
-        echo "state,population,year,pathogentype" > placeholder_census_bacterial.csv
-        echo "CA,10000000,2020,Bacterial" >> placeholder_census_bacterial.csv
-        echo "CO,5000000,2020,Bacterial" >> placeholder_census_bacterial.csv
-        echo "CT,3000000,2020,Bacterial" >> placeholder_census_bacterial.csv
-        echo "GA,8000000,2020,Bacterial" >> placeholder_census_bacterial.csv
-        echo "MD,5000000,2020,Bacterial" >> placeholder_census_bacterial.csv
-        echo "MN,4000000,2020,Bacterial" >> placeholder_census_bacterial.csv
-        echo "NM,2000000,2020,Bacterial" >> placeholder_census_bacterial.csv
-        echo "NY,15000000,2020,Bacterial" >> placeholder_census_bacterial.csv
-        echo "OR,3000000,2020,Bacterial" >> placeholder_census_bacterial.csv
-        echo "TN,5000000,2020,Bacterial" >> placeholder_census_bacterial.csv
-        CENSUS_B="${PWD}/placeholder_census_bacterial.csv"
-    else
-        CENSUS_B="${censusFileB}"
-    fi
+    # Create function to handle census files
+    cat > handle_census_file.sh << 'EOT'
+    function handle_census_file() {
+        local file_path=$1
+        local pathogen_type=$2
+        local placeholder_file=$3
+        local log_file=$4
+
+        if [ ! -f "${file_path}" ] || [ ! -s "${file_path}" ]; then
+            echo "WARNING: Census ${pathogen_type} file missing or empty: ${file_path}" >> ${log_file}
+            echo "Creating standardized placeholder for census ${pathogen_type} file" >> ${log_file}
+            
+            # Create directory if it doesn't exist
+            mkdir -p "$(dirname "${placeholder_file}")"
+            
+            # Create standardized placeholder file
+            echo "state,population,year,pathogentype" > "${placeholder_file}"
+            for state in CA CO CT GA MD MN NM NY OR TN; do
+                for year in {2016..2023}; do
+                    echo "${state},5000000,${year},${pathogen_type}" >> "${placeholder_file}"
+                done
+            done
+            
+            echo "CRITICAL WARNING: Using PLACEHOLDER ${pathogen_type} census data" | tee -a ${log_file}
+            echo "                  Results will NOT be valid for production use!" | tee -a ${log_file}
+            echo "                  Placeholder file created at: ${placeholder_file}" | tee -a ${log_file}
+            
+            local output_path="${placeholder_file}"
+        else
+            echo "Census ${pathogen_type} file exists: ${file_path}" >> ${log_file}
+            local output_path="${file_path}"
+            
+            # Verify file format
+            if [[ "${file_path}" == *.csv ]]; then
+                echo "Census ${pathogen_type} file format: CSV" >> ${log_file}
+                # Verify file has required columns
+                if ! head -1 "${file_path}" | grep -i -q "state" || ! head -1 "${file_path}" | grep -i -q "year"; then
+                    echo "WARNING: Census ${pathogen_type} file may be missing required columns" >> ${log_file}
+                fi
+            elif [[ "${file_path}" == *.sas7bdat ]]; then
+                echo "Census ${pathogen_type} file format: SAS" >> ${log_file}
+            else
+                echo "WARNING: Census ${pathogen_type} file has unknown format: ${file_path}" >> ${log_file}
+            fi
+        fi
+        
+        echo "${output_path}"
+    }
+    EOT
+
+    # Source the function
+    source handle_census_file.sh
     
-    # Handle missing or empty census parasitic file
-    if [ ! -f "${censusFileP}" ] || [ ! -s "${censusFileP}" ]; then
-        echo "WARNING: Census parasitic file missing or empty: ${censusFileP}" >> ${outputBase}_warnings.log
-        echo "Creating standardized placeholder for census parasitic file" >> ${outputBase}_warnings.log
-        echo "state,population,year,pathogentype" > placeholder_census_parasitic.csv
-        echo "CA,10000000,2020,Parasitic" >> placeholder_census_parasitic.csv
-        echo "CO,5000000,2020,Parasitic" >> placeholder_census_parasitic.csv
-        echo "CT,3000000,2020,Parasitic" >> placeholder_census_parasitic.csv
-        echo "GA,8000000,2020,Parasitic" >> placeholder_census_parasitic.csv
-        echo "MD,5000000,2020,Parasitic" >> placeholder_census_parasitic.csv
-        echo "MN,4000000,2020,Parasitic" >> placeholder_census_parasitic.csv
-        echo "NM,2000000,2020,Parasitic" >> placeholder_census_parasitic.csv
-        echo "NY,15000000,2020,Parasitic" >> placeholder_census_parasitic.csv
-        echo "OR,3000000,2020,Parasitic" >> placeholder_census_parasitic.csv
-        echo "TN,5000000,2020,Parasitic" >> placeholder_census_parasitic.csv
-        CENSUS_P="${PWD}/placeholder_census_parasitic.csv"
-    else
-        CENSUS_P="${censusFileP}"
-    fi
+    # Handle census bacterial file
+    CENSUS_B=$(handle_census_file "${censusFileB}" "bacterial" "${PWD}/placeholder_census_bacterial.csv" "${outputBase}_warnings.log")
+    
+    # Handle census parasitic file 
+    CENSUS_P=$(handle_census_file "${censusFileP}" "parasitic" "${PWD}/placeholder_census_parasitic.csv" "${outputBase}_warnings.log")
     
     # Execute the R preprocessing script with output capturing and proper argument handling
     echo "Using census bacterial file: \${CENSUS_B}" | tee -a ${outputBase}_process.log

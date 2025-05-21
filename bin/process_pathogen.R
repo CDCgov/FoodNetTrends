@@ -187,7 +187,7 @@ if (is.null(mmwrdata) || nrow(mmwrdata) == 0) {
   stop("MMWR data could not be loaded or is empty.")
 }
 
-# Import census bacterial data
+# Import and standardize census bacterial data
 censusBdata <- NULL
 if (!is.null(args$censusFileB) && file.exists(args$censusFileB)) {
   tryCatch({
@@ -197,12 +197,49 @@ if (!is.null(args$censusFileB) && file.exists(args$censusFileB)) {
     } else if (grepl("\\.sas7bdat$", args$censusFileB, ignore.case = TRUE)) {
       censusBdata <- read_sas(args$censusFileB)
     }
+    
+    # Standardize column names by looking for variations 
+    log_message("IMPORT", "Standardizing bacterial census column names")
+    
+    # Print column names to debug logs
+    log_message("DEBUG", paste("Original bacterial census columns:", 
+                             paste(names(censusBdata), collapse=", ")))
+    
+    # Find case-insensitive matches for state and year columns
+    state_col <- grep("^state$|^st$|^STATE$|^state_name$", names(censusBdata), 
+                    ignore.case = TRUE, value = TRUE)[1]
+    year_col <- grep("^year$|^yr$|^YEAR$|^mmwr_year$", names(censusBdata), 
+                   ignore.case = TRUE, value = TRUE)[1]
+    
+    log_message("DEBUG", paste("Detected state column:", state_col))
+    log_message("DEBUG", paste("Detected year column:", year_col))
+    
+    # Rename columns to standard names and ensure proper types
+    if (!is.na(state_col) && state_col != "state") {
+      censusBdata$state <- toupper(as.character(censusBdata[[state_col]]))
+    } else if (is.na(state_col)) {
+      log_message("ERROR", "Could not find state column in bacterial census file")
+      censusBdata <- NULL
+    }
+    
+    if (!is.na(year_col) && year_col != "year") {
+      censusBdata$year <- as.numeric(as.character(censusBdata[[year_col]]))
+    } else if (is.na(year_col)) {
+      log_message("ERROR", "Could not find year column in bacterial census file")
+      censusBdata <- NULL
+    }
+    
+    # Add pathogentype if missing
+    if (!"pathogentype" %in% names(censusBdata)) {
+      censusBdata$pathogentype <- "Bacterial"
+    }
+    
   }, error = function(e) {
     log_message("WARNING", paste("Failed to read bacterial census data:", e$message))
   })
 }
 
-# Import census parasitic data
+# Import and standardize census parasitic data
 censusPdata <- NULL
 if (!is.null(args$censusFileP) && file.exists(args$censusFileP)) {
   tryCatch({
@@ -212,6 +249,43 @@ if (!is.null(args$censusFileP) && file.exists(args$censusFileP)) {
     } else if (grepl("\\.sas7bdat$", args$censusFileP, ignore.case = TRUE)) {
       censusPdata <- read_sas(args$censusFileP)
     }
+    
+    # Standardize column names by looking for variations 
+    log_message("IMPORT", "Standardizing parasitic census column names")
+    
+    # Print column names to debug logs
+    log_message("DEBUG", paste("Original parasitic census columns:", 
+                             paste(names(censusPdata), collapse=", ")))
+    
+    # Find case-insensitive matches for state and year columns
+    state_col <- grep("^state$|^st$|^STATE$|^state_name$", names(censusPdata), 
+                    ignore.case = TRUE, value = TRUE)[1]
+    year_col <- grep("^year$|^yr$|^YEAR$|^mmwr_year$", names(censusPdata), 
+                   ignore.case = TRUE, value = TRUE)[1]
+    
+    log_message("DEBUG", paste("Detected state column:", state_col))
+    log_message("DEBUG", paste("Detected year column:", year_col))
+    
+    # Rename columns to standard names and ensure proper types
+    if (!is.na(state_col) && state_col != "state") {
+      censusPdata$state <- toupper(as.character(censusPdata[[state_col]]))
+    } else if (is.na(state_col)) {
+      log_message("ERROR", "Could not find state column in parasitic census file")
+      censusPdata <- NULL
+    }
+    
+    if (!is.na(year_col) && year_col != "year") {
+      censusPdata$year <- as.numeric(as.character(censusPdata[[year_col]]))
+    } else if (is.na(year_col)) {
+      log_message("ERROR", "Could not find year column in parasitic census file")
+      censusPdata <- NULL
+    }
+    
+    # Add pathogentype if missing
+    if (!"pathogentype" %in% names(censusPdata)) {
+      censusPdata$pathogentype <- "Parasitic"
+    }
+    
   }, error = function(e) {
     log_message("WARNING", paste("Failed to read parasitic census data:", e$message))
   })
@@ -275,15 +349,59 @@ if (pathogen == "CYCLOSPORA") {
     group_by(state, year) %>%
     summarize(count = n(), .groups = "drop")
   
+  # Verify census data before joining
+  if (is.null(censusPdata)) {
+    log_message("ERROR", paste("CRITICAL: No valid parasitic census data available for", pathogen))
+    log_message("ERROR", "USING PLACEHOLDER DATA - Results will NOT be valid for production")
+    
+    # Create emergency census data matching the states and years in pathogen_counts
+    censusPdata <- expand.grid(
+      state = unique(pathogen_counts$state),
+      year = unique(pathogen_counts$year),
+      stringsAsFactors = FALSE
+    )
+    censusPdata$population <- 5000000
+    censusPdata$pathogentype <- "Parasitic"
+  } else {
+    log_message("INFO", "Using real parasitic census data for population values")
+  }
+  
+  # Check for required columns in census data
+  if (!all(c("state", "year", "population") %in% names(censusPdata))) {
+    log_message("ERROR", paste("CRITICAL: Census parasitic data missing required columns:", 
+                             paste(setdiff(c("state", "year", "population"), names(censusPdata)), collapse=", ")))
+    log_message("ERROR", "Available columns: ", paste(names(censusPdata), collapse=", "))
+    log_message("ERROR", "USING PLACEHOLDER DATA - Results will NOT be valid for production")
+    
+    # Create emergency census data matching the states and years in pathogen_counts
+    censusPdata <- expand.grid(
+      state = unique(pathogen_counts$state),
+      year = unique(pathogen_counts$year),
+      stringsAsFactors = FALSE
+    )
+    censusPdata$population <- 5000000
+    censusPdata$pathogentype <- "Parasitic"
+  }
+  
   # Join with census data
-  analysis_data <- left_join(pathogen_counts, censusPdata,
-                            by = c("state", "year"))
+  log_message("MODEL", "Joining pathogen counts with census data")
+  analysis_data <- left_join(pathogen_counts, censusPdata, by = c("state", "year"))
   
   # Handle missing population values
-  if (any(is.na(analysis_data$population))) {
-    log_message("WARNING", "Missing population values found, using defaults")
+  missing_pop_count <- sum(is.na(analysis_data$population))
+  if (missing_pop_count > 0) {
+    log_message("WARNING", paste(missing_pop_count, "missing population values found, using defaults"))
     analysis_data$population[is.na(analysis_data$population)] <- 5000000
   }
+  
+  # Verify successful join
+  if (nrow(analysis_data) == 0) {
+    log_message("ERROR", "Join with census data produced 0 rows - check state/year values in both datasets")
+    stop("Critical error: Census data join failed for ", pathogen)
+  }
+  
+  log_message("INFO", paste("Final analysis dataset has", nrow(analysis_data), "rows for", pathogen))
+  
 } else {
   # For other pathogens (standard approach)
   log_message("MODEL", paste("Using standard model approach for", pathogen))
@@ -307,15 +425,58 @@ if (pathogen == "CYCLOSPORA") {
     group_by(state, year) %>%
     summarize(count = n(), .groups = "drop")
   
-  # Join with census data (using bacterial census for non-Cyclospora)
-  analysis_data <- left_join(pathogen_counts, censusBdata,
-                           by = c("state", "year"))
+  # Verify census data before joining
+  if (is.null(censusBdata)) {
+    log_message("ERROR", paste("CRITICAL: No valid bacterial census data available for", pathogen))
+    log_message("ERROR", "USING PLACEHOLDER DATA - Results will NOT be valid for production")
+    
+    # Create emergency census data matching the states and years in pathogen_counts
+    censusBdata <- expand.grid(
+      state = unique(pathogen_counts$state),
+      year = unique(pathogen_counts$year),
+      stringsAsFactors = FALSE
+    )
+    censusBdata$population <- 5000000
+    censusBdata$pathogentype <- "Bacterial"
+  } else {
+    log_message("INFO", "Using real bacterial census data for population values")
+  }
+  
+  # Check for required columns in census data
+  if (!all(c("state", "year", "population") %in% names(censusBdata))) {
+    log_message("ERROR", paste("CRITICAL: Census bacterial data missing required columns:", 
+                             paste(setdiff(c("state", "year", "population"), names(censusBdata)), collapse=", ")))
+    log_message("ERROR", "Available columns: ", paste(names(censusBdata), collapse=", "))
+    log_message("ERROR", "USING PLACEHOLDER DATA - Results will NOT be valid for production")
+    
+    # Create emergency census data matching the states and years in pathogen_counts
+    censusBdata <- expand.grid(
+      state = unique(pathogen_counts$state),
+      year = unique(pathogen_counts$year),
+      stringsAsFactors = FALSE
+    )
+    censusBdata$population <- 5000000
+    censusBdata$pathogentype <- "Bacterial"
+  }
+  
+  # Join with census data
+  log_message("MODEL", "Joining pathogen counts with census data")
+  analysis_data <- left_join(pathogen_counts, censusBdata, by = c("state", "year"))
   
   # Handle missing population values
-  if (any(is.na(analysis_data$population))) {
-    log_message("WARNING", "Missing population values found, using defaults")
+  missing_pop_count <- sum(is.na(analysis_data$population))
+  if (missing_pop_count > 0) {
+    log_message("WARNING", paste(missing_pop_count, "missing population values found, using defaults"))
     analysis_data$population[is.na(analysis_data$population)] <- 5000000
   }
+  
+  # Verify successful join
+  if (nrow(analysis_data) == 0) {
+    log_message("ERROR", "Join with census data produced 0 rows - check state/year values in both datasets")
+    stop("Critical error: Census data join failed for ", pathogen)
+  }
+  
+  log_message("INFO", paste("Final analysis dataset has", nrow(analysis_data), "rows for", pathogen))
 }
 
 # ---- Fit Bayesian Model ----

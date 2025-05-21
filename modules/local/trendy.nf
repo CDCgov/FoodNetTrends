@@ -201,6 +201,25 @@ process TRENDY {
         fi
     fi
     
+    # Check that data files exist and log their status clearly
+    echo "===== DATA FILES VERIFICATION =====" >> ${pathogen}_trendy.log
+    if [ -f "./census_bact.sas7bdat" ] && [ -s "./census_bact.sas7bdat" ]; then
+        echo "VALID: Using real bacterial census data (SAS format)" >> ${pathogen}_trendy.log
+    elif [ -f "./census_bact.csv" ] && [ -s "./census_bact.csv" ]; then
+        echo "VALID: Using real bacterial census data (CSV format)" >> ${pathogen}_trendy.log
+    else 
+        echo "WARNING: Using PLACEHOLDER bacterial census data - results will NOT be valid for production" >> ${pathogen}_trendy.log
+    fi
+    
+    if [ -f "./census_para.sas7bdat" ] && [ -s "./census_para.sas7bdat" ]; then
+        echo "VALID: Using real parasitic census data (SAS format)" >> ${pathogen}_trendy.log
+    elif [ -f "./census_para.csv" ] && [ -s "./census_para.csv" ]; then
+        echo "VALID: Using real parasitic census data (CSV format)" >> ${pathogen}_trendy.log
+    else
+        echo "WARNING: Using PLACEHOLDER parasitic census data - results will NOT be valid for production" >> ${pathogen}_trendy.log
+    fi
+    echo "===================================" >> ${pathogen}_trendy.log
+    
     # Check that our local data file copy exists and is readable
     if [ ! -f "./input_data.${mmwrFile.extension}" ] || [ ! -r "./input_data.${mmwrFile.extension}" ]; then
         error_exit "Local MMWR data file copy not found or not readable. Original file: ${mmwrFile}, Local copy attempt: ./input_data.${mmwrFile.extension}, Current directory contents: \$(ls -la ./)"
@@ -220,9 +239,63 @@ process TRENDY {
     echo "Census parasitic arg: \${CENSUS_P_ARG}" >> ${pathogen}_trendy.log
     echo "Preprocessing arg: \${PREPROC_ARG}" >> ${pathogen}_trendy.log
     
+    # Create a results summary file that will be clearly visible
+    echo "====================================================" > ${pathogen}_data_summary.txt
+    echo "     ANALYSIS SETUP FOR PATHOGEN: ${pathogen}" >> ${pathogen}_data_summary.txt
+    echo "====================================================" >> ${pathogen}_data_summary.txt
+    echo "Data Sources:" >> ${pathogen}_data_summary.txt
+    echo "  MMWR Data:       ./input_data.${mmwrFile.extension}" >> ${pathogen}_data_summary.txt
+    echo "  Census Data:" >> ${pathogen}_data_summary.txt
+    
+    # Check census data files and record their status
+    echo "  Census Bacterial Status:" >> ${pathogen}_data_summary.txt
+    if [ -f "./census_bact.sas7bdat" ] && [ -s "./census_bact.sas7bdat" ]; then
+        echo "    REAL DATA (SAS format)" >> ${pathogen}_data_summary.txt
+        ls -la "./census_bact.sas7bdat" >> ${pathogen}_data_summary.txt
+    elif [ -f "./census_bact.csv" ] && [ -s "./census_bact.csv" ]; then
+        echo "    REAL DATA (CSV format)" >> ${pathogen}_data_summary.txt
+        ls -la "./census_bact.csv" >> ${pathogen}_data_summary.txt
+    elif [ -f "./empty_census_bact.csv" ] && [ -s "./empty_census_bact.csv" ]; then
+        echo "    *** PLACEHOLDER DATA *** (Results are NOT suitable for production use)" >> ${pathogen}_data_summary.txt
+        ls -la "./empty_census_bact.csv" >> ${pathogen}_data_summary.txt
+    else
+        echo "    *** NO CENSUS FILE FOUND ***" >> ${pathogen}_data_summary.txt
+    fi
+    
+    echo "  Census Parasitic Status:" >> ${pathogen}_data_summary.txt
+    if [ -f "./census_para.sas7bdat" ] && [ -s "./census_para.sas7bdat" ]; then
+        echo "    REAL DATA (SAS format)" >> ${pathogen}_data_summary.txt
+        ls -la "./census_para.sas7bdat" >> ${pathogen}_data_summary.txt
+    elif [ -f "./census_para.csv" ] && [ -s "./census_para.csv" ]; then
+        echo "    REAL DATA (CSV format)" >> ${pathogen}_data_summary.txt
+        ls -la "./census_para.csv" >> ${pathogen}_data_summary.txt
+    elif [ -f "./empty_census_para.csv" ] && [ -s "./empty_census_para.csv" ]; then
+        echo "    *** PLACEHOLDER DATA *** (Results are NOT suitable for production use)" >> ${pathogen}_data_summary.txt
+        ls -la "./empty_census_para.csv" >> ${pathogen}_data_summary.txt
+    else
+        echo "    *** NO CENSUS FILE FOUND ***" >> ${pathogen}_data_summary.txt
+    fi
+    
+    echo "" >> ${pathogen}_data_summary.txt
+    echo "Analysis Parameters:" >> ${pathogen}_data_summary.txt
+    echo "  Pathogen:        ${pathogen}" >> ${pathogen}_data_summary.txt
+    echo "  Travel Types:    ${params.travel}" >> ${pathogen}_data_summary.txt
+    echo "  CIDT Types:      ${params.cidt}" >> ${pathogen}_data_summary.txt
+    echo "  MCMC Chains:     ${params.chains}" >> ${pathogen}_data_summary.txt
+    echo "  Iterations:      ${params.iterations}" >> ${pathogen}_data_summary.txt
+    echo "  Cores:           ${params.cores}" >> ${pathogen}_data_summary.txt
+    echo "  Script Path:     \${SCRIPT_PATH}" >> ${pathogen}_data_summary.txt
+    echo "====================================================" >> ${pathogen}_data_summary.txt
+    echo "" >> ${pathogen}_data_summary.txt
+    
+    # Copy to the log file as well
+    cat ${pathogen}_data_summary.txt >> ${pathogen}_trendy.log
+
     # Run the pathogen analysis with the new unified script
     echo "Running pathogen analysis for ${pathogen}" >> ${pathogen}_trendy.log
     echo "Using script: \${SCRIPT_PATH}" >> ${pathogen}_trendy.log
+    
+    # Run the R script with both stderr and stdout captured to a dedicated log file
     Rscript "\${SCRIPT_PATH}" \\
         --pathogen="${pathogen}" \\
         --mmwrFile="./input_data.${mmwrFile.extension}" \\
@@ -239,15 +312,50 @@ process TRENDY {
         --adapt_delta=${params.adapt_delta} \\
         --max_treedepth=${params.max_treedepth} \\
         --seed=${params.seed} \\
-        ${params.debug ? '--debug' : ''}
+        ${params.debug ? '--debug' : ''} 2>&1 | tee ${pathogen}_R_output.log
     
     # Check return code from R script
     R_STATUS=\$?
     if [ \$R_STATUS -ne 0 ]; then
         echo "ERROR: R script failed with exit code \$R_STATUS" >> ${pathogen}_trendy.log
+        
+        # Create a more visible error summary
+        echo "EXECUTION ERROR" >> ${pathogen}_data_summary.txt
+        echo "----------------" >> ${pathogen}_data_summary.txt
+        echo "The R script failed with exit code \$R_STATUS" >> ${pathogen}_data_summary.txt
+        echo "Check ${pathogen}_R_output.log for details" >> ${pathogen}_data_summary.txt
+        
         error_exit "Analysis failed for pathogen ${pathogen}"
     fi
     
+    # Check for the presence of key output files
+    if [ -f "${pathogen}_IRCatch.csv" ]; then
+        echo "SUCCESS: Generated incidence rate file ${pathogen}_IRCatch.csv" >> ${pathogen}_data_summary.txt
+        wc -l "${pathogen}_IRCatch.csv" >> ${pathogen}_data_summary.txt
+    else
+        echo "WARNING: No incidence rate file was generated!" >> ${pathogen}_data_summary.txt
+    fi
+    
+    if [ -f "${pathogen}_brm.Rds" ]; then
+        echo "SUCCESS: Generated model file ${pathogen}_brm.Rds" >> ${pathogen}_data_summary.txt
+        ls -la "${pathogen}_brm.Rds" >> ${pathogen}_data_summary.txt
+    else
+        echo "WARNING: No model file was generated!" >> ${pathogen}_data_summary.txt
+    fi
+    
+    # Check for figures
+    png_count=\$(ls -1 ${pathogen}_*.png 2>/dev/null | wc -l)
+    if [ \$png_count -gt 0 ]; then
+        echo "SUCCESS: Generated \$png_count visualization files" >> ${pathogen}_data_summary.txt
+        ls -la ${pathogen}_*.png >> ${pathogen}_data_summary.txt
+    else
+        echo "WARNING: No visualization files were generated!" >> ${pathogen}_data_summary.txt
+    fi
+    
     echo "Analysis completed successfully" >> ${pathogen}_trendy.log
+    echo "ANALYSIS COMPLETED SUCCESSFULLY" >> ${pathogen}_data_summary.txt
+    
+    # Copy the data summary to the log path as well to ensure it's published
+    cp ${pathogen}_data_summary.txt ${pathogen}_data_summary.log
     """
 }

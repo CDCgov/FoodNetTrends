@@ -23,7 +23,7 @@ process GENERATE_DASHBOARD {
     echo "=========================================" > ${projID}_data_quality.log
     echo "  FoodNet Trends Data Quality Assessment" >> ${projID}_data_quality.log
     echo "  Project ID: ${projID}" >> ${projID}_data_quality.log
-    echo "  Generated: $(date)" >> ${projID}_data_quality.log
+    echo "  Generated: \$(date)" >> ${projID}_data_quality.log
     echo "=========================================" >> ${projID}_data_quality.log
     echo "" >> ${projID}_data_quality.log
     
@@ -31,7 +31,7 @@ process GENERATE_DASHBOARD {
     cat > ${projID}_data_quality.json << EOF
     {
       "projectId": "${projID}",
-      "generationDate": "$(date -Iseconds)",
+      "generationDate": "\$(date -Iseconds)",
       "dataQuality": {
         "usesPlaceholderData": false,
         "affectedPathogens": [],
@@ -94,7 +94,7 @@ process GENERATE_DASHBOARD {
         
         # Create a detailed warning banner for the dashboard with pathogen-specific info
         if [ -n "\$pathogen_warnings" ]; then
-            warning_details="<ul style='margin-top:10px;text-align:left;'>\$(echo -e "\$pathogen_warnings" | sed 's/- /<li>/g' | sed 's/$/<\\/li>/g')</ul>"
+            warning_details="<ul style='margin-top:10px;text-align:left;'>\$(echo -e "\$pathogen_warnings" | sed 's/- /<li>/g' | sed 's/\$//<\\/li>/g')</ul>"
         else
             warning_details=""
         fi
@@ -142,6 +142,6 @@ process GENERATE_DASHBOARD {
     
     # Add note to quality log
     echo "" >> ${projID}_data_quality.log
-    echo "Dashboard generation completed at $(date)" >> ${projID}_data_quality.log
+    echo "Dashboard generation completed at \$(date)" >> ${projID}_data_quality.log
     """
 }
