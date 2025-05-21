@@ -1,13 +1,13 @@
 process GENERATE_DASHBOARD {
-    // Always ignore errors in dashboard generation to ensure workflow completes
-    errorStrategy 'ignore'
-    maxRetries 0
+    // Use retry strategy to handle potential memory or time issues
+    errorStrategy { task.exitStatus == 137 ? 'retry' : 'ignore' } // 137 is OOM kill
+    maxRetries 3
     tag "Generate dashboard"
-    label 'process_medium'
+    label 'process_high_memory' // Increase resource label
     shell "/bin/bash"
     container 'foodnet.sif'
-    time '30m'
-    memory '4 GB'
+    time '1h'
+    memory '16 GB' // Significantly increase memory allocation
 
     input:
     path ir_outputs
@@ -24,6 +24,10 @@ process GENERATE_DASHBOARD {
 
     script:
     """
+    # Memory optimization for R
+    export R_MAX_VSIZE=12G
+    export R_GC_MEM_GROW=0
+    
     # Create a data quality assessment log
     echo "=========================================" > ${projID}_data_quality.log
     echo "  FoodNet Trends Data Quality Assessment" >> ${projID}_data_quality.log
@@ -230,16 +234,17 @@ ERRORTEMPLATE
         echo "Incidence rate files available:" >> ${projID}_data_quality.log
         find . -name "*_IRCatch.csv" -ls >> ${projID}_data_quality.log 2>/dev/null || echo "  None found" >> ${projID}_data_quality.log
         
-        # Run script with error handling and detailed logging
+        # Run script with error handling and detailed logging - use optimized version
         set +e
         Rscript \\
-          "${dashboardScript}" \\
+          "${workflow.projectDir}/bin/generate_dashboard_optimized.R" \\
           --outDir="${resultDir}" \\
           --resultDir="${resultDir}" \\
           --outputFile="${projID}_dashboard.html" \\
           --title="FoodNet Trends Analysis: ${projID}" \\
           --templateFile="\$TEMPLATE_TO_USE" \\
-          --qualityDataPath="${projID}_data_quality.json" 2>&1 | tee -a dashboard_generation.log
+          --qualityDataPath="${projID}_data_quality.json" \\
+          --memoryLimit=14 2>&1 | tee -a dashboard_generation.log
           
         SCRIPT_EXIT_CODE=\$?
         set -e

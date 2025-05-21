@@ -10,7 +10,12 @@
 # Usage:
 #   ./emergency_dashboard.sh [output_directory] [project_id]
 #
+# This script is the most reliable final fallback for dashboard creation
+# when all other methods fail.
 # =========================================================================
+
+# Enable error handling
+set -e
 
 OUTPUT_DIR=${1:-"output"}
 PROJECT_ID=${2:-$(date +%Y%m%d_%H%M%S)}
