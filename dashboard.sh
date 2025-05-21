@@ -50,6 +50,17 @@ else
   echo "Proceeding with dashboard generation..."
 fi
 
+# Load necessary modules if available
+if command -v module &> /dev/null; then
+    module purge
+    module load nextflow/24.10.4
+    module load singularity/4.1.4
+    module load java/17.0.6
+    echo "Loaded required modules for HPC environment"
+else
+    echo "Module system not detected, using environment PATH"
+fi
+
 # Run the dashboard-only workflow
 nextflow run main.nf -entry DASHBOARD_GEN \
   -profile singularity,production \

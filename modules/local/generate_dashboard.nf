@@ -24,6 +24,9 @@ process GENERATE_DASHBOARD {
 
     script:
     """
+    # Define timestamp for file naming
+    TIMESTAMP=\$(date +%Y%m%d_%H%M%S)
+    
     # Memory optimization for R
     export R_MAX_VSIZE=12G
     export R_GC_MEM_GROW=0
@@ -395,7 +398,6 @@ ERRORTEMPLATE
     
     # Make sure the output dashboard exists even if it failed to generate properly
     # Create dashboard with both timestamp and projID to ensure it matches the expected pattern
-    TIMESTAMP=\$(date +%Y%m%d_%H%M%S)
     # First try with the pattern specified in the output
     if [ ! -f "${projID}_dashboard.html" ]; then
         echo "Creating emergency fallback dashboard at ${projID}_dashboard.html" >> ${projID}_data_quality.log
