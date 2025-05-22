@@ -317,29 +317,16 @@ workflow SPLINE {
         new File(dashboardDir).mkdirs()
         
         try {
-            // Collect ALL outputs from TRENDY processes - results, figures, and summaries
+            // Collect ALL outputs from TRENDY processes using mix to combine channels
             // This ensures dashboard only runs after ALL TRENDY processes complete
-            def all_results = results.collect()
-            def all_figures = figures.collect()
-            def all_summaries = summary.collect()
-            
-            // Combine all outputs into a single channel
-            all_results
-                .combine(all_figures)
-                .combine(all_summaries)
-                .map { results_list, figures_list, summaries_list ->
-                    // Flatten all files into a single list
-                    def all_files = []
-                    all_files.addAll(results_list)
-                    all_files.addAll(figures_list)
-                    all_files.addAll(summaries_list)
-                    return all_files
-                }
-                .set { collected_all_files }
+            results
+                .mix(figures, summary)  // Combine all output channels
+                .collect()              // Wait for all files to be available
+                .set { all_output_files }
             
             // Now pass ALL collected files to the dashboard
             GENERATE_DASHBOARD(
-                collected_all_files,  // This includes CSV, PNG, and summary files
+                all_output_files,  // This includes CSV, PNG, and summary files
                 dashboardDir,
                 projID,
                 dashboardTemplateVal,
