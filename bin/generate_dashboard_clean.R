@@ -87,6 +87,17 @@ scan_results <- function(result_dir) {
     log_files = files[grepl("\\.log$", files)]
   )
   
+  # Also check for symlinked files (Nextflow creates symlinks)
+  symlinked_files <- list.files(result_dir, full.names = TRUE, recursive = FALSE)
+  symlinked_files <- symlinked_files[file.info(symlinked_files)$islink]
+  
+  if (length(symlinked_files) > 0) {
+    # Add symlinked files to appropriate categories
+    result_data$png_files <- c(result_data$png_files, symlinked_files[grepl("\\.png$", symlinked_files)])
+    result_data$summary_files <- c(result_data$summary_files, symlinked_files[grepl("_summary\\.txt$", symlinked_files)])
+    result_data$ir_files <- c(result_data$ir_files, symlinked_files[grepl("_IRCatch\\.csv$", symlinked_files)])
+  }
+  
   cat("Found files:\n")
   cat("  IR files:", length(result_data$ir_files), "\n")
   cat("  PNG files:", length(result_data$png_files), "\n")

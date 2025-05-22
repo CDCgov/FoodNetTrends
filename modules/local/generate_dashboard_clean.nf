@@ -53,6 +53,14 @@ EOF
     ls -la *.png >> ${projID}_data_quality.log 2>/dev/null || echo "No PNG files found" >> ${projID}_data_quality.log
     ls -la *summary.txt >> ${projID}_data_quality.log 2>/dev/null || echo "No summary files found" >> ${projID}_data_quality.log
     
+    # Also check for linked files (Nextflow creates symlinks)
+    echo "All files in work directory:" >> ${projID}_data_quality.log
+    ls -la >> ${projID}_data_quality.log
+    
+    # Follow symlinks to find actual PNG and summary files
+    find . -name "*.png" -type l >> ${projID}_data_quality.log 2>/dev/null || echo "No PNG symlinks found" >> ${projID}_data_quality.log
+    find . -name "*summary.txt" -type l >> ${projID}_data_quality.log 2>/dev/null || echo "No summary symlinks found" >> ${projID}_data_quality.log
+    
     # Use the clean dashboard script
     CLEAN_SCRIPT="${workflow.projectDir}/bin/generate_dashboard_clean.R"
     
@@ -70,8 +78,8 @@ HTMLEOF
     else
         echo "Running clean dashboard generator..." >> ${projID}_data_quality.log
         
-        # Execute the clean dashboard script
-        singularity exec foodnet.sif Rscript "\$CLEAN_SCRIPT" \\
+        # Execute the clean dashboard script (Nextflow handles container automatically)
+        Rscript "\$CLEAN_SCRIPT" \\
             --outDir="." \\
             --resultDir="." \\
             --outputFile="dashboard.html" \\
