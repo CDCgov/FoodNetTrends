@@ -990,37 +990,40 @@ model_fit <- tryCatch({
       return(TRUE)  # Must return TRUE to continue sampling
     }
     
-    # Fit model with progress callback
+    # Test with minimal Stan settings first to isolate the issue
+    # If this works, we can gradually increase complexity
     brm(
       formula = formula,
       data = analysis_data,
       family = "negbinomial",
-      cores = args$cores,
-      chains = args$chains,
-      iter = args$iterations,
+      cores = 1,  # Start with single core to avoid parallel issues
+      chains = 2,  # Minimal chains for testing
+      iter = 200,  # Very short run for testing
       control = list(
-        adapt_delta = args$adapt_delta,
-        max_treedepth = args$max_treedepth
+        adapt_delta = 0.8,  # More lenient
+        max_treedepth = 8   # Lower complexity
       ),
       seed = args$seed,
-      backend = "rstan",  # Must use rstan for refresh
-      refresh = 0,  # Disable default progress to avoid conflicts with our progress bar
-      callback = mcmc_progress
+      backend = "rstan",
+      refresh = 50,  # Enable Stan output to see what's happening
+      silent = FALSE  # Show Stan messages
     )
   } else {
-    # Fit model without progress tracking
+    # Test with minimal Stan settings (no progress tracking)
     brm(
       formula = formula,
       data = analysis_data,
       family = "negbinomial",
-      cores = args$cores,
-      chains = args$chains,
-      iter = args$iterations,
+      cores = 1,  # Single core for testing
+      chains = 2,  # Minimal chains
+      iter = 200,  # Short test run
       control = list(
-        adapt_delta = args$adapt_delta,
-        max_treedepth = args$max_treedepth
+        adapt_delta = 0.8,
+        max_treedepth = 8
       ),
-      seed = args$seed
+      seed = args$seed,
+      refresh = 50,  # Show Stan messages
+      silent = FALSE
     )
   }
 }, error = function(e) {
