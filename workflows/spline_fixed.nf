@@ -20,7 +20,7 @@ Date:    May 2025
 // Import required modules
 include { PREPROCESS } from './preprocess'
 include { TRENDY } from '../modules/local/trendy'
-include { GENERATE_DASHBOARD } from '../modules/local/generate_dashboard'
+include { GENERATE_DASHBOARD } from '../modules/local/generate_dashboard_clean'
 
 // Define the main workflow
 workflow SPLINE {
@@ -262,7 +262,7 @@ workflow SPLINE {
     
     // Dashboard templates - required files
     def dashboardTemplateVal = file("${workflow.projectDir}/assets/dashboard_template.html", checkIfExists: false)
-    def dashboardScriptVal = file("${workflow.projectDir}/bin/generate_dashboard_enhanced.R", checkIfExists: false)
+    def dashboardScriptVal = file("${workflow.projectDir}/bin/generate_dashboard_clean.R", checkIfExists: false)
     
     // Verify dashboard files exist and set fallbacks if needed
     if (!dashboardTemplateVal.exists()) {
@@ -292,8 +292,8 @@ workflow SPLINE {
         log.warn "Dashboard script file not found: ${dashboardScriptVal}"
         // Try alternate locations for script
         def altScripts = [
-            file("${workflow.projectDir}/scripts/generate_dashboard_enhanced.R", checkIfExists: false),
-            file("${workflow.launchDir}/bin/generate_dashboard_enhanced.R", checkIfExists: false)
+            file("${workflow.projectDir}/scripts/generate_dashboard_clean.R", checkIfExists: false),
+            file("${workflow.launchDir}/bin/generate_dashboard_clean.R", checkIfExists: false)
         ]
         
         // Use first alternate that exists
