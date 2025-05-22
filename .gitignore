@@ -148,3 +148,8 @@ FoodNetTrends.*
 # Archives
 #########################
 archive/
+
+#########################
+# Local backups
+#########################
+backup/
