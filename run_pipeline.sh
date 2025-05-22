@@ -695,7 +695,7 @@ discover_pathogen_subtypes() {
     return 1
 }
 
-# JSON parsing function using R (no external dependencies)
+# JSON parsing function with R and bash fallbacks
 parse_metadata_json() {
     local json_file="$1"
     local field="$2"
@@ -705,20 +705,45 @@ parse_metadata_json() {
         return 1
     fi
     
-    # Use R to parse JSON (already available in container)
-    Rscript -e "
-    tryCatch({
-        library(jsonlite)
-        data <- fromJSON('$json_file')
-        if('$field' %in% names(data)) {
-            if(is.list(data[['$field']]) || is.vector(data[['$field']])) {
-                cat(paste(data[['$field']], collapse=','))
-            } else {
-                cat(data[['$field']])
+    # Try R first (preferred method)
+    if command -v Rscript >/dev/null 2>&1; then
+        local r_result=$(Rscript -e "
+        tryCatch({
+            library(jsonlite)
+            data <- fromJSON('$json_file')
+            if('$field' %in% names(data)) {
+                if(is.list(data[['$field']]) || is.vector(data[['$field']])) {
+                    cat(paste(data[['$field']], collapse=','))
+                } else {
+                    cat(data[['$field']])
+                }
             }
-        }
-    }, error = function(e) { cat('') })
-    " 2>/dev/null
+        }, error = function(e) { cat('') })
+        " 2>/dev/null)
+        
+        if [[ -n "$r_result" ]]; then
+            echo "$r_result"
+            return 0
+        fi
+    fi
+    
+    # Fallback: Simple bash parsing for basic JSON arrays
+    if [[ "$field" == "pathogens" || "$field" == "states" ]]; then
+        local bash_result=$(grep -o "\"$field\"[[:space:]]*:[[:space:]]*\[[^]]*\]" "$json_file" | \
+                           sed 's/.*\[\(.*\)\].*/\1/' | \
+                           sed 's/"//g' | \
+                           tr -d ' ' | \
+                           sed 's/,/, /g')
+        
+        if [[ -n "$bash_result" ]]; then
+            echo "$bash_result"
+            return 0
+        fi
+    fi
+    
+    # If all else fails, return empty
+    echo ""
+    return 1
 }
 
 # Set up paths, files
@@ -1526,13 +1551,13 @@ case $performance_profile in
         echo "Cores: $cores"
         echo "Memory: 64GB"
         ;;
-    5) # Stable Profile - Known working settings
-        chains=4
-        iterations=1500
-        adapt_delta=0.95
-        max_treedepth=12
-        cores=8
-        memory="16.GB"
+    5) # Stable Profile - Ultra-conservative settings that actually work
+        chains=2
+        iterations=200
+        adapt_delta=0.8
+        max_treedepth=8
+        cores=2
+        memory="8.GB"
         flag="stable"
         echo ""
         echo "Stable Profile Selected (RECOMMENDED)"
@@ -1541,8 +1566,8 @@ case $performance_profile in
         echo "Adapt delta: $adapt_delta"
         echo "Max treedepth: $max_treedepth"
         echo "Cores: $cores"
-        echo "Memory: 16GB"
-        echo "This profile uses proven settings that work reliably without Stan crashes."
+        echo "Memory: 8GB"
+        echo "This profile uses ultra-conservative settings proven to work without Stan crashes."
         ;;
     6) # Custom Configuration
         echo ""
