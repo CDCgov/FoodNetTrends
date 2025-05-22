@@ -1361,7 +1361,7 @@ tryCatch({
       geom_ribbon(data = overall_spline, aes(x = year, ymin = ir_lower, ymax = ir_upper), 
                   alpha = 0.3, fill = "blue") +
       geom_line(data = overall_spline, aes(x = year, y = ir), 
-                color = "blue", size = 1.2) +
+                color = "blue", linewidth = 1.2) +
       # Observed data points
       geom_point(data = aggregate(ir ~ year, data = observed_data, FUN = mean, na.rm = TRUE),
                 aes(x = year, y = ir), color = "darkblue", size = 2.5, alpha = 0.7) +
@@ -1380,7 +1380,7 @@ tryCatch({
     # Fallback for observed data only
     overall_observed <- aggregate(ir ~ year, data = observed_data, FUN = mean, na.rm = TRUE)
     p1 <- ggplot(overall_observed, aes(x = year, y = ir)) +
-      geom_line(color = "blue", size = 1) +
+      geom_line(color = "blue", linewidth = 1) +
       geom_point(color = "blue", size = 2) +
       labs(
         title = paste(pathogen, "Incidence Rate Trend (Observed Data)"),
@@ -1397,7 +1397,7 @@ tryCatch({
     p2 <- ggplot() +
       # Spline trend lines by state
       geom_line(data = spline_data, aes(x = year, y = ir, color = state, group = state), 
-                size = 1) +
+                linewidth = 1) +
       # Observed data points by state
       geom_point(data = observed_data, aes(x = year, y = ir, color = state), 
                 size = 2, alpha = 0.7) +
@@ -1416,7 +1416,7 @@ tryCatch({
   } else {
     # Fallback for observed data only
     p2 <- ggplot(observed_data, aes(x = year, y = ir, color = state, group = state)) +
-      geom_line(size = 1) +
+      geom_line(linewidth = 1) +
       geom_point(size = 2) +
       labs(
         title = paste(pathogen, "Incidence Rate by State (Observed Data)"),
@@ -1437,7 +1437,7 @@ tryCatch({
     
     p3 <- ggplot() +
       geom_line(data = overall_spline, aes(x = year, y = ir), 
-                color = "blue", size = 1.5, linetype = "solid") +
+                color = "blue", linewidth = 1.5, linetype = "solid") +
       geom_point(data = overall_observed, aes(x = year, y = ir), 
                 color = "red", size = 3, alpha = 0.8) +
       labs(
@@ -1514,9 +1514,9 @@ if (!is.na(convergence_check$max_rhat)) {
   cat(paste("Max Rhat:         ", round(convergence_check$max_rhat, 3), 
            if(convergence_check$max_rhat <= 1.1) " (Good)" else " (Concerning)", "\n"))
 }
-cat(paste("Trend Significance:", if(is.na(trend_significance$significant)) "N/A" else 
+cat(paste("Trend Significance:", if(is.null(trend_significance) || is.na(trend_significance$significant)) "N/A" else 
                                   if(trend_significance$significant) "SIGNIFICANT" else "NOT SIGNIFICANT", "\n"))
-if (!is.na(trend_significance$proportion_significant)) {
+if (!is.null(trend_significance) && !is.null(trend_significance$proportion_significant) && !is.na(trend_significance$proportion_significant)) {
   cat(paste("Significant Terms:", round(trend_significance$proportion_significant * 100, 1), "%\n"))
 }
 

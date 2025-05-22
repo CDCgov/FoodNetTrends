@@ -1,0 +1,201 @@
+[smn9@rosalind02 FoodNetTrends]$ ls /scicomp/scratch/smn9/nextflow/work/07/183fe8422746269ebf33b7e89f469c
+bin                                input_data.csv                      YERSINIA_EstIRRCatch_2018_2022.csv  YERSINIA_R_output.log
+cen9624_para.sas7bdat              progress.R                          YERSINIA_EstIRRCatch_2020_2022.csv  YERSINIA_state_trends_observed.png
+cen9624.sas7bdat                   YERSINIA_brm.Rds                    YERSINIA_IRCatch.csv                YERSINIA_summary.txt
+census_bact.sas7bdat               YERSINIA_data_summary.log           YERSINIA_percent.txt                YERSINIA_trend_observed.png
+census_para.sas7bdat               YERSINIA_data_summary.txt           YERSINIA_progress_log.txt           YERSINIA_trendy.log
+foodnet_data_mmwr9624_May2025.csv  YERSINIA_EstIRRCatch_2016_2020.csv  YERSINIA_progress.txt
+[smn9@rosalind02 FoodNetTrends]$ cat /scicomp/scratch/smn9/nextflow/work/07/183fe8422746269ebf33b7e89f469c/.command.err
+WARNING: While bind mounting '/scicomp:/scicomp': destination is already in the mount point list
+[smn9@rosalind02 FoodNetTrends]$ cat /scicomp/scratch/smn9/nextflow/work/07/183fe8422746269ebf33b7e89f469c/.command.log
+/opt/sge/default/spool/rosalind-060/job_scripts/3285035: line 345: module: command not found
+WARNING: While bind mounting '/scicomp:/scicomp': destination is already in the mount point list
+Using MMWR data file: foodnet_data_mmwr9624_May2025.csv (csv format)
+'foodnet_data_mmwr9624_May2025.csv' -> 'input_data.csv'
+Created local copy of MMWR file as: input_data.csv
+'cen9624.sas7bdat' -> './census_bact.sas7bdat'
+'cen9624_para.sas7bdat' -> './census_para.sas7bdat'
+'bin/progress.R' -> './progress.R'
+WARNING: ignoring environment value of R_HOME
+Attempting to source functions.R from: bin/functions.R
+Progress tracking enabled using milestone-based progress bars
+[░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░]   0% | SETUP - Initializing analysis for pathogen
+=========================================
+  PATHOGEN: YERSINIA [0%]
+  STAGE: SETUP
+  [2025-05-22 16:17:28]
+=========================================
+SETUP: Initializing analysis for pathogen
+[........................................]   0% | YERSINIA | Elapsed: 0s | ETA: --
+[░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░]   0% | CONFIG - Pathogen: YERSINIA
+=========================================
+  PATHOGEN: YERSINIA [0%]
+  STAGE: CONFIG
+  [2025-05-22 16:17:28]
+=========================================
+CONFIG: Pathogen: YERSINIA
+[........................................]   0% | YERSINIA | Elapsed: 0s | ETA: --
+[░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░]   0% | CONFIG - MMWR File: ./input_data.csv
+=========================================
+  PATHOGEN: YERSINIA [0%]
+  STAGE: CONFIG
+  [2025-05-22 16:17:28]
+=========================================
+CONFIG: MMWR File: ./input_data.csv
+[........................................]   0% | YERSINIA | Elapsed: 0s | ETA: --
+[░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░]   0% | CONFIG - Census Bacterial: census_bact.sas7bdat
+=========================================
+  PATHOGEN: YERSINIA [0%]
+  STAGE: CONFIG
+  [2025-05-22 16:17:28]
+=========================================
+CONFIG: Census Bacterial: census_bact.sas7bdat
+[........................................]   0% | YERSINIA | Elapsed: 0s | ETA: --
+[░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░]   0% | CONFIG - Census Parasitic: census_para.sas7bdat
+=========================================
+  PATHOGEN: YERSINIA [0%]
+  STAGE: CONFIG
+  [2025-05-22 16:17:28]
+=========================================
+CONFIG: Census Parasitic: census_para.sas7bdat
+[........................................]   0% | YERSINIA | Elapsed: 0s | ETA: --
+[░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░]   0% | CONFIG - Travel: NO,UNKNOWN,YES
+=========================================
+  PATHOGEN: YERSINIA [0%]
+  STAGE: CONFIG
+  [2025-05-22 16:17:28]
+=========================================
+CONFIG: Travel: NO,UNKNOWN,YES
+[........................................]   0% | YERSINIA | Elapsed: 0s | ETA: --
+[░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░]   0% | CONFIG - CIDT: CIDT+,CX+,PARASITIC
+=========================================
+  PATHOGEN: YERSINIA [0%]
+  STAGE: CONFIG
+  [2025-05-22 16:17:28]
+=========================================
+CONFIG: CIDT: CIDT+,CX+,PARASITIC
+[........................................]   0% | YERSINIA | Elapsed: 0s | ETA: --
+[░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░]   0% | CONFIG - Preprocessed: TRUE
+=========================================
+  PATHOGEN: YERSINIA [0%]
+  STAGE: CONFIG
+  [2025-05-22 16:17:28]
+=========================================
+CONFIG: Preprocessed: TRUE
+[........................................]   0% | YERSINIA | Elapsed: 0s | ETA: --
+[██░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░]   5% | IMPORT - Loading MMWR data file
+=========================================
+  PATHOGEN: YERSINIA [5%]
+  STAGE: IMPORT
+  [2025-05-22 16:17:28]
+=========================================
+IMPORT: Loading MMWR data file
+[##......................................]   5% | YERSINIA | Elapsed: 0s | ETA: calculating...
+[2025-05-22 16:17:28] IMPORT: Reading preprocessed CSV file: ./input_data.csv
+[2025-05-22 16:17:56] IMPORT: Reading bacterial census file: census_bact.sas7bdat
+[2025-05-22 16:17:56] IMPORT: Standardizing bacterial census column names
+[2025-05-22 16:17:56] DEBUG: Original bacterial census columns: Year, State, EntryYear, State_EntYear, Population, STFIP, COFIP, county
+[2025-05-22 16:17:56] DEBUG: Detected state column: State
+[2025-05-22 16:17:56] DEBUG: Detected year column: Year
+[2025-05-22 16:17:56] DEBUG: Detected population column: Population
+[2025-05-22 16:17:56] IMPORT: Reading parasitic census file: census_para.sas7bdat
+[2025-05-22 16:17:56] IMPORT: Standardizing parasitic census column names
+[2025-05-22 16:17:56] DEBUG: Original parasitic census columns: Year, State, EntryYear, State_EntYear, Population, STFIP, COFIP, county
+[2025-05-22 16:17:56] DEBUG: Detected state column: State
+[2025-05-22 16:17:56] DEBUG: Detected year column: Year
+[2025-05-22 16:17:56] DEBUG: Detected population column: Population
+[2025-05-22 16:17:56] ANALYSIS: Starting analysis for YERSINIA
+[2025-05-22 16:17:57] MODEL: Using standard model approach for YERSINIA
+[2025-05-22 16:17:57] INFO: Using real bacterial census data for population values
+[2025-05-22 16:17:57] DEBUG: Pathogen counts columns before join: state, year, count
+[2025-05-22 16:17:57] DEBUG: Pathogen counts year class: numeric
+[2025-05-22 16:17:57] DEBUG: Census data year class: numeric
+[2025-05-22 16:17:57] MODEL: Joining pathogen counts with census data
+[2025-05-22 16:17:57] WARNING: 18 missing population values found, using defaults
+[2025-05-22 16:17:57] INFO: Final analysis dataset has 10356 rows for YERSINIA
+[████████████████░░░░░░░░░░░░░░░░░░░░░░░░]  40% | MODEL - Fitting Bayesian hierarchical model
+=========================================
+  PATHOGEN: YERSINIA [40%]
+  STAGE: MODEL
+  [2025-05-22 16:17:57]
+=========================================
+MODEL: Fitting Bayesian hierarchical model
+[################........................]  40% | YERSINIA | Elapsed: 29s | ETA: 44s
+[2025-05-22 16:17:57] WARNING: Data quality issues for YERSINIA :
+[2025-05-22 16:17:57] WARNING:   - Extreme outliers detected (>10x median)
+Compiling Stan program...
+Start sampling
+Warning in parallel::mclapply(1:chains, FUN = callFun, mc.preschedule = FALSE,  :
+  16 function calls resulted in an error
+[2025-05-22 16:19:09] ERROR: Model fitting failed: no applicable method for `@` applied to an object of class "try-error"
+[2025-05-22 16:19:09] SUGGESTION: Try running with --debug flag for more details
+[2025-05-22 16:19:09] FALLBACK: Creating fallback model object for graceful degradation
+[2025-05-22 16:19:09] INFO: Performing model validation and diagnostics...
+[████████████████████████░░░░░░░░░░░░░░░░]  60% | OUTPUT - Saving model file
+=========================================
+  PATHOGEN: YERSINIA [60%]
+  STAGE: OUTPUT
+  [2025-05-22 16:19:09]
+=========================================
+OUTPUT: Saving model file
+[########################................]  60% | YERSINIA | Elapsed: 1m 41s | ETA: 1m 7s
+[████████████████████████░░░░░░░░░░░░░░░░]  60% | OUTPUT - Saved model to YERSINIA_brm.Rds
+=========================================
+  PATHOGEN: YERSINIA [60%]
+  STAGE: OUTPUT
+  [2025-05-22 16:19:09]
+=========================================
+OUTPUT: Saved model to YERSINIA_brm.Rds
+[########################................]  60% | YERSINIA | Elapsed: 1m 41s | ETA: 1m 7s
+[████████████████████████████░░░░░░░░░░░░]  70% | RESULTS - Generating incidence rate estimates
+=========================================
+  PATHOGEN: YERSINIA [70%]
+  STAGE: RESULTS
+  [2025-05-22 16:19:09]
+=========================================
+RESULTS: Generating incidence rate estimates
+[############################............]  70% | YERSINIA | Elapsed: 1m 41s | ETA: 43s
+[2025-05-22 16:19:09] WARNING: Using dummy model - no spline trends available
+[████████████████████████████░░░░░░░░░░░░]  70% | OUTPUT - Saved IR data to YERSINIA_IRCatch.csv
+=========================================
+  PATHOGEN: YERSINIA [70%]
+  STAGE: OUTPUT
+  [2025-05-22 16:19:11]
+=========================================
+OUTPUT: Saved IR data to YERSINIA_IRCatch.csv
+[############################............]  70% | YERSINIA | Elapsed: 1m 43s | ETA: 44s
+[████████████████████████████████░░░░░░░░]  80% | RESULTS - Generating incidence rate ratios
+=========================================
+  PATHOGEN: YERSINIA [80%]
+  STAGE: RESULTS
+  [2025-05-22 16:19:11]
+=========================================
+RESULTS: Generating incidence rate ratios
+[################################........]  80% | YERSINIA | Elapsed: 1m 43s | ETA: 25s
+[2025-05-22 16:19:11] OUTPUT: Saved IRR data to YERSINIA_EstIRRCatch_2016_2020.csv
+[2025-05-22 16:19:11] OUTPUT: Saved IRR data to YERSINIA_EstIRRCatch_2018_2022.csv
+[2025-05-22 16:19:11] OUTPUT: Saved IRR data to YERSINIA_EstIRRCatch_2020_2022.csv
+[████████████████████████████████████░░░░]  90% | PLOTS - Generating visualization plots
+=========================================
+  PATHOGEN: YERSINIA [90%]
+  STAGE: PLOTS
+  [2025-05-22 16:19:11]
+=========================================
+PLOTS: Generating visualization plots
+[####################################....]  90% | YERSINIA | Elapsed: 1m 43s | ETA: 11s
+Warning: Using `size` aesthetic for lines was deprecated in ggplot2 3.4.0.
+i Please use `linewidth` instead.
+[2025-05-22 16:19:12] OUTPUT: Saved observed trend plot to YERSINIA_trend_observed.png
+[2025-05-22 16:19:12] OUTPUT: Saved state observed trends plot to YERSINIA_state_trends_observed.png
+[██████████████████████████████████████░░]  95% | SUMMARY - Generating summary report
+=========================================
+  PATHOGEN: YERSINIA [95%]
+  STAGE: SUMMARY
+  [2025-05-22 16:19:12]
+=========================================
+SUMMARY: Generating summary report
+[######################################..]  95% | YERSINIA | Elapsed: 1m 44s | ETA: 5s
+Error in if (!is.na(trend_significance$proportion_significant)) { :
+  argument is of length zero
+Execution halted
+[smn9@rosalind02 FoodNetTrends]$

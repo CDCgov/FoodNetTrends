@@ -607,26 +607,86 @@ discover_pathogen_subtypes() {
         fi
     fi
     
-    # Fallback: scan MMWR file
+    # Fallback: scan MMWR file using robust R-based CSV parsing
     if [[ -f "$mmwr_file" ]]; then
-        # Find appropriate column (serotype, serogroup, etc.)
-        local col_pattern=""
-        if [[ "$subtype" == "serotype" ]]; then
-            col_pattern="serotype|sero|serotypesummary"
-        elif [[ "$subtype" == "serogroup" ]]; then
-            col_pattern="serogroup|sero_group"
-        fi
+        local discovered_subtypes=$(Rscript -e "
+            tryCatch({
+                data <- read.csv('$mmwr_file', stringsAsFactors = FALSE, nrows = 2000)
+                
+                # Find pathogen column (same logic as main pathogen discovery)
+                pathogen_col <- NULL
+                for (col in names(data)) {
+                    if (grepl('^pathogen\$|^organism\$|^etiology\$', col, ignore.case = TRUE)) {
+                        pathogen_col <- col
+                        break
+                    }
+                }
+                
+                if (is.null(pathogen_col)) {
+                    # Try first few columns for pathogen data
+                    for (i in 1:min(5, ncol(data))) {
+                        col_values <- unique(toupper(as.character(data[[i]])))
+                        col_values <- col_values[col_values != '' & !is.na(col_values)]
+                        known_pathogens <- c('SALMONELLA', 'CAMPYLOBACTER', 'SHIGA', 'STEC', 'ECOLI', 'CYCLOSPORA', 'LISTERIA', 'VIBRIO', 'YERSINIA')
+                        matches <- sum(sapply(known_pathogens, function(p) any(grepl(p, col_values))))
+                        if (matches > 0) {
+                            pathogen_col <- names(data)[i]
+                            break
+                        }
+                    }
+                }
+                
+                # Find subtype column (serotype/serogroup)
+                subtype_col <- NULL
+                if ('$subtype' == 'serotype') {
+                    for (col in names(data)) {
+                        if (grepl('serotype|sero(?!group)', col, ignore.case = TRUE, perl = TRUE)) {
+                            subtype_col <- col
+                            break
+                        }
+                    }
+                } else if ('$subtype' == 'serogroup') {
+                    for (col in names(data)) {
+                        if (grepl('serogroup|sero_group', col, ignore.case = TRUE)) {
+                            subtype_col <- col
+                            break
+                        }
+                    }
+                }
+                
+                if (!is.null(pathogen_col) && !is.null(subtype_col)) {
+                    # Filter data for this pathogen
+                    pathogen_data <- data[toupper(data[[pathogen_col]]) == toupper('$pathogen'), ]
+                    
+                    if (nrow(pathogen_data) > 0) {
+                        # Extract unique subtypes
+                        subtypes <- unique(as.character(pathogen_data[[subtype_col]]))
+                        subtypes <- subtypes[subtypes != '' & !is.na(subtypes)]
+                        
+                        # Clean up subtypes - remove obvious garbage
+                        subtypes <- gsub('[\"\\\\]', '', subtypes)  # Remove quotes and backslashes
+                        subtypes <- subtypes[nchar(subtypes) > 0 & nchar(subtypes) < 100]
+                        subtypes <- subtypes[!grepl('TRAVEL|FAMILY|PFGE|DAYCARE|ONSET|MOM|FATHER|DIALYSIS|UNKNOWN|^[0-9]+\$', subtypes)]
+                        
+                        if (length(subtypes) > 0) {
+                            cat(paste(subtypes, collapse=','))
+                        } else {
+                            cat('')
+                        }
+                    } else {
+                        cat('')
+                    }
+                } else {
+                    cat('')
+                }
+            }, error = function(e) {
+                cat('')
+            })
+        " 2>/dev/null)
         
-        local col_num=$(head -1 "$mmwr_file" | tr ',' '\n' | grep -i -n -E "$col_pattern" | cut -d: -f1 | head -1)
-        
-        if [[ -n "$col_num" ]]; then
-            # Extract unique subtypes for this pathogen
-            local discovered_subtypes=$(awk -F',' -v pathogen="$pathogen" -v col="$col_num" 'NR>1 && toupper($1)==toupper(pathogen) && $col!="" {subtypes[$col]++} END {for(s in subtypes) printf "%s,", s}' "$mmwr_file" | sed 's/,$//')
-            
-            if [[ -n "$discovered_subtypes" ]]; then
-                echo "$discovered_subtypes"
-                return 0
-            fi
+        if [[ -n "$discovered_subtypes" ]]; then
+            echo "$discovered_subtypes"
+            return 0
         fi
     fi
     
