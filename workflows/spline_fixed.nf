@@ -335,13 +335,19 @@ workflow SPLINE {
             
             log.info "Created backup dashboard at ${fallbackHtml}"
             
-            // Collect all results first and wait until they're all available
+            // Collect all results and wait until they're all available
             // This ensures dashboard only runs after ALL TRENDY processes complete
-            def all_results = results.collect()
+            results
+                .collect()
+                .map { all_files ->
+                    // Dashboard will only start after all TRENDY processes complete
+                    return all_files
+                }
+                .set { collected_results }
             
             // Now pass the collected results to the dashboard
             GENERATE_DASHBOARD(
-                all_results,  // This will wait for ALL results before starting
+                collected_results,  // This will wait for ALL results before starting
                 dashboardDir,
                 projID,
                 dashboardTemplateVal,
