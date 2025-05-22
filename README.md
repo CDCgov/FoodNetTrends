@@ -420,6 +420,24 @@ tail -f .nextflow.log
 | **R package errors** | Check `foodnet.yml` for package compatibility |
 | **No progress visible** | Use `nextflow log -f name,status` to check pipeline progress |
 
+## Known Limitations
+
+### Serotype/Serogroup Analysis Constraints
+
+**Current limitation**: The pipeline supports only **one analysis level per pathogen** within a single run. For example, if analyzing Salmonella, you must choose either:
+- Pathogen level (all Salmonella together)
+- Serogroup level (specific serogroups like Group B, Group D)
+- Serotype level (specific serotypes like Enteritidis, Typhimurium)
+
+**Impact**: Users cannot perform mixed-level analysis of the same pathogen in one run. For instance, you cannot simultaneously analyze:
+- Salmonella as a whole pathogen
+- Two specific Salmonella serogroups  
+- One specific Salmonella serotype
+
+**Workaround**: Run separate analyses for each desired level and combine results manually.
+
+**Future enhancement**: Multi-level pathogen analysis capability is planned for future releases.
+
 ### Common Error Messages
 
 #### "Divergent transitions after warmup"

@@ -209,6 +209,28 @@ log_progress <- function(stage, message=NULL, milestone=NULL, ...) {
     )
     progress_str <- bar
     
+    # Dynamic terminal progress bar (updates in place)
+    tryCatch({
+      dynamic_bar <- paste0(
+        "\r[", 
+        strrep("█", filled),
+        strrep("░", max(0, width - filled)),
+        "] ", 
+        sprintf("%3d%%", progress_pct),
+        " | ", stage,
+        if(!is.null(message)) paste0(" - ", message) else "",
+        "        " # Extra spaces to clear previous text
+      )
+      
+      # Write to stderr to avoid interference with data output
+      cat(dynamic_bar, file = stderr())
+      flush(stderr())
+    }, error = function(e) {
+      # Fallback for restricted environments
+      cat(paste0("\r", stage, ": ", progress_pct, "%"))
+      flush.console()
+    })
+    
     # Write to progress file (overwrite previous content)
     tryCatch({
       # Write basic progress information to file - helps with monitoring
@@ -259,6 +281,34 @@ log_progress <- function(stage, message=NULL, milestone=NULL, ...) {
     cat(full_message, "\n", file = log_file, append = TRUE)
   }, error = function(e) {
     # Silent fail - don't disrupt processing for logging
+  })
+}
+
+#' Clear progress bar and move to next line
+#' 
+#' Call this when a stage completes to clear the dynamic progress bar
+clear_progress_line <- function() {
+  tryCatch({
+    cat("\r", paste(rep(" ", 80), collapse=""), "\r", file = stderr())
+    flush(stderr())
+  }, error = function(e) {
+    cat("\n")
+  })
+}
+
+#' Signal stage completion to shell progress system
+#'
+#' Writes a completion marker that the shell can monitor
+signal_stage_complete <- function(stage) {
+  tryCatch({
+    completion_file <- paste0(progress_state$pathogen, "_stage_", stage, "_complete.txt")
+    writeLines(c(
+      paste0("STAGE: ", stage),
+      paste0("PATHOGEN: ", progress_state$pathogen),
+      paste0("TIMESTAMP: ", Sys.time())
+    ), completion_file)
+  }, error = function(e) {
+    # Silent failure - don't disrupt analysis if we can't signal
   })
 }
 

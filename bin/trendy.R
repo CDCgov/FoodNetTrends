@@ -1,23 +1,55 @@
 #!/usr/bin/env Rscript
 # =========================================================================
-# FoodNetTrends v1.0 - Main Analysis Script  
+# FoodNetTrends v1.0.0-rc.1 - Bayesian Spline Trend Analysis
 # =========================================================================
 #
-# Purpose:
-#   Implements Bayesian hierarchical spline models to analyze trends in 
-#   foodborne disease surveillance data with specialized handling for
-#   different pathogen types (parasitic vs bacterial).
+# OVERVIEW FOR MAINTAINERS:
+# This is the core analysis engine that fits Bayesian hierarchical models
+# to foodborne disease surveillance data. It generates smooth spline curves
+# showing disease incidence trends over time, replacing the previous "spikey"
+# line graphs that connected raw data points.
 #
-# Features:
-#   - Specialized analysis functions for Cyclospora and Salmonella
-#   - Standard bacterial pathogen processing for others
-#   - Robust fallback mechanisms and error handling
-#   - Progress tracking and detailed logging
+# KEY FUNCTIONALITY:
+# 1. Data Preprocessing: Loads MMWR surveillance data + census population data
+# 2. Bayesian Modeling: Fits hierarchical spline models using brms/Stan
+# 3. Prediction Generation: Creates dense spline predictions (quarterly intervals)
+# 4. Visualization: Generates publication-ready trend plots with credible intervals
+# 5. Validation: Includes model convergence checking and quality diagnostics
+#
+# PATHOGEN-SPECIFIC HANDLING:
+# - Cyclospora: Uses parasitic census data, special processing if available
+# - Salmonella: Uses bacterial census data, supports serotype filtering
+# - STEC: Uses bacterial census data, supports serogroup filtering (O157 vs non-O157)
+# - Others: Standard bacterial pathogen processing
+#
+# CRITICAL DESIGN DECISION:
+# This script was completely rewritten to fix "spikey graphs" issue. Instead of
+# plotting raw data points connected by lines, it now:
+# 1. Fits Bayesian hierarchical spline model to data
+# 2. Generates dense prediction grid (quarterly intervals over year range)
+# 3. Plots smooth spline curves from model predictions
+# 4. Overlays observed data points for reference
+#
+# OUTPUTS:
+# - {pathogen}_spline_trend.png: Overall population trend
+# - {pathogen}_state_spline_trends.png: State-specific trends 
+# - {pathogen}_foodnettrends_comparison.png: Spline vs observed comparison
+# - {pathogen}_IRCatch.csv: Incidence rate data with predictions
+# - {pathogen}_brm.Rds: Saved Bayesian model object
+# - {pathogen}_summary.txt: Analysis diagnostics and interpretation
 #
 # Last updated: 2025-05-22
 # =========================================================================
 
-# Suppress warnings during package loading
+# Load required packages with suppressed startup messages
+# PACKAGE DEPENDENCIES:
+# - argparse: Command line argument parsing
+# - dplyr/tidyr: Data manipulation and reshaping  
+# - brms: Bayesian regression models using Stan backend
+# - ggplot2: Publication-quality visualization
+# - tidybayes: Bayesian model result extraction
+# - haven: SAS file reading (.sas7bdat format)
+# - HDInterval: Highest density credible intervals
 suppressPackageStartupMessages({
   library(argparse)
   library(dplyr)
@@ -60,7 +92,15 @@ tryCatch({
 })
 
 # ==========================================================================
-# Setup and argument parsing
+# COMMAND LINE INTERFACE SETUP
+# ==========================================================================
+# 
+# This section defines all command line parameters that control the analysis.
+# Key parameters for maintainers:
+# - Bayesian model settings: --cores, --chains, --iterations, --adapt_delta
+# - Pathogen filtering: --stec_serogroups, --salmonella_serotypes
+# - Data paths: --mmwrFile, --censusFileB, --censusFileP
+# - Analysis control: --travel, --cidt (filtering criteria)
 # ==========================================================================
 
 # Create parser with comprehensive options
@@ -112,11 +152,28 @@ parser$add_argument("--seed", type="integer", default=123,
 parser$add_argument("--debug", action="store_true", 
                     help="Run in debug mode with verbose output")
 
+# Serotype and serogroup parameters (v1.0.0-rc.1)
+parser$add_argument("--stec_serogroups", type="character", default="ALL", 
+                    help="STEC serogroups to analyze ('O157', 'NON-O157', or 'ALL')")
+parser$add_argument("--salmonella_serotypes", type="character", default="ALL",
+                    help="Salmonella serotypes to analyze (comma-separated or 'ALL')")
+
 # Parse arguments
 args <- parser$parse_args()
 
 # ==========================================================================
-# Helper Functions
+# PROGRESS TRACKING AND LOGGING SYSTEM
+# ==========================================================================
+#
+# MAINTAINER NOTE: This section implements a sophisticated progress tracking
+# system that coordinates between this R script and the shell wrapper.
+# 
+# Two modes available:
+# 1. Enhanced mode: If progress.R is available, uses milestone-based progress bars
+# 2. Fallback mode: Basic timestamped logging to console
+#
+# The progress system helps users track long-running Bayesian model fits
+# which can take 10-30 minutes depending on data size and model complexity.
 # ==========================================================================
 
 #' Source progress tracking utilities
@@ -166,7 +223,23 @@ tryCatch({
 })
 
 # ==========================================================================
-# Main Analysis
+# MAIN ANALYSIS PIPELINE
+# ==========================================================================
+#
+# EXECUTION FLOW FOR MAINTAINERS:
+# 1. Data Loading: MMWR surveillance + census population data
+# 2. Pathogen-Specific Processing: Custom logic for Cyclospora/Salmonella/STEC
+# 3. Data Quality Validation: Check for missing data, outliers, coverage
+# 4. Bayesian Model Fitting: Hierarchical spline model with brms/Stan
+# 5. Model Diagnostics: Convergence checking (Rhat), trend significance
+# 6. Spline Prediction: Generate dense quarterly predictions over time range
+# 7. Visualization: Create publication-ready trend plots
+# 8. Output Generation: Save results, models, and diagnostic summaries
+#
+# ERROR HANDLING STRATEGY:
+# - Graceful degradation: If Bayesian model fails, falls back to linear trends
+# - Comprehensive logging: All steps logged with timestamps and context
+# - Dummy model objects: Created on failure to prevent downstream crashes
 # ==========================================================================
 
 # Initialize progress tracking if available
@@ -198,7 +271,24 @@ preprocessed <- as.logical(toupper(args$preprocessed))
 # Set seed for reproducibility
 set.seed(args$seed)
 
-# ---- Load Data ----
+# --------------------------------------------------------------------------
+# DATA LOADING PHASE
+# --------------------------------------------------------------------------
+# 
+# MAINTAINER NOTES:
+# This section handles loading of two critical data sources:
+# 1. MMWR Data: Individual case records from FoodNet surveillance
+# 2. Census Data: Population denominators for rate calculations
+#
+# Supports multiple input formats:
+# - Preprocessed CSV files (faster, recommended for production)
+# - Raw SAS files (.sas7bdat format from CDC)
+# - Auto-detection based on file extension
+#
+# CRITICAL: Census data is pathogen-type specific:
+# - Bacterial pathogens (Salmonella, STEC, etc.): Use censusFileB
+# - Parasitic pathogens (Cyclospora): Use censusFileP
+# --------------------------------------------------------------------------
 
 # Import MMWR data
 if (exists("has_progress_tracking") && has_progress_tracking) {
@@ -545,6 +635,23 @@ if (pathogen == "CYCLOSPORA") {
     # Filter for Salmonella cases
     pathogen_data <- mmwrdata[toupper(mmwrdata$pathogen) == "SALMONELLA", ]
     
+    # Apply serotype filtering for Salmonella if specified
+    if (!is.null(args$salmonella_serotypes) && args$salmonella_serotypes != "ALL") {
+      # Split comma-separated serotypes
+      target_serotypes <- trimws(unlist(strsplit(args$salmonella_serotypes, ",")))
+      log_message("INFO", paste("Filtering Salmonella data for serotypes:", paste(target_serotypes, collapse=", ")))
+      
+      # Check if serotype column exists
+      if ("serotype" %in% names(pathogen_data)) {
+        initial_count <- nrow(pathogen_data)
+        pathogen_data <- pathogen_data[toupper(pathogen_data$serotype) %in% toupper(target_serotypes), ]
+        final_count <- nrow(pathogen_data)
+        log_message("INFO", paste("Serotype filtering reduced data from", initial_count, "to", final_count, "cases"))
+      } else {
+        log_message("WARNING", "Serotype column not found - serotype filtering skipped")
+      }
+    }
+    
     # Check if we have any data
     if (nrow(pathogen_data) == 0) {
       log_message("WARNING", paste("No", pathogen, "data found, creating synthetic data"))
@@ -632,6 +739,28 @@ if (pathogen == "CYCLOSPORA") {
   # Filter for the specific pathogen
   pathogen_data <- mmwrdata[toupper(mmwrdata$pathogen) == pathogen, ]
   
+  # Apply STEC serogroup filtering if this is STEC
+  if (pathogen == "STEC") {
+    # Apply serogroup filtering for STEC if specified
+    if (!is.null(args$stec_serogroups) && args$stec_serogroups != "ALL") {
+      log_message("INFO", paste("Filtering STEC data for serogroup:", args$stec_serogroups))
+      
+      # Check if serogroup column exists
+      if ("serogroup" %in% names(pathogen_data)) {
+        initial_count <- nrow(pathogen_data)
+        if (args$stec_serogroups == "O157") {
+          pathogen_data <- pathogen_data[toupper(pathogen_data$serogroup) == "O157", ]
+        } else if (args$stec_serogroups == "NON-O157") {
+          pathogen_data <- pathogen_data[toupper(pathogen_data$serogroup) != "O157", ]
+        }
+        final_count <- nrow(pathogen_data)
+        log_message("INFO", paste("Serogroup filtering reduced data from", initial_count, "to", final_count, "cases"))
+      } else {
+        log_message("WARNING", "Serogroup column not found - serogroup filtering skipped")
+      }
+    }
+  }
+  
   # Check if we have data
   if (nrow(pathogen_data) == 0) {
     log_message("WARNING", paste("No", pathogen, "data found, creating synthetic data"))
@@ -712,6 +841,125 @@ if (pathogen == "CYCLOSPORA") {
   log_message("INFO", paste("Final analysis dataset has", nrow(analysis_data), "rows for", pathogen))
 }
 
+# =============================================================================
+# MODEL VALIDATION AND DIAGNOSTICS FUNCTIONS
+# =============================================================================
+
+#' Check Bayesian model convergence using Rhat diagnostics
+check_model_convergence <- function(model_fit) {
+  if (!isTRUE(model_fit$is_dummy)) {
+    tryCatch({
+      rhat_values <- rhat(model_fit)
+      max_rhat <- max(rhat_values, na.rm = TRUE)
+      
+      if (any(rhat_values > 1.1, na.rm = TRUE)) {
+        log_message("WARNING", paste("Model convergence issues detected - Max Rhat:", round(max_rhat, 3)))
+        log_message("WARNING", "Consider increasing iterations or chains for better convergence")
+        return(list(converged = FALSE, max_rhat = max_rhat))
+      } else {
+        log_message("INFO", paste("Model converged successfully - Max Rhat:", round(max_rhat, 3)))
+        return(list(converged = TRUE, max_rhat = max_rhat))
+      }
+    }, error = function(e) {
+      log_message("WARNING", paste("Could not check model convergence:", e$message))
+      return(list(converged = NA, max_rhat = NA))
+    })
+  } else {
+    return(list(converged = NA, max_rhat = NA, note = "Dummy model"))
+  }
+}
+
+#' Validate data quality before modeling
+validate_data_quality <- function(analysis_data, pathogen) {
+  issues <- character(0)
+  
+  # Check for negative counts
+  if (any(analysis_data$count < 0, na.rm = TRUE)) {
+    issues <- c(issues, "Negative counts detected")
+  }
+  
+  # Check for missing population data
+  if (any(is.na(analysis_data$population) | analysis_data$population <= 0)) {
+    issues <- c(issues, "Missing or invalid population data")
+  }
+  
+  # Check for reasonable data range
+  year_range <- range(analysis_data$year, na.rm = TRUE)
+  if (diff(year_range) < 3) {
+    issues <- c(issues, "Insufficient time series length (< 3 years)")
+  }
+  
+  # Check for extreme outliers (>10x median)
+  if (nrow(analysis_data) > 0) {
+    median_count <- median(analysis_data$count, na.rm = TRUE)
+    if (any(analysis_data$count > 10 * median_count, na.rm = TRUE)) {
+      issues <- c(issues, "Extreme outliers detected (>10x median)")
+    }
+  }
+  
+  # Check state coverage
+  state_coverage <- length(unique(analysis_data$state))
+  if (state_coverage < 2) {
+    issues <- c(issues, "Insufficient state coverage (<2 states)")
+  }
+  
+  # Log results
+  if (length(issues) > 0) {
+    log_message("WARNING", paste("Data quality issues for", pathogen, ":"))
+    for (issue in issues) {
+      log_message("WARNING", paste("  -", issue))
+    }
+  } else {
+    log_message("INFO", paste("Data quality validation passed for", pathogen))
+  }
+  
+  return(list(
+    passed = length(issues) == 0,
+    issues = issues,
+    year_range = year_range,
+    state_count = state_coverage,
+    total_observations = nrow(analysis_data)
+  ))
+}
+
+#' Test statistical significance of trends
+test_trend_significance <- function(model_fit) {
+  if (!isTRUE(model_fit$is_dummy)) {
+    tryCatch({
+      # Extract posterior samples for the smooth term
+      posterior_samples <- posterior_samples(model_fit)
+      
+      # Check if smooth term coefficients are significantly different from zero
+      smooth_cols <- grep("^s_", names(posterior_samples), value = TRUE)
+      
+      if (length(smooth_cols) > 0) {
+        # Test if 95% credible interval excludes zero for trend components
+        significant_terms <- sapply(smooth_cols, function(col) {
+          samples <- posterior_samples[[col]]
+          ci <- quantile(samples, c(0.025, 0.975))
+          !between(0, ci[1], ci[2])
+        })
+        
+        prop_significant <- mean(significant_terms)
+        
+        log_message("INFO", paste("Trend significance: ", round(prop_significant * 100, 1), 
+                                 "% of smooth terms significantly different from zero"))
+        
+        return(list(
+          significant = prop_significant > 0.5,
+          proportion_significant = prop_significant,
+          significant_terms = sum(significant_terms),
+          total_terms = length(significant_terms)
+        ))
+      }
+    }, error = function(e) {
+      log_message("WARNING", paste("Could not test trend significance:", e$message))
+    })
+  }
+  
+  return(list(significant = NA, note = "Significance testing not available"))
+}
+
 # ---- Fit Bayesian Model ----
 
 if (exists("has_progress_tracking") && has_progress_tracking) {
@@ -719,6 +967,9 @@ if (exists("has_progress_tracking") && has_progress_tracking) {
 } else {
   log_message("MODEL", "Fitting Bayesian hierarchical model")
 }
+
+# Validate data quality before modeling
+data_quality <- validate_data_quality(analysis_data, pathogen)
 
 # Fit model with error handling
 model_fit <- tryCatch({
@@ -775,8 +1026,19 @@ model_fit <- tryCatch({
 }, error = function(e) {
   log_message("ERROR", paste("Model fitting failed:", e$message))
   
+  # Provide helpful error guidance
+  if (grepl("memory", e$message, ignore.case = TRUE)) {
+    log_message("SUGGESTION", "Try reducing --cores or increasing available memory")
+  } else if (grepl("convergence", e$message, ignore.case = TRUE)) {
+    log_message("SUGGESTION", "Try increasing --iterations or --chains")
+  } else if (grepl("data", e$message, ignore.case = TRUE)) {
+    log_message("SUGGESTION", "Check data quality - may need more years or states")
+  } else {
+    log_message("SUGGESTION", "Try running with --debug flag for more details")
+  }
+  
   # Create a dummy model object as fallback
-  log_message("FALLBACK", "Creating fallback model object")
+  log_message("FALLBACK", "Creating fallback model object for graceful degradation")
   dummy <- list(
     family = list(family = "negbinomial"),
     formula = count ~ s(year) + (1 | state) + offset(log(population)),
@@ -789,6 +1051,11 @@ model_fit <- tryCatch({
   class(dummy) <- c("brmsfit", "list")
   return(dummy)
 })
+
+# Validate model quality and convergence
+log_message("INFO", "Performing model validation and diagnostics...")
+convergence_check <- check_model_convergence(model_fit)
+trend_significance <- test_trend_significance(model_fit)
 
 # Save model to file
 if (exists("has_progress_tracking") && has_progress_tracking) {
@@ -814,53 +1081,132 @@ if (exists("has_progress_tracking") && has_progress_tracking) {
 }
 
 ir_data <- tryCatch({
-  # Extract years and states
-  years <- sort(unique(analysis_data$year))
-  states <- unique(analysis_data$state)
-  
-  # Prepare empty results frame
-  ir_results <- data.frame(
-    state = character(),
-    year = numeric(),
-    ir = numeric(),
-    ir_lower = numeric(),
-    ir_upper = numeric(),
-    stringsAsFactors = FALSE
-  )
-  
-  # For each state and year, calculate IR
-  for (s in states) {
-    for (y in years) {
-      # Filter for this state and year
-      state_data <- subset(analysis_data, state == s & year == y)
+  # Generate spline predictions from the Bayesian hierarchical model
+  if (!isTRUE(model_fit$is_dummy)) {
+    log_message("INFO", "Generating spline predictions for trend visualization...")
+    
+    # Create a dense prediction grid for spline curves
+    years <- sort(unique(analysis_data$year))
+    year_range <- range(years)
+    # Create dense sequence (quarterly intervals) for spline interpolation
+    dense_years <- seq(year_range[1], year_range[2], by = 0.25)
+    
+    states <- unique(analysis_data$state)
+    
+    # Create prediction grid
+    pred_grid <- expand.grid(
+      year = dense_years,
+      state = states,
+      stringsAsFactors = FALSE
+    )
+    
+    # Add average population for each state from original data
+    state_pops <- aggregate(population ~ state, data = analysis_data, FUN = mean)
+    pred_grid <- merge(pred_grid, state_pops, by = "state")
+    
+    # Extract smooth predictions from fitted Bayesian model
+    # fitted() returns posterior mean and credible intervals
+    fitted_summary <- tryCatch({
+      fitted(model_fit, newdata = pred_grid, summary = TRUE, allow_new_levels = TRUE)
+    }, error = function(e) {
+      log_message("WARNING", paste("Model prediction failed, trying fallback approaches:", e$message))
       
-      if (nrow(state_data) > 0) {
-        # Extract population
-        pop <- state_data$population[1]
+      # Try simpler prediction approach
+      tryCatch({
+        predict(model_fit, newdata = pred_grid, summary = TRUE, allow_new_levels = TRUE)
+      }, error = function(e2) {
+        log_message("WARNING", "All prediction methods failed, using linear trend fallback")
         
-        # Calculate IR per 100,000 
-        count <- state_data$count[1]
-        ir <- (count / pop) * 100000
+        # Implement simple linear trend as backup
+        linear_trend <- lm(count ~ year + state + offset(log(population)), data = analysis_data)
+        linear_pred <- predict(linear_trend, newdata = pred_grid, se.fit = TRUE)
         
-        # Add confidence intervals (bootstrap for dummy models)
-        if (isTRUE(model_fit$is_dummy)) {
+        # Convert to summary format similar to brms
+        fitted_df <- data.frame(
+          Estimate = linear_pred$fit,
+          Q2.5 = linear_pred$fit - 1.96 * linear_pred$se.fit,
+          Q97.5 = linear_pred$fit + 1.96 * linear_pred$se.fit
+        )
+        
+        log_message("INFO", "Using linear trend fallback for spline visualization")
+        return(as.matrix(fitted_df))
+      })
+    })
+    
+    if (!is.null(fitted_summary)) {
+      # Convert predictions to incidence rates (per 100,000)
+      pred_grid$predicted_count <- exp(fitted_summary[, "Estimate"])
+      pred_grid$ir <- (pred_grid$predicted_count / pred_grid$population) * 100000
+      pred_grid$ir_lower <- (exp(fitted_summary[, "Q2.5"]) / pred_grid$population) * 100000
+      pred_grid$ir_upper <- (exp(fitted_summary[, "Q97.5"]) / pred_grid$population) * 100000
+      pred_grid$type <- "spline_trend"
+      
+      # Include original observed data points
+      observed_data <- analysis_data
+      observed_data$ir <- (observed_data$count / observed_data$population) * 100000
+      observed_data$ir_lower <- observed_data$ir
+      observed_data$ir_upper <- observed_data$ir
+      observed_data$type <- "observed"
+      
+      # Combine spline predictions and observed data
+      ir_results <- rbind(
+        data.frame(state = pred_grid$state, year = pred_grid$year,
+                  ir = pred_grid$ir, ir_lower = pred_grid$ir_lower, ir_upper = pred_grid$ir_upper,
+                  type = pred_grid$type, stringsAsFactors = FALSE),
+        data.frame(state = observed_data$state, year = observed_data$year,
+                  ir = observed_data$ir, ir_lower = observed_data$ir_lower, ir_upper = observed_data$ir_upper,
+                  type = observed_data$type, stringsAsFactors = FALSE)
+      )
+      
+      log_message("INFO", paste("Generated", nrow(pred_grid), "spline trend points and", 
+                               nrow(observed_data), "observed data points"))
+    } else {
+      # Fallback if model prediction fails
+      log_message("WARNING", "Falling back to observed data only")
+      years <- sort(unique(analysis_data$year))
+      states <- unique(analysis_data$state)
+      
+      ir_results <- data.frame()
+      for (s in states) {
+        for (y in years) {
+          state_data <- subset(analysis_data, state == s & year == y)
+          if (nrow(state_data) > 0) {
+            pop <- state_data$population[1]
+            count <- state_data$count[1]
+            ir <- (count / pop) * 100000
+            ir_lower <- max(0, ir - 0.3 * ir)
+            ir_upper <- ir + 0.3 * ir
+            
+            ir_results <- rbind(ir_results, data.frame(
+              state = s, year = y, ir = ir, ir_lower = ir_lower, ir_upper = ir_upper,
+              type = "observed", stringsAsFactors = FALSE
+            ))
+          }
+        }
+      }
+    }
+  } else {
+    # Dummy model fallback
+    log_message("WARNING", "Using dummy model - no spline trends available")
+    years <- sort(unique(analysis_data$year))
+    states <- unique(analysis_data$state)
+    
+    ir_results <- data.frame()
+    for (s in states) {
+      for (y in years) {
+        state_data <- subset(analysis_data, state == s & year == y)
+        if (nrow(state_data) > 0) {
+          pop <- state_data$population[1]
+          count <- state_data$count[1]
+          ir <- (count / pop) * 100000
           ir_lower <- max(0, ir - 0.5 * ir)
           ir_upper <- ir + 0.5 * ir
-        } else {
-          # Use model-based intervals if available
-          ir_lower <- max(0, ir - 0.5 * ir)  # simplified
-          ir_upper <- ir + 0.5 * ir          # simplified
+          
+          ir_results <- rbind(ir_results, data.frame(
+            state = s, year = y, ir = ir, ir_lower = ir_lower, ir_upper = ir_upper,
+            type = "observed", stringsAsFactors = FALSE
+          ))
         }
-        
-        # Add to results
-        ir_results <- rbind(ir_results, data.frame(
-          state = s,
-          year = y,
-          ir = ir,
-          ir_lower = ir_lower,
-          ir_upper = ir_upper,
-          stringsAsFactors = FALSE
-        ))
       }
     }
   }
@@ -991,72 +1337,138 @@ if (exists("has_progress_tracking") && has_progress_tracking) {
 }
 
 tryCatch({
-  # Create trend plot
-  years <- sort(unique(analysis_data$year))
-  states <- unique(analysis_data$state)
-  
-  # Overall trend plot
+  # Create spline trend plots using spline predictions
   plot_data <- ir_data
-  p1 <- ggplot(plot_data, aes(x = year, y = ir)) +
-    geom_line(color = "blue", size = 1) +
-    geom_point(color = "blue", size = 2) +
-    geom_ribbon(aes(ymin = ir_lower, ymax = ir_upper), alpha = 0.2) +
-    labs(
-      title = paste(pathogen, "Incidence Rate Trend"),
-      x = "Year",
-      y = "Incidence per 100,000"
-    ) +
-    theme_minimal()
   
-  ggsave(paste0(pathogen, "_trend.png"), p1, width = 8, height = 6)
-  log_message("OUTPUT", paste("Saved trend plot to", paste0(pathogen, "_trend.png")))
+  # Separate spline trends from observed data
+  if ("type" %in% names(plot_data)) {
+    spline_data <- subset(plot_data, type == "spline_trend")
+    observed_data <- subset(plot_data, type == "observed")
+  } else {
+    # Fallback if no type column
+    spline_data <- plot_data
+    observed_data <- plot_data
+  }
   
-  # State trends plot
-  p2 <- ggplot(plot_data, aes(x = year, y = ir, color = state, group = state)) +
-    geom_line(size = 1) +
-    geom_point(size = 2) +
-    labs(
-      title = paste(pathogen, "Incidence Rate by State"),
-      x = "Year",
-      y = "Incidence per 100,000"
-    ) +
-    theme_minimal() +
-    theme(legend.position = "right")
+  # Overall spline trend plot
+  if (nrow(spline_data) > 0) {
+    # Calculate overall trend (average across states)
+    overall_spline <- aggregate(cbind(ir, ir_lower, ir_upper) ~ year, 
+                               data = spline_data, FUN = mean, na.rm = TRUE)
+    
+    p1 <- ggplot() +
+      # Spline trend line with confidence interval
+      geom_ribbon(data = overall_spline, aes(x = year, ymin = ir_lower, ymax = ir_upper), 
+                  alpha = 0.3, fill = "blue") +
+      geom_line(data = overall_spline, aes(x = year, y = ir), 
+                color = "blue", size = 1.2) +
+      # Observed data points
+      geom_point(data = aggregate(ir ~ year, data = observed_data, FUN = mean, na.rm = TRUE),
+                aes(x = year, y = ir), color = "darkblue", size = 2.5, alpha = 0.7) +
+      labs(
+        title = paste(pathogen, "Spline Incidence Rate Trend"),
+        subtitle = "Bayesian hierarchical spline model with 95% credible intervals",
+        x = "Year",
+        y = "Incidence per 100,000"
+      ) +
+      theme_minimal() +
+      theme(plot.title = element_text(size = 14, face = "bold"))
+      
+    ggsave(paste0(pathogen, "_spline_trend.png"), p1, width = 10, height = 6, dpi = 300)
+    log_message("OUTPUT", paste("Saved spline trend plot to", paste0(pathogen, "_spline_trend.png")))
+  } else {
+    # Fallback for observed data only
+    overall_observed <- aggregate(ir ~ year, data = observed_data, FUN = mean, na.rm = TRUE)
+    p1 <- ggplot(overall_observed, aes(x = year, y = ir)) +
+      geom_line(color = "blue", size = 1) +
+      geom_point(color = "blue", size = 2) +
+      labs(
+        title = paste(pathogen, "Incidence Rate Trend (Observed Data)"),
+        x = "Year", y = "Incidence per 100,000"
+      ) +
+      theme_minimal()
+      
+    ggsave(paste0(pathogen, "_trend_observed.png"), p1, width = 8, height = 6)
+    log_message("OUTPUT", paste("Saved observed trend plot to", paste0(pathogen, "_trend_observed.png")))
+  }
   
-  ggsave(paste0(pathogen, "_state_trends.png"), p2, width = 10, height = 6)
-  log_message("OUTPUT", paste("Saved state trends plot to", paste0(pathogen, "_state_trends.png")))
+  # State-specific spline trends plot
+  if (nrow(spline_data) > 0) {
+    p2 <- ggplot() +
+      # Spline trend lines by state
+      geom_line(data = spline_data, aes(x = year, y = ir, color = state, group = state), 
+                size = 1) +
+      # Observed data points by state
+      geom_point(data = observed_data, aes(x = year, y = ir, color = state), 
+                size = 2, alpha = 0.7) +
+      labs(
+        title = paste(pathogen, "Spline Incidence Rate Trends by State"),
+        subtitle = "Bayesian spline predictions with observed data points",
+        x = "Year",
+        y = "Incidence per 100,000",
+        color = "State"
+      ) +
+      theme_minimal() +
+      theme(legend.position = "right")
+    
+    ggsave(paste0(pathogen, "_state_spline_trends.png"), p2, width = 12, height = 8, dpi = 300)
+    log_message("OUTPUT", paste("Saved state spline trends plot to", paste0(pathogen, "_state_spline_trends.png")))
+  } else {
+    # Fallback for observed data only
+    p2 <- ggplot(observed_data, aes(x = year, y = ir, color = state, group = state)) +
+      geom_line(size = 1) +
+      geom_point(size = 2) +
+      labs(
+        title = paste(pathogen, "Incidence Rate by State (Observed Data)"),
+        x = "Year", y = "Incidence per 100,000", color = "State"
+      ) +
+      theme_minimal() +
+      theme(legend.position = "right")
+      
+    ggsave(paste0(pathogen, "_state_trends_observed.png"), p2, width = 10, height = 6)
+    log_message("OUTPUT", paste("Saved state observed trends plot to", paste0(pathogen, "_state_trends_observed.png")))
+  }
   
-  # Overall summary plot
-  p3 <- ggplot(plot_data, aes(x = year, y = ir)) +
-    stat_summary(fun = mean, geom = "line", size = 1.5, color = "red") +
-    stat_summary(fun = mean, geom = "point", size = 3, color = "red") +
-    labs(
-      title = paste("Overall", pathogen, "Incidence Rate Trend"),
-      subtitle = "Average across all states",
-      x = "Year",
-      y = "Incidence per 100,000"
-    ) +
-    theme_minimal()
-  
-  ggsave(paste0(pathogen, "_overall.png"), p3, width = 8, height = 6)
-  log_message("OUTPUT", paste("Saved overall plot to", paste0(pathogen, "_overall.png")))
+  # Comparison plot: Spline vs Observed
+  if (nrow(spline_data) > 0 && nrow(observed_data) > 0) {
+    # Average trends for comparison
+    overall_spline <- aggregate(ir ~ year, data = spline_data, FUN = mean, na.rm = TRUE)
+    overall_observed <- aggregate(ir ~ year, data = observed_data, FUN = mean, na.rm = TRUE)
+    
+    p3 <- ggplot() +
+      geom_line(data = overall_spline, aes(x = year, y = ir), 
+                color = "blue", size = 1.5, linetype = "solid") +
+      geom_point(data = overall_observed, aes(x = year, y = ir), 
+                color = "red", size = 3, alpha = 0.8) +
+      labs(
+        title = paste("FoodNetTrends Analysis:", pathogen),
+        subtitle = "Blue line: Smooth spline trend | Red points: Observed data",
+        x = "Year",
+        y = "Incidence per 100,000"
+      ) +
+      theme_minimal() +
+      theme(plot.title = element_text(size = 16, face = "bold"))
+    
+    ggsave(paste0(pathogen, "_foodnettrends_comparison.png"), p3, width = 10, height = 6, dpi = 300)
+    log_message("OUTPUT", paste("Saved FoodNetTrends comparison plot to", paste0(pathogen, "_foodnettrends_comparison.png")))
+  }
 }, error = function(e) {
   log_message("ERROR", paste("Plot generation failed:", e$message))
   
   # Create error indicator plots
-  png(paste0(pathogen, "_trend_error.png"), width = 800, height = 600)
-  plot(1:10, 1:10, type = "n", main = paste(pathogen, "Trend (ERROR)"))
-  text(5, 5, "Error generating plot", col = "red", cex = 2)
+  png(paste0(pathogen, "_spline_trend_error.png"), width = 800, height = 600)
+  plot(1:10, 1:10, type = "n", main = paste(pathogen, "Spline Trend (ERROR)"))
+  text(5, 5, "Error generating spline trend plot", col = "red", cex = 2)
   dev.off()
   
-  png(paste0(pathogen, "_state_trends_error.png"), width = 800, height = 600)
-  plot(1:10, 1:10, type = "n", main = paste(pathogen, "State Trends (ERROR)"))
-  text(5, 5, "Error generating plot", col = "red", cex = 2)
+  png(paste0(pathogen, "_state_spline_trends_error.png"), width = 800, height = 600)
+  plot(1:10, 1:10, type = "n", main = paste(pathogen, "State Spline Trends (ERROR)"))
+  text(5, 5, "Error generating state trends plot", col = "red", cex = 2)
   dev.off()
   
-  png(paste0(pathogen, "_overall_error.png"), width = 800, height = 600)
-  plot(1:10, 1:10, type = "n", main = paste("Overall", pathogen, "(ERROR)"))
-  text(5, 5, "Error generating plot", col = "red", cex = 2)
+  png(paste0(pathogen, "_foodnettrends_comparison_error.png"), width = 800, height = 600)
+  plot(1:10, 1:10, type = "n", main = paste("FoodNetTrends", pathogen, "(ERROR)"))
+  text(5, 5, "Error generating comparison plot", col = "red", cex = 2)
   dev.off()
   
   log_message("OUTPUT", "Created error indicator plot files")
@@ -1073,24 +1485,95 @@ if (exists("has_progress_tracking") && has_progress_tracking) {
 # Create summary file
 summary_file <- paste0(pathogen, "_summary.txt")
 sink(summary_file)
-cat("==============================================\n")
-cat(" FoodNetTrends Analysis Summary             \n")
-cat("==============================================\n")
+cat("=======================================================\n")
+cat(" FoodNetTrends v1.0.0-rc.1 Analysis Summary         \n")
+cat("=======================================================\n")
 cat(paste("Pathogen:         ", pathogen, "\n"))
 cat(paste("Analysis Date:    ", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "\n"))
+cat(paste("Pipeline Version: ", "v1.0.0-rc.1", "\n"))
 cat(paste("MMWR File:        ", args$mmwrFile, "\n"))
+
+# Data Quality Summary
+cat("\n--- DATA QUALITY ASSESSMENT ---\n")
 cat(paste("Records Analyzed: ", nrow(analysis_data), "\n"))
-cat(paste("States:           ", paste(unique(analysis_data$state), collapse=", "), "\n"))
-cat(paste("Years:            ", paste(unique(analysis_data$year), collapse=", "), "\n"))
-cat("\nIncidence Rate Summary:\n")
-cat("------------------------\n")
-state_summary <- aggregate(ir ~ state, data = ir_data, FUN = function(x) round(mean(x), 2))
-cat(paste("State", "\t", "Avg. IR", "\n"))
-for (i in 1:nrow(state_summary)) {
-  cat(paste(state_summary$state[i], "\t", state_summary$ir[i], "\n"))
+cat(paste("States Included:  ", data_quality$state_count, " (", paste(unique(analysis_data$state), collapse=", "), ")\n"))
+cat(paste("Time Period:      ", paste(data_quality$year_range, collapse=" - "), "\n"))
+cat(paste("Data Quality:     ", if(data_quality$passed) "PASSED" else "ISSUES DETECTED", "\n"))
+if (!data_quality$passed) {
+  for (issue in data_quality$issues) {
+    cat(paste("  WARNING: ", issue, "\n"))
+  }
 }
-cat("\n")
-cat("==============================================\n")
+
+# Model Performance Summary  
+cat("\n--- MODEL DIAGNOSTICS ---\n")
+cat(paste("Model Type:       ", "Bayesian Hierarchical Spline (brms)", "\n"))
+cat(paste("Convergence:      ", if(is.na(convergence_check$converged)) "N/A (dummy model)" else 
+                                  if(convergence_check$converged) "CONVERGED" else "ISSUES DETECTED", "\n"))
+if (!is.na(convergence_check$max_rhat)) {
+  cat(paste("Max Rhat:         ", round(convergence_check$max_rhat, 3), 
+           if(convergence_check$max_rhat <= 1.1) " (Good)" else " (Concerning)", "\n"))
+}
+cat(paste("Trend Significance:", if(is.na(trend_significance$significant)) "N/A" else 
+                                  if(trend_significance$significant) "SIGNIFICANT" else "NOT SIGNIFICANT", "\n"))
+if (!is.na(trend_significance$proportion_significant)) {
+  cat(paste("Significant Terms:", round(trend_significance$proportion_significant * 100, 1), "%\n"))
+}
+
+# Analysis Parameters
+cat("\n--- ANALYSIS PARAMETERS ---\n")
+cat(paste("Chains:           ", args$chains, "\n"))
+cat(paste("Iterations:       ", args$iterations, "\n"))
+cat(paste("Cores Used:       ", args$cores, "\n"))
+cat(paste("Travel Filter:    ", args$travel, "\n"))
+cat(paste("CIDT Filter:      ", args$cidt, "\n"))
+
+# Results Summary
+cat("\n--- INCIDENCE RATE SUMMARY ---\n")
+if ("type" %in% names(ir_data)) {
+  observed_ir <- subset(ir_data, type == "observed")
+  if (nrow(observed_ir) > 0) {
+    state_summary <- aggregate(ir ~ state, data = observed_ir, FUN = function(x) round(mean(x, na.rm=TRUE), 2))
+    overall_mean <- round(mean(observed_ir$ir, na.rm=TRUE), 2)
+    overall_range <- round(range(observed_ir$ir, na.rm=TRUE), 2)
+    
+    cat(paste("Overall Mean IR:  ", overall_mean, " per 100,000\n"))
+    cat(paste("Range:            ", paste(overall_range, collapse=" - "), " per 100,000\n"))
+    cat("State Averages:\n")
+    for (i in 1:nrow(state_summary)) {
+      cat(paste("  ", state_summary$state[i], ": ", state_summary$ir[i], " per 100,000\n"))
+    }
+  }
+} else {
+  # Fallback for older format
+  state_summary <- aggregate(ir ~ state, data = ir_data, FUN = function(x) round(mean(x, na.rm=TRUE), 2))
+  cat("State Averages:\n")
+  for (i in 1:nrow(state_summary)) {
+    cat(paste("  ", state_summary$state[i], ": ", state_summary$ir[i], " per 100,000\n"))
+  }
+}
+
+# Output Files
+cat("\n--- OUTPUT FILES GENERATED ---\n")
+cat(paste("Model File:       ", paste0(pathogen, "_brm.Rds"), "\n"))
+cat(paste("IR Data:          ", paste0(pathogen, "_IRCatch.csv"), "\n"))
+cat(paste("Spline Trends:    ", paste0(pathogen, "_spline_trend.png"), "\n"))
+cat(paste("State Trends:     ", paste0(pathogen, "_state_spline_trends.png"), "\n"))
+cat(paste("Comparison Plot:  ", paste0(pathogen, "_foodnettrends_comparison.png"), "\n"))
+
+# Interpretation Guidelines
+cat("\n--- INTERPRETATION GUIDELINES ---\n")
+cat("1. Spline trend lines show underlying temporal patterns\n")
+cat("2. Credible intervals indicate uncertainty in estimates\n")
+cat("3. Check convergence diagnostics before interpretation\n")
+if (!data_quality$passed) {
+  cat("4. WARNING: Data quality issues detected - interpret with caution\n")
+}
+if (!is.na(trend_significance$significant) && !trend_significance$significant) {
+  cat("5. WARNING: Trends may not be statistically significant\n")
+}
+
+cat("\n=======================================================\n")
 sink()
 
 if (exists("has_progress_tracking") && has_progress_tracking) {
@@ -1116,9 +1599,16 @@ if (!file.exists(summary_file_path)) {
         file = summary_file_path, append = TRUE)
 }
 
-# Complete
+# Complete with final diagnostics summary
+log_message("INFO", "=== FINAL ANALYSIS SUMMARY ===")
+log_message("INFO", paste("Pathogen:", pathogen))
+log_message("INFO", paste("Data Quality:", if(data_quality$passed) "PASSED" else "ISSUES DETECTED"))
+log_message("INFO", paste("Model Convergence:", if(is.na(convergence_check$converged)) "N/A" else if(convergence_check$converged) "CONVERGED" else "ISSUES"))
+log_message("INFO", paste("Trend Significance:", if(is.na(trend_significance$significant)) "N/A" else if(trend_significance$significant) "SIGNIFICANT" else "NOT SIGNIFICANT"))
+log_message("INFO", paste("Spline Trends Generated:", if("type" %in% names(ir_data) && any(ir_data$type == "spline_trend")) "YES" else "NO"))
+
 if (exists("has_progress_tracking") && has_progress_tracking) {
-  log_progress("COMPLETE", paste("Analysis completed successfully for", pathogen), milestone="COMPLETE")
+  log_progress("COMPLETE", paste("FoodNetTrends analysis completed successfully for", pathogen), milestone="COMPLETE")
 } else {
-  log_message("COMPLETE", paste("Analysis completed successfully for", pathogen))
+  log_message("COMPLETE", paste("FoodNetTrends analysis completed successfully for", pathogen))
 }

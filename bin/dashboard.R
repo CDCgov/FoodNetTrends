@@ -1,22 +1,44 @@
 #!/usr/bin/env Rscript
 # =========================================================================
-# FoodNetTrends v1.0 - Interactive Dashboard Generator
+# FoodNetTrends v1.0.0-rc.1 - Interactive Dashboard Generator
 # =========================================================================
 #
-# Purpose:
-#   Generates interactive HTML dashboards from completed analysis results.
-#   Creates self-contained reports with embedded visualizations, data tables,
-#   and responsive design for comprehensive result exploration.
+# OVERVIEW FOR MAINTAINERS:
+# This script generates comprehensive HTML dashboards from completed 
+# FoodNetTrends analysis results. It creates self-contained, professional
+# reports suitable for epidemiological review and public health decision-making.
 #
-# Key Features:
-#   - Interactive image gallery with modal expansion
-#   - Tabbed data interface for multi-pathogen results
-#   - Dark/light mode accessibility options
-#   - Responsive design for multiple device types
-#   - Embedded visualizations for offline viewing
+# DASHBOARD COMPONENTS:
+# 1. Analysis Overview: Summary statistics and completion status
+# 2. Visualization Gallery: Embedded spline trend plots with modal viewing
+# 3. Tabbed Data Interface: Comprehensive data tables for each pathogen
+# 4. Summary Reports: Text summaries with model diagnostics
+# 5. Accessibility Features: Dark/light mode toggle, responsive design
+#
+# TECHNICAL FEATURES:
+# - Self-contained: All images embedded as base64 for offline viewing
+# - Responsive: Works on desktop, tablet, and mobile devices
+# - Interactive: Click-to-expand images, tabbed data navigation
+# - Professional: Publication-ready styling with muted color palette
+# - Robust: Graceful degradation when base64enc package unavailable
+#
+# FILE RECOGNITION PATTERNS:
+# The dashboard automatically recognizes these analysis outputs:
+# - *_spline_trend.png: Main population-level trend visualizations
+# - *_state_spline_trends.png: State-specific trend comparisons
+# - *_foodnettrends_comparison.png: Methodology comparison plots
+# - *_IRCatch.csv: Incidence rate data with predictions
+# - *_summary.txt: Analysis diagnostics and interpretation guides
+#
+# DEPLOYMENT:
+# Generated dashboard.html files are completely self-contained and can be:
+# - Viewed directly in any web browser
+# - Shared via email or file transfer
+# - Hosted on web servers for team access
+# - Archived for long-term reference
 #
 # Last updated: 2025-05-22
-# =========================================================================
+# ========================================================================="
 
 # Performance optimizations
 gc(reset = TRUE)
@@ -663,10 +685,14 @@ generate_image_gallery <- function(png_files) {
     
     if (grepl("_overall\\.png$", basename)) {
       type <- "Overall Trends"
-    } else if (grepl("_state_trends\\.png$", basename)) {
-      type <- "State Trends"
+    } else if (grepl("_state_spline_trends\\.png$", basename)) {
+      type <- "State Spline Trends"
+    } else if (grepl("_spline_trend\\.png$", basename)) {
+      type <- "Spline Trend Analysis"
     } else if (grepl("_trend\\.png$", basename)) {
       type <- "Trend Analysis"
+    } else if (grepl("_foodnettrends_comparison\\.png$", basename)) {
+      type <- "FoodNetTrends Comparison"
     } else {
       type <- "Analysis"
     }

@@ -1,23 +1,35 @@
 /*
  * ==================================================================
- * FoodNetTrends v1.0.0-rc.1 - Main Analysis Workflow
+ * FoodNetTrends v1.0.0-rc.1 - Main Bayesian Spline Analysis Workflow
  * ==================================================================
  *
- * Purpose:
- *   Orchestrates the complete FoodNetTrends analysis pipeline from
- *   data validation through Bayesian modeling to dashboard generation.
- *   Implements hierarchical spline models for foodborne disease trends.
+ * OVERVIEW FOR MAINTAINERS:
+ * This is the core Nextflow workflow that orchestrates the complete
+ * FoodNetTrends analysis pipeline. It coordinates data preprocessing,
+ * Bayesian spline modeling, and dashboard generation across multiple
+ * pathogens in parallel.
  *
- * Workflow Steps:
- *   1. Input validation and census file discovery
- *   2. Pathogen-specific Bayesian modeling (parallel execution)
- *   3. Result aggregation and visualization generation
- *   4. Interactive dashboard creation
+ * WORKFLOW ARCHITECTURE:
+ * 1. Input Validation: Validates MMWR and census data files
+ * 2. Data Preprocessing: Prepares surveillance data for modeling
+ * 3. Parallel Modeling: Runs Bayesian spline analysis per pathogen
+ * 4. Result Collection: Aggregates outputs from parallel analyses
+ * 5. Dashboard Generation: Creates interactive HTML reports
  *
- * Key Features:
- *   - Multi-pathogen parallel processing
- *   - Automatic resource optimization
- *   - Comprehensive error handling and logging
+ * CRITICAL DESIGN DECISIONS:
+ * - Parallel Execution: Each pathogen analyzed independently for speed
+ * - Channel Synchronization: Careful coordination of optional outputs
+ * - Resource Optimization: Dynamic memory/CPU allocation based on data size
+ * - Error Isolation: Pathogen failures don't crash entire pipeline
+ *
+ * CHANNEL FLOW (for maintainers):
+ * mmwr_data -> preprocess -> pathogen_channels -> trendy_analysis -> 
+ * collect_results -> dashboard_generation -> final_outputs
+ *
+ * MAINTAINER WARNING:
+ * The channel collection logic in this workflow was specifically designed
+ * to handle optional outputs (some pathogens may fail). Modifications to
+ * channel operations should preserve this fault-tolerance.
  *   - Self-contained output with embedded visualizations
  *
  * Last updated: 2025-05-22
@@ -90,7 +102,7 @@ workflow SPLINE {
         }
     }
     
-    log.info "Running FoodNetTrends Spline Analysis Workflow v1.0"
+    log.info "Running FoodNetTrends Spline Analysis Workflow v1.0.0-rc.1"
     log.info "Analyzing ${pathogenList.size()} pathogens: ${pathogenList.join(', ')}"
     
     // Create mmwrFile as file value with existence check

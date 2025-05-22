@@ -28,7 +28,7 @@ include { PREPROCESS } from '../modules/local/preprocess'
 
 workflow PREPROCESS_WORKFLOW {
     // Log workflow version at startup
-    log.info "Running FoodNetTrends Preprocessing Workflow v1.0"
+    log.info "Running FoodNetTrends Preprocessing Workflow v1.0.0-rc.1"
     
     // Validate required parameters
     if (!params.mmwrFile) {
