@@ -143,3 +143,8 @@ FoodNetTrends.*
 # Git large files
 #########################
 .git/objects/pack/pack-*.pack
+
+#########################
+# Archives
+#########################
+archive/
