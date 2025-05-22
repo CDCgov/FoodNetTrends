@@ -1,7 +1,7 @@
 #!/usr/bin/env nextflow
 /*
  * ==================================================================
- * FoodNetTrends v1.0 - Preprocessing Workflow
+ * FoodNetTrends v1.0.0-rc.1 - Preprocessing Workflow
  * ==================================================================
  *
  * Purpose:

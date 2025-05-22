@@ -1,4 +1,4 @@
-# FoodNetTrends Analysis Pipeline v1.0
+# FoodNetTrends Analysis Pipeline v1.0.0-rc.1
 
 A Nextflow-based pipeline for Bayesian modeling of foodborne disease surveillance data.
 

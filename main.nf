@@ -1,7 +1,7 @@
 #!/usr/bin/env nextflow
 /*
  * ==================================================================
- * FoodNetTrends v1.0 - Main Pipeline Entry Point
+ * FoodNetTrends v1.0.0-rc.1 - Main Pipeline Entry Point
  * ==================================================================
  *
  * Purpose:

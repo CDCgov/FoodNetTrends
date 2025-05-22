@@ -1,6 +1,6 @@
 /*
  * ==================================================================
- * FoodNetTrends v1.0 - Dashboard Generation Workflow
+ * FoodNetTrends v1.0.0-rc.1 - Dashboard Generation Workflow
  * ==================================================================
  *
  * Purpose:

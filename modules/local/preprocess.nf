@@ -1,6 +1,6 @@
 /*
  * ==================================================================
- * FoodNetTrends v1.0 - Data Preprocessing Module
+ * FoodNetTrends v1.0.0-rc.1 - Data Preprocessing Module
  * ==================================================================
  * 
  * Purpose:

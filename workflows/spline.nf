@@ -1,6 +1,6 @@
 /*
  * ==================================================================
- * FoodNetTrends v1.0 - Main Analysis Workflow
+ * FoodNetTrends v1.0.0-rc.1 - Main Analysis Workflow
  * ==================================================================
  *
  * Purpose:
@@ -330,11 +330,15 @@ workflow SPLINE {
         new File(dashboardDir).mkdirs()
         
         try {
-            // Collect ALL outputs from TRENDY processes using mix to combine channels
-            // This ensures dashboard only runs after ALL TRENDY processes complete
-            results
-                .mix(figures, summary)  // Combine all output channels
-                .collect()              // Wait for all files to be available
+            // v1.0.0-rc.1: Fixed critical channel collection bug for dashboard generation
+            // Previous logic failed when optional outputs (CSV/PNG files) were missing from any pathogen
+            // The mix() operation would create channel synchronization deadlocks with empty channels
+            // New approach: Flatten all TRENDY outputs and filter only existing files for dashboard input
+            TRENDY.out.results
+                .mix(TRENDY.out.figures, TRENDY.out.summary)
+                .flatten()
+                .filter { it.exists() }  // Only include files that actually exist - handles optional outputs
+                .collect()               // Now safe to collect since we only process existing files
                 .set { all_output_files }
             
             // Now pass ALL collected files to the dashboard

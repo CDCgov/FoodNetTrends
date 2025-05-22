@@ -1,6 +1,6 @@
 /*
  * ==================================================================
- * FoodNetTrends v1.0 - Interactive Dashboard Generation Module
+ * FoodNetTrends v1.0.0-rc.1 - Interactive Dashboard Generation Module
  * ==================================================================
  *
  * Purpose:

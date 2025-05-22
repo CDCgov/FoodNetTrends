@@ -1,6 +1,6 @@
 /*
  * ==================================================================
- * FoodNetTrends v1.0 - Bayesian Modeling Module
+ * FoodNetTrends v1.0.0-rc.1 - Bayesian Modeling Module
  * ==================================================================
  *
  * Purpose:
