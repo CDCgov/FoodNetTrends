@@ -47,7 +47,7 @@ process GENERATE_DASHBOARD {
     echo "" >> ${projID}_data_quality.log
     
     # Initialize JSON structure for data quality metadata
-    cat > ${projID}_data_quality.json << 'JSONTEMPLATE'
+    cat > ${projID}_data_quality.json << JSONTEMPLATE
     {
       "projectId": "${projID}",
       "generationDate": "${currentDate}",
@@ -127,7 +127,7 @@ process GENERATE_DASHBOARD {
             TEMPLATE_TO_USE="modified_template.html"
         else
             # Create a simple fallback template using a heredoc instead of multiple echo statements
-            cat > fallback_template.html << 'EOFTEMPLATE'
+            cat > fallback_template.html << EOFTEMPLATE
 <!DOCTYPE html>
 <html>
 <head><title>FoodNet Trends Dashboard - Fallback Template</title></head>
@@ -137,7 +137,7 @@ EOFTEMPLATE
             echo "\$WARNING_BANNER" >> fallback_template.html
             
             # Complete the HTML template
-            cat >> fallback_template.html << 'EOFTEMPLATE'
+            cat >> fallback_template.html << EOFTEMPLATE
 <h1>FoodNet Trends Analysis</h1>
 <p>This is a fallback template due to missing template file.</p>
 </body>
@@ -219,7 +219,7 @@ EOFTEMPLATE
     if [ ! -f "${dashboardScript}" ]; then
         echo "ERROR: Dashboard script not found: ${dashboardScript}" >> ${projID}_data_quality.log
         # Create fallback dashboard - using a safer approach
-        cat > ${projID}_dashboard.html << 'ERRORTEMPLATE'
+        cat > ${projID}_dashboard.html << ERRORTEMPLATE
 <!DOCTYPE html>
 <html>
 <head><title>FoodNet Trends Dashboard - Error</title></head>
@@ -234,7 +234,7 @@ ERRORTEMPLATE
         echo "<p>Analysis completed at: ${currentDate}</p>" >> ${projID}_dashboard.html
         
         # Close the HTML
-        cat >> ${projID}_dashboard.html << 'ERRORTEMPLATE'
+        cat >> ${projID}_dashboard.html << ERRORTEMPLATE
 </body>
 </html>
 ERRORTEMPLATE
@@ -283,7 +283,7 @@ ERRORTEMPLATE
             
             # Create a more informative fallback dashboard - using a safer approach with multiple parts
             # First create the basic HTML structure
-            cat > ${projID}_dashboard.html << 'ERRORTEMPLATE'
+            cat > ${projID}_dashboard.html << ERRORTEMPLATE
 <!DOCTYPE html>
 <html>
 <head>
@@ -306,7 +306,7 @@ ERRORTEMPLATE
             echo "    <p>The dashboard generation script failed with exit code \$SCRIPT_EXIT_CODE.</p>" >> ${projID}_dashboard.html
             
             # Continue with the rest of the template
-            cat >> ${projID}_dashboard.html << 'ERRORTEMPLATE'
+            cat >> ${projID}_dashboard.html << ERRORTEMPLATE
   </div>
   
   <div class="debug-info">
@@ -320,7 +320,7 @@ ERRORTEMPLATE
             echo "    <p><strong>Analysis time:</strong> ${currentDate}</p>" >> ${projID}_dashboard.html
             
             # Continue with static content
-            cat >> ${projID}_dashboard.html << 'ERRORTEMPLATE'    
+            cat >> ${projID}_dashboard.html << ERRORTEMPLATE    
     <h4>Possible solutions:</h4>
     <ul>
       <li>Check that all required result files exist</li>
@@ -338,7 +338,7 @@ ERRORTEMPLATE
             fi
             
             # Close the HTML structure
-            cat >> ${projID}_dashboard.html << 'ERRORTEMPLATE'
+            cat >> ${projID}_dashboard.html << ERRORTEMPLATE
   </div>
 </body>
 </html>
@@ -361,7 +361,7 @@ ERRORTEMPLATE
         
         # Create a simple fallback dashboard with diagnostic info - using a safer approach with multiple steps
         # First create the basic HTML structure
-        cat > ${projID}_dashboard.html << 'ERRORTEMPLATE'
+        cat > ${projID}_dashboard.html << ERRORTEMPLATE
 <!DOCTYPE html>
 <html>
 <head>
@@ -390,7 +390,7 @@ ERRORTEMPLATE
         echo "    <p><strong>Analysis completed at:</strong> ${currentDate}</p>" >> ${projID}_dashboard.html
         
         # Complete the HTML structure
-        cat >> ${projID}_dashboard.html << 'ERRORTEMPLATE'    
+        cat >> ${projID}_dashboard.html << ERRORTEMPLATE    
     <h4>Diagnostic Information</h4>
     <p>Diagnostic information has been saved to the 'debuginfo' directory.</p>
     
