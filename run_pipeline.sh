@@ -993,7 +993,7 @@ elif [[ "$workflow_mode" == "2" ]]; then
 
     # Search for preprocessed CSV files
     echo "Searching for preprocessed CSV files..."
-    mapfile -t found_csv < <(find . -type f -path "*/preprocessed/*.csv" 2>/dev/null)
+    mapfile -t found_csv < <(find . -type f -path "*/preprocessed/*.csv" -o -path "preprocessed_*/preprocessed/*.csv" 2>/dev/null)
     if [[ ${#found_csv[@]} -gt 0 ]]; then
         echo "Found the following preprocessed CSV files:"
         for i in "${!found_csv[@]}"; do
@@ -1029,7 +1029,7 @@ elif [[ "$workflow_mode" == "2" ]]; then
     # Search for preprocessed JSON metadata files
     echo ""
     echo "Searching for preprocessed metadata JSON files..."
-    mapfile -t found_json < <(find . -type f -path "*/preprocessed/*.json" 2>/dev/null)
+    mapfile -t found_json < <(find . -type f -path "*/preprocessed/*.json" -o -path "preprocessed_*/preprocessed/*.json" 2>/dev/null)
     if [[ ${#found_json[@]} -gt 0 ]]; then
         echo "Found the following preprocessed metadata JSON files:"
         for i in "${!found_json[@]}"; do
@@ -1072,6 +1072,10 @@ elif [[ "$workflow_mode" == "2" ]]; then
         fi
     fi
 fi
+
+# Initialize default pathogen and state lists
+ALL_PATHOGENS="SALMONELLA,CAMPYLOBACTER,SHIGA,STEC,CYCLOSPORA,LISTERIA,VIBRIO,YERSINIA"
+ALL_STATES=""
 
 # Load metadata if available
 has_metadata=false
@@ -1125,13 +1129,16 @@ if [[ -n "${preprocessed_metadata}" && -f "${preprocessed_metadata}" ]]; then
     fi
 fi
 
-# Add CAMPYLOBACTER,CYCLOSPORA to ALL_PATHOGENS if not present
+# Ensure key pathogens are always available (for backward compatibility)
 if [[ ! "$ALL_PATHOGENS" == *"CAMPYLOBACTER"* ]]; then
     ALL_PATHOGENS="$ALL_PATHOGENS,CAMPYLOBACTER"
 fi
 if [[ ! "$ALL_PATHOGENS" == *"CYCLOSPORA"* ]]; then
     ALL_PATHOGENS="$ALL_PATHOGENS,CYCLOSPORA"
 fi
+
+# Clean up any leading commas from pathogen list
+ALL_PATHOGENS=$(echo "$ALL_PATHOGENS" | sed 's/^,//')
 
 # Get travel status filter
 echo ""
@@ -1431,18 +1438,19 @@ echo "1) Quick Test - Minimal resources for testing (~1 hour, 4GB RAM, 2 cores)"
 echo "2) Standard Run - Balanced resources (~4 hours, 16GB RAM, 8 cores)"
 echo "3) Production Run - Full resources for accurate results (~8 hours, 32GB RAM, 16 cores)"
 echo "4) Maximum Performance - Highest resource allocation (~12 hours, 64GB RAM, 32 cores)"
-echo "5) Custom Resource Configuration"
+echo "5) Stable (RECOMMENDED) - Proven Stan settings that work reliably (~3 hours, 16GB RAM, 8 cores)"
+echo "6) Custom Resource Configuration"
 
-# Set default based on pathogen count
+# Set default based on pathogen count - default to stable (most reliable)
 if [[ $pathogen_count -le 1 ]]; then
-    # For single pathogen, suggest standard run
-    default_profile=2
+    # For single pathogen, suggest stable
+    default_profile=5
 elif [[ $pathogen_count -le 3 ]]; then
-    # For 2-3 pathogens, suggest production run
-    default_profile=3
+    # For 2-3 pathogens, suggest stable
+    default_profile=5
 else
-    # For 4+ pathogens, suggest maximum performance
-    default_profile=4
+    # For 4+ pathogens, suggest stable (proven to work)
+    default_profile=5
 fi
 
 read -p "Enter selection [$default_profile]: " performance_profile
@@ -1518,7 +1526,25 @@ case $performance_profile in
         echo "Cores: $cores"
         echo "Memory: 64GB"
         ;;
-    5) # Custom Configuration
+    5) # Stable Profile - Known working settings
+        chains=4
+        iterations=1500
+        adapt_delta=0.95
+        max_treedepth=12
+        cores=8
+        memory="16.GB"
+        flag="stable"
+        echo ""
+        echo "Stable Profile Selected (RECOMMENDED)"
+        echo "Chains: $chains"
+        echo "Iterations: $iterations"
+        echo "Adapt delta: $adapt_delta"
+        echo "Max treedepth: $max_treedepth"
+        echo "Cores: $cores"
+        echo "Memory: 16GB"
+        echo "This profile uses proven settings that work reliably without Stan crashes."
+        ;;
+    6) # Custom Configuration
         echo ""
         echo "======== Custom Resource Configuration ========"
         echo "IMPORTANT: For optimal performance in HPC environments, ensure:"

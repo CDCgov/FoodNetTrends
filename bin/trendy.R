@@ -990,72 +990,39 @@ model_fit <- tryCatch({
       return(TRUE)  # Must return TRUE to continue sampling
     }
     
-    # Optimized production settings based on successful testing
-    # Use capped values to prevent resource overload that caused failures
-    cores_safe <- min(args$cores, 8)      # Cap at 8 cores max
-    chains_safe <- min(args$chains, 8)    # Cap at 8 chains max
-    iter_safe <- min(args$iterations, 2000)  # Cap at 2000 iterations max
-    
-    # Log any parameter adjustments for transparency
-    if (cores_safe < args$cores) {
-      log_message("INFO", paste("Cores capped at", cores_safe, "for stability (requested:", args$cores, ")"))
-    }
-    if (chains_safe < args$chains) {
-      log_message("INFO", paste("Chains capped at", chains_safe, "for stability (requested:", args$chains, ")"))
-    }
-    if (iter_safe < args$iterations) {
-      log_message("INFO", paste("Iterations capped at", iter_safe, "for stability (requested:", args$iterations, ")"))
-    }
-    
+    # Fit model with progress callback using command-line parameters
     brm(
       formula = formula,
       data = analysis_data,
       family = "negbinomial",
-      cores = cores_safe,
-      chains = chains_safe,
-      iter = iter_safe,
+      cores = args$cores,
+      chains = args$chains,
+      iter = args$iterations,
       control = list(
-        adapt_delta = max(args$adapt_delta, 0.90),  # Ensure at least 0.90
-        max_treedepth = max(args$max_treedepth, 10)  # Ensure at least 10
+        adapt_delta = args$adapt_delta,
+        max_treedepth = args$max_treedepth
       ),
       seed = args$seed,
       backend = "rstan",
       refresh = 0,  # Quiet mode for production
-      silent = TRUE,  # Hide Stan messages in production
       callback = mcmc_progress
     )
   } else {
-    # Optimized production settings (no progress tracking)
-    cores_safe <- min(args$cores, 8)      # Cap at 8 cores max
-    chains_safe <- min(args$chains, 8)    # Cap at 8 chains max  
-    iter_safe <- min(args$iterations, 2000)  # Cap at 2000 iterations max
-    
-    # Log any parameter adjustments for transparency
-    if (cores_safe < args$cores) {
-      log_message("INFO", paste("Cores capped at", cores_safe, "for stability (requested:", args$cores, ")"))
-    }
-    if (chains_safe < args$chains) {
-      log_message("INFO", paste("Chains capped at", chains_safe, "for stability (requested:", args$chains, ")"))
-    }
-    if (iter_safe < args$iterations) {
-      log_message("INFO", paste("Iterations capped at", iter_safe, "for stability (requested:", args$iterations, ")"))
-    }
-    
+    # Fit model without progress tracking using command-line parameters
     brm(
       formula = formula,
       data = analysis_data,
       family = "negbinomial",
-      cores = cores_safe,
-      chains = chains_safe,
-      iter = iter_safe,
+      cores = args$cores,
+      chains = args$chains,
+      iter = args$iterations,
       control = list(
-        adapt_delta = max(args$adapt_delta, 0.90),  # Ensure at least 0.90
-        max_treedepth = max(args$max_treedepth, 10)  # Ensure at least 10
+        adapt_delta = args$adapt_delta,
+        max_treedepth = args$max_treedepth
       ),
       seed = args$seed,
       backend = "rstan",
-      refresh = 0,  # Quiet mode for production
-      silent = TRUE   # Hide Stan messages in production
+      refresh = 0   # Quiet mode for production
     )
   }
 }, error = function(e) {
