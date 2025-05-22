@@ -315,7 +315,8 @@ workflow SPLINE {
         
         // Make sure output directory exists
         new File(dashboardDir).mkdirs()
-            
+        
+        try {
             // Collect all results and wait until they're all available
             // This ensures dashboard only runs after ALL TRENDY processes complete
             results
