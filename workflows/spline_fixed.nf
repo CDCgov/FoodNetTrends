@@ -314,26 +314,7 @@ workflow SPLINE {
         def dashboardDir = "${params.outdir}/${projID}"
         
         // Make sure output directory exists
-        log.info "Generating dashboard in ${dashboardDir}"
         new File(dashboardDir).mkdirs()
-
-        // Create fallback dashboard directly in output directory as a safety measure
-        def timestamp = new java.text.SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date())
-        def fallbackHtml = file("${dashboardDir}/${timestamp}_dashboard.html")
-        
-        try {
-            fallbackHtml.text = """<!DOCTYPE html>
-<html>
-<head><title>Backup Dashboard</title></head>
-<body>
-<h1>FoodNet Trends Backup Dashboard</h1>
-<p>This is a backup dashboard created at the start of dashboard generation.</p>
-<p>If you see this file, the main dashboard generation may have failed.</p>
-<p>Generated at: ${new Date()}</p>
-</body>
-</html>"""
-            
-            log.info "Created backup dashboard at ${fallbackHtml}"
             
             // Collect all results and wait until they're all available
             // This ensures dashboard only runs after ALL TRENDY processes complete
@@ -354,8 +335,7 @@ workflow SPLINE {
                 dashboardScriptVal
             )
         } catch (Exception e) {
-            log.warn "Exception in dashboard generation section: ${e.getMessage()}"
-            log.warn "Using pre-created fallback dashboard"
+            log.error "Dashboard generation failed: ${e.getMessage()}"
             log.warn "To regenerate the dashboard after pipeline completion, run:"
             log.warn "./dashboard.sh ${projID}"
         }
