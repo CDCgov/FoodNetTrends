@@ -1,32 +1,26 @@
 /*
  * ==================================================================
- * FoodNet Trends - TRENDY Process Module
+ * FoodNetTrends v1.0 - Bayesian Modeling Module
  * ==================================================================
  *
  * Purpose:
- *   This process runs the main Bayesian modeling for each pathogen.
- *   It handles input data preparation, executes the R modeling script,
- *   captures detailed logs, and manages potential errors.
+ *   Executes Bayesian hierarchical spline models for individual pathogens.
+ *   Handles data preparation, model fitting, and result generation with
+ *   specialized processing for different pathogen types.
  *
  * Inputs:
- *   - Pathogen name (for targeting specific organism)
- *   - MMWR data file (preprocessed or raw)
- *   - Census files (bacterial and parasitic)
- *   - Travel and CIDT filtering parameters
- *   - Project ID and script paths
+ *   - Target pathogen identifier
+ *   - Preprocessed MMWR surveillance data
+ *   - Population census data (bacterial/parasitic)
+ *   - Analysis parameters and filtering criteria
  *
  * Outputs:
- *   - Bayesian model RDS files
- *   - Incidence rate estimates CSV
- *   - Visualizations (PNG files)
- *   - Summary statistics and logs
- *   - Interactive HTML dashboard
+ *   - Fitted Bayesian model objects (RDS)
+ *   - Incidence rate estimates with confidence intervals
+ *   - Trend visualizations and summary statistics
+ *   - Detailed execution logs
  *
- * Error handling:
- *   - Retries on memory/resource errors
- *   - Detailed logging for diagnostics
- *
- * Last updated: 2025-05-21
+ * Last updated: 2025-05-22
  * ==================================================================
  */
 
@@ -276,27 +270,22 @@ process TRENDY {
     cat ${pathogen}_data_summary.txt >> ${pathogen}_trendy.log
     
     # Find the R script
-    SCRIPT_PATH="${bin_dir}/process_pathogen.R"
+    SCRIPT_PATH="${bin_dir}/trendy.R"
     echo "Checking script path: \${SCRIPT_PATH}" >> ${pathogen}_trendy.log
     
     # Check that R script exists
     if [ ! -f "\${SCRIPT_PATH}" ]; then
-        # Fall back to trendy.R if process_pathogen.R doesn't exist
-        echo "New script not found, falling back to legacy script" >> ${pathogen}_trendy.log
-        SCRIPT_PATH="${bin_dir}/trendy.R"
-        if [ ! -f "\${SCRIPT_PATH}" ]; then
-            ls -la ${bin_dir} > script_dir_contents.txt
-            error_exit "R script not found. Checked ${bin_dir}/process_pathogen.R and ${bin_dir}/trendy.R"
-        fi
+        ls -la ${bin_dir} > script_dir_contents.txt
+        error_exit "R script not found: \${SCRIPT_PATH}"
     fi
     
-    # Copy progress utility file if it exists
-    PROGRESS_UTILS="${bin_dir}/progress_utils.R"
-    if [ -f "\${PROGRESS_UTILS}" ]; then
-        echo "Copying progress tracking utilities..." >> ${pathogen}_trendy.log
-        cp -v "\${PROGRESS_UTILS}" ./ || echo "Warning: Could not copy progress utilities" >> ${pathogen}_trendy.log
+    # Copy progress tracking file if it exists
+    PROGRESS_FILE="${bin_dir}/progress.R"
+    if [ -f "\${PROGRESS_FILE}" ]; then
+        echo "Copying progress tracking module..." >> ${pathogen}_trendy.log
+        cp -v "\${PROGRESS_FILE}" ./ || echo "Warning: Could not copy progress tracking" >> ${pathogen}_trendy.log
     else
-        echo "Progress tracking utilities not found (this is okay)" >> ${pathogen}_trendy.log
+        echo "Progress tracking module not found (this is okay)" >> ${pathogen}_trendy.log
     fi
     
     # Run the pathogen analysis script

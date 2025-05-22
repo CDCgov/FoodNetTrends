@@ -1,11 +1,26 @@
 /*
-=========================================
- FoodNet Trends: Dashboard Generation Workflow
-=========================================
-
-This is a dedicated workflow for dashboard generation only.
-It can be run separately after the main analysis is complete.
-*/
+ * ==================================================================
+ * FoodNetTrends v1.0 - Dashboard Generation Workflow
+ * ==================================================================
+ *
+ * Purpose:
+ *   Standalone workflow for generating interactive HTML dashboards
+ *   from completed analysis results. Can be executed independently
+ *   after the main modeling pipeline has finished.
+ *
+ * Workflow Steps:
+ *   1. Locate and validate analysis result files
+ *   2. Aggregate data from multiple pathogen analyses
+ *   3. Generate interactive dashboard with embedded visualizations
+ *
+ * Use Cases:
+ *   - Re-generating dashboards with updated styling
+ *   - Creating dashboards from archived analysis results
+ *   - Dashboard customization and branding
+ *
+ * Last updated: 2025-05-22
+ * ==================================================================
+ */
 
 // Import required modules
 include { GENERATE_DASHBOARD } from '../modules/local/generate_dashboard'

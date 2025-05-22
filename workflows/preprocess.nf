@@ -1,25 +1,34 @@
 #!/usr/bin/env nextflow
 /*
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    FoodNet Trends Preprocessing Workflow
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    This workflow handles data preprocessing for the FoodNet Trends pipeline.
-    
-    Main steps:
-    1. Validate input parameters
-    2. Process MMWR surveillance data
-    3. Generate clean CSV and optional metadata
-    
-    Last updated: 2025-05-18
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-*/
+ * ==================================================================
+ * FoodNetTrends v1.0 - Preprocessing Workflow
+ * ==================================================================
+ *
+ * Purpose:
+ *   Standalone workflow for data preprocessing operations.
+ *   Validates and standardizes raw MMWR surveillance data for
+ *   downstream analysis without running the full modeling pipeline.
+ *
+ * Workflow Steps:
+ *   1. Input parameter validation
+ *   2. Raw data processing and standardization
+ *   3. Metadata generation and output verification
+ *
+ * Use Cases:
+ *   - Data preparation for multiple analysis runs
+ *   - Quality control and data validation
+ *   - Preprocessing for external analysis tools
+ *
+ * Last updated: 2025-05-22
+ * ==================================================================
+ */
 
 // Import module
 include { PREPROCESS } from '../modules/local/preprocess'
 
 workflow PREPROCESS_WORKFLOW {
     // Log workflow version at startup
-    log.info "Running FoodNet Trends Preprocessing Workflow v1.0"
+    log.info "Running FoodNetTrends Preprocessing Workflow v1.0"
     
     // Validate required parameters
     if (!params.mmwrFile) {
@@ -96,7 +105,7 @@ workflow PREPROCESS_WORKFLOW {
     // Log preprocessing start
     log.info """
     ==============================================
-    FoodNet Trends Preprocessing
+    FoodNetTrends Preprocessing
     ==============================================
     MMWR File         : ${params.mmwrFile}
     Census File (B)   : ${params.censusFileB} ${censusFileB && censusFileB.exists() ? "✓" : "✗"}
@@ -132,7 +141,7 @@ workflow PREPROCESS_WORKFLOW {
 
         log.info """
         ==============================================
-        FoodNet Trends Preprocessing: ${status}
+        FoodNetTrends Preprocessing: ${status}
         ==============================================
         Completed at     : ${now}
         Duration         : ${w?.duration ?: 'unknown'}

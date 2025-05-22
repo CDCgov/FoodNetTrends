@@ -1,16 +1,19 @@
 # =========================================================================
-# FoodNet Trends - Core Statistical and Data Processing Functions
+# FoodNetTrends v1.0 - Core Statistical and Data Processing Functions
 # =========================================================================
-# This file contains the core functions used by the FoodNet trends pipeline
-# for data processing, statistical modeling, and result visualization.
 #
-# The functions handle:
-# - Data preparation and cleaning
-# - Bayesian modeling with brms
-# - Visualization of trends and results
-# - Handling of special cases like zero-count data
-# 
-# Last updated: 2025-05-18
+# Purpose:
+#   Contains essential statistical functions for the FoodNetTrends pipeline.
+#   Provides data processing, Bayesian modeling utilities, and result
+#   formatting for foodborne disease surveillance analysis.
+#
+# Key Functions:
+#   - Data preparation and standardization
+#   - Bayesian model utilities for brms
+#   - Specialized pathogen analysis (Cyclospora, Salmonella)
+#   - Visualization and output formatting
+#
+# Last updated: 2025-05-22
 # =========================================================================
 
 # Load required libraries
@@ -30,7 +33,7 @@ suppressPackageStartupMessages({
 
 #' Generate Standardized Filename
 #'
-#' Generates a standardized filename for FoodNet Trends outputs.
+#' Generates a standardized filename for FoodNetTrends outputs.
 #' This function ensures consistent naming patterns across the pipeline.
 #'
 #' @param pathogen Name of the pathogen (e.g., "CAMPYLOBACTER")
@@ -126,7 +129,7 @@ safe_write <- function(data, file_path) {
 
 #' Prepare and Aggregate Pathogen Data
 #'
-#' Filters and aggregates FoodNet data for specified pathogens and joins with census data.
+#' Filters and aggregates FoodNetTrends data for specified pathogens and joins with census data.
 #' This function is used for most bacterial pathogens.
 #'
 #' @param mmwrdata MMWR surveillance data frame
@@ -358,7 +361,7 @@ path_analysis <- function(mmwrdata, census) {
 
 #' Prepare and Aggregate Cyclospora Data
 #'
-#' Filters and aggregates FoodNet data specifically for Cyclospora and joins with census data.
+#' Filters and aggregates FoodNetTrends data specifically for Cyclospora and joins with census data.
 #' Note: Cyclospora requires parasitic census data, unlike bacterial pathogens.
 #'
 #' @param mmwrdata MMWR surveillance data frame
@@ -586,7 +589,7 @@ cyclospora_analysis <- function(mmwrdata, census) {
 
 #' Prepare and Aggregate Salmonella Data
 #'
-#' Filters and aggregates FoodNet data specifically for Salmonella and joins with census data.
+#' Filters and aggregates FoodNetTrends data specifically for Salmonella and joins with census data.
 #' Salmonella gets special handling due to its public health importance and serotype considerations.
 #'
 #' @param mmwrdata MMWR surveillance data frame
@@ -1503,7 +1506,7 @@ save_pathogen_model <- function(model, pathogen, output_dir = ".", output_suffix
   model$creation_time <- Sys.time()
   model$pathogen <- pathogen
   
-  # Try to save the model
+  # Save the fitted model to file
   result <- tryCatch({
     saveRDS(model, file = filepath)
     cat("Saved model for", pathogen, "to", filepath, "\n")

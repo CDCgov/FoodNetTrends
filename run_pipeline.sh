@@ -1,6 +1,6 @@
 #!/bin/bash
 #==============================================================================
-# FoodNet Trends Pipeline v1.1 - HPC-Optimized Execution Script
+# FoodNetTrends Pipeline v1.1 - HPC-Optimized Execution Script
 #==============================================================================
 #
 # Purpose:
@@ -25,7 +25,7 @@ fi
 #   - Resource scaling based on dataset size
 #
 # Usage:
-#   ./run_workflow_hpc.sh
+#   ./run_pipeline.sh
 #
 # Dependencies:
 #   - Same as run_workflow.sh, plus:
@@ -36,7 +36,7 @@ fi
 
 # Initialize log file for error tracking
 error_log="foodnet_errors.log"
-echo "$(date): Starting FoodNet Trends Analysis Pipeline (HPC Edition)" > "$error_log"
+echo "$(date): Starting FoodNetTrends Analysis Pipeline (HPC Edition)" > "$error_log"
 
 # Check for jq but make it optional
 have_jq=true
@@ -78,7 +78,7 @@ timestamp=$(date +%Y%m%d_%H%M%S)
 
 # Display welcome banner
 echo "========================================="
-echo "   FoodNet Trends Analysis Pipeline      "
+echo "   FoodNetTrends Analysis Pipeline      "
 echo "          HPC Edition                    "
 echo "========================================="
 echo ""
@@ -855,7 +855,7 @@ echo "======== Dashboard Generation ========"
 echo "An interactive HTML dashboard will be automatically generated with run details included."
 
 # Automatically generate dashboard title with timestamp for identification
-dashboard_title="FoodNet Trends Analysis - Run ${timestamp}"
+dashboard_title="FoodNetTrends Analysis - Run ${timestamp}"
 dashboard_params="--enable_dashboard true --dashboard_title \"$dashboard_title\""
 
 # Tell the user what's happening

@@ -1,10 +1,10 @@
-# FoodNet Trends Analysis Pipeline v1.0
+# FoodNetTrends Analysis Pipeline v1.0
 
 A Nextflow-based pipeline for Bayesian modeling of foodborne disease surveillance data.
 
 ## Overview
 
-The FoodNet Trends pipeline processes food-borne illness surveillance data from the CDC's Foodborne Diseases Active Surveillance Network (FoodNet), applies Bayesian hierarchical models with splines, and generates standardized incidence rates, trend analysis, and visualizations. The pipeline is designed for epidemiologists and statisticians analyzing surveillance data for public health decision-making.
+The FoodNetTrends pipeline processes food-borne illness surveillance data from the CDC's Foodborne Diseases Active Surveillance Network (FoodNet), applies Bayesian hierarchical models with splines, and generates standardized incidence rates, trend analysis, and visualizations. The pipeline is designed for epidemiologists and statisticians analyzing surveillance data for public health decision-making.
 
 ## Features
 
@@ -31,7 +31,7 @@ The FoodNet Trends pipeline processes food-borne illness surveillance data from 
 
 ## Pipeline Structure
 
-The FoodNet Trends pipeline consists of the following primary components:
+The FoodNetTrends pipeline consists of the following primary components:
 
 ```
 FoodNetTrends/
@@ -40,7 +40,7 @@ FoodNetTrends/
 ├── bin/                      # Core R scripts for analysis
 │   ├── trendy.R              # Main Bayesian modeling script
 │   ├── functions.R           # Shared statistical functions
-│   ├── calcIR.R              # Data preprocessing script
+│   ├── preprocess.R          # Data preprocessing script
 │   └── generate_dashboard.R  # Interactive dashboard generator
 ├── conf/                     # Configuration profiles
 ├── modules/                  # Nextflow processes
@@ -128,7 +128,7 @@ The dashboard is a self-contained HTML file that provides an interactive visuali
 
 ## Interactive Dashboard
 
-The FoodNet Trends pipeline automatically generates an interactive HTML dashboard that allows users to explore and visualize results without requiring any server setup or additional software.
+The FoodNetTrends pipeline automatically generates an interactive HTML dashboard that allows users to explore and visualize results without requiring any server setup or additional software.
 
 ### Dashboard Features
 

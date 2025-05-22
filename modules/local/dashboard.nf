@@ -1,3 +1,27 @@
+/*
+ * ==================================================================
+ * FoodNetTrends v1.0 - Interactive Dashboard Generation Module
+ * ==================================================================
+ *
+ * Purpose:
+ *   Generates comprehensive HTML dashboards from completed analysis results.
+ *   Creates self-contained reports with embedded visualizations, interactive
+ *   data tables, and responsive design for result exploration and sharing.
+ *
+ * Inputs:
+ *   - Analysis result files (CSV, PNG, model summaries)
+ *   - Output directory and project identification
+ *   - Dashboard template and generation script
+ *
+ * Outputs:
+ *   - Interactive HTML dashboard with embedded content
+ *   - Data quality assessment reports
+ *   - Generation logs and diagnostics
+ *
+ * Last updated: 2025-05-22
+ * ==================================================================
+ */
+
 process GENERATE_DASHBOARD {
     tag "Generate dashboard"
     label 'process_high_memory'
@@ -25,7 +49,7 @@ process GENERATE_DASHBOARD {
     #!/bin/bash
     
     echo "=========================================" > ${projID}_data_quality.log
-    echo "  FoodNet Trends Clean Dashboard Generation" >> ${projID}_data_quality.log
+    echo "  FoodNetTrends Clean Dashboard Generation" >> ${projID}_data_quality.log
     echo "  Project ID: ${projID}" >> ${projID}_data_quality.log
     echo "  Generated: ${currentDate}" >> ${projID}_data_quality.log
     echo "=========================================" >> ${projID}_data_quality.log
@@ -62,7 +86,7 @@ EOF
     find . -name "*summary.txt" -type l >> ${projID}_data_quality.log 2>/dev/null || echo "No summary symlinks found" >> ${projID}_data_quality.log
     
     # Use the clean dashboard script
-    CLEAN_SCRIPT="${workflow.projectDir}/bin/generate_dashboard_clean.R"
+    CLEAN_SCRIPT="${workflow.projectDir}/bin/dashboard.R"
     
     if [ ! -f "\$CLEAN_SCRIPT" ]; then
         echo "ERROR: Clean dashboard script not found" >> ${projID}_data_quality.log
@@ -71,7 +95,7 @@ EOF
 <!DOCTYPE html>
 <html><head><title>FoodNet Dashboard</title></head>
 <body>
-<h1>FoodNet Trends Analysis</h1>
+<h1>FoodNetTrends Analysis</h1>
 <p>Dashboard script not found. This is a minimal fallback.</p>
 </body></html>
 HTMLEOF
@@ -83,7 +107,7 @@ HTMLEOF
             --outDir="." \\
             --resultDir="." \\
             --outputFile="dashboard.html" \\
-            --title="FoodNet Trends Analysis: ${projID}" \\
+            --title="FoodNetTrends Analysis: ${projID}" \\
             --debug 2>&1 | tee -a ${projID}_data_quality.log
             
         SCRIPT_EXIT=\$?
@@ -96,7 +120,7 @@ HTMLEOF
 <!DOCTYPE html>
 <html><head><title>FoodNet Dashboard - Error</title></head>
 <body>
-<h1>FoodNet Trends Analysis</h1>
+<h1>FoodNetTrends Analysis</h1>
 <p>Dashboard generation failed. Check logs for details.</p>
 </body></html>
 HTMLEOF

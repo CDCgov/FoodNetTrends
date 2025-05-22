@@ -1,31 +1,25 @@
 /*
  * ==================================================================
- * FoodNet Trends - PREPROCESS Process Module
+ * FoodNetTrends v1.0 - Data Preprocessing Module
  * ==================================================================
  * 
  * Purpose:
- *   This process handles the preprocessing of raw MMWR data files.
- *   It standardizes formats, cleans data, and generates optional
- *   metadata for downstream discovery and filtering.
+ *   Standardizes raw MMWR surveillance data for downstream analysis.
+ *   Performs data cleaning, format validation, and metadata generation
+ *   to ensure consistent input for Bayesian modeling processes.
  *
  * Inputs:
- *   - MMWR data file in SAS format
- *   - Census bacterial file in SAS format
- *   - Census parasitic file in SAS format
- *   - Output base name
- *   - Flag to generate metadata
+ *   - Raw MMWR data file (SAS format)
+ *   - Census files (bacterial and parasitic populations)
+ *   - Output naming parameters
+ *   - Metadata generation flags
  * 
  * Outputs:
- *   - Cleaned CSV file with standardized format
- *   - Optional JSON metadata about dataset contents
- *   - Process logs for troubleshooting
+ *   - Standardized CSV data file
+ *   - JSON metadata with dataset characteristics
+ *   - Process execution logs
  * 
- * Error handling:
- *   - Input file validation
- *   - Output verification
- *   - Detailed logging
- * 
- * Last updated: 2025-05-21
+ * Last updated: 2025-05-22
  * ==================================================================
  */
 
@@ -62,7 +56,7 @@ process PREPROCESS {
     """
     # Create process log
     echo "===============================================" > ${outputBase}_process.log
-    echo "FoodNet Trends Preprocessing" >> ${outputBase}_process.log
+    echo "FoodNetTrends Preprocessing" >> ${outputBase}_process.log
     echo "===============================================" >> ${outputBase}_process.log
     echo "Starting preprocessing" >> ${outputBase}_process.log
     echo "Input file: ${mmwrFile}" >> ${outputBase}_process.log
@@ -114,7 +108,7 @@ process PREPROCESS {
     echo "  Output file: ${outputBase}.csv" >> ${outputBase}_process.log
     echo "  Generate metadata: ${generateMetadata}" >> ${outputBase}_process.log
     
-    Rscript ${workflow.projectDir}/bin/calcIR.R \\
+    Rscript ${workflow.projectDir}/bin/preprocess.R \\
       --mmwrFile="${mmwrFile}" \\
       --censusFileB="\$CENSUS_B_ABS" \\
       --censusFileP="\$CENSUS_P_ABS" \\

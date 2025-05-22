@@ -1,10 +1,30 @@
+#!/usr/bin/env nextflow
+/*
+ * ==================================================================
+ * FoodNetTrends v1.0 - Main Pipeline Entry Point
+ * ==================================================================
+ *
+ * Purpose:
+ *   Primary entry point for the FoodNetTrends analysis pipeline.
+ *   Handles parameter validation, workflow selection, and provides
+ *   comprehensive help documentation for users.
+ *
+ * Available Workflows:
+ *   - Default: Complete analysis pipeline (SPLINE)
+ *   - PREPROCESS_ONLY: Data preprocessing only
+ *   - DASHBOARD_GEN: Dashboard generation only
+ *
+ * Last updated: 2025-05-22
+ * ==================================================================
+ */
+
 nextflow.enable.dsl = 2
 
 // Handle help parameter
 if (params.help) {
     println """
     ============================================
-    FoodNet Trends Pipeline
+    FoodNetTrends Pipeline
     ============================================
     Usage:
         nextflow run main.nf [options]
@@ -102,7 +122,7 @@ def validateFilePaths() {
 }
 
 // Include the workflows
-include { SPLINE } from './workflows/spline_fixed.nf'
+include { SPLINE } from './workflows/spline.nf'
 include { DASHBOARD_ONLY } from './workflows/dashboard.nf'
 include { PREPROCESS_WORKFLOW } from './workflows/preprocess.nf'
 
@@ -140,7 +160,7 @@ workflow {
 // Add a global onComplete handler with null-safe check
 workflow.onComplete = { 
     def status = workflow?.success ? 'completed successfully' : 'failed'
-    log.info "FoodNet Trends workflow $status"
+    log.info "FoodNetTrends workflow $status"
 }
 
 // PREPROCESS_ONLY workflow entry point

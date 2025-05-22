@@ -1,6 +1,6 @@
 #!/usr/bin/env Rscript
 # =========================================================================
-# FoodNet Trends - Data Preprocessing and Cleaning
+# FoodNetTrends v1.0 - Data Preprocessing and Cleaning
 # =========================================================================
 #
 # Purpose:
@@ -22,7 +22,7 @@
 #   - Cleaned CSV file with standardized format
 #   - Optional JSON metadata file with dataset summary
 #
-# Last updated: 2025-05-18
+# Last updated: 2025-05-22
 # =========================================================================
 
 # Attempt to load functions from library
@@ -30,7 +30,7 @@ tryCatch({
   source("functions.R")
   cat("Successfully sourced functions.R\n")
 }, error = function(e) {
-  # If functions.R isn't available, try to find it in the script directory
+  # Attempt to locate functions.R in the script directory if not found
   script_path <- commandArgs(trailingOnly = FALSE)
   script_path <- script_path[grep("--file=", script_path)]
   

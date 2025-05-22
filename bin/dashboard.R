@@ -1,19 +1,22 @@
 #!/usr/bin/env Rscript
-# ========================================================================
-# FoodNet Trends v2.0 - Clean Performance Dashboard Generator
-# ========================================================================
+# =========================================================================
+# FoodNetTrends v1.0 - Interactive Dashboard Generator
+# =========================================================================
 #
-# Purpose: Creates a clean, fast, professional dashboard with embedded images
-# Focus: Performance, usability, and visual clarity
+# Purpose:
+#   Generates interactive HTML dashboards from completed analysis results.
+#   Creates self-contained reports with embedded visualizations, data tables,
+#   and responsive design for comprehensive result exploration.
 #
-# Design Principles:
-#   - Muted color palette for professional appearance
-#   - Image gallery for generated visualizations
-#   - Minimal JavaScript to prevent crashes
-#   - Progressive loading for large datasets
-#   - Clean, scannable layout
+# Key Features:
+#   - Interactive image gallery with modal expansion
+#   - Tabbed data interface for multi-pathogen results
+#   - Dark/light mode accessibility options
+#   - Responsive design for multiple device types
+#   - Embedded visualizations for offline viewing
 #
-# ========================================================================
+# Last updated: 2025-05-22
+# =========================================================================
 
 # Performance optimizations
 gc(reset = TRUE)
@@ -40,7 +43,7 @@ load_package <- function(pkg) {
 essential_packages <- c("argparse", "jsonlite", "utils")
 loaded <- sapply(essential_packages, load_package)
 
-# Try to load base64enc if available, otherwise use fallback
+# Load base64enc package if available, use fallback encoding otherwise
 has_base64enc <- load_package("base64enc")
 
 if (!all(loaded)) {
@@ -55,7 +58,7 @@ parser <- ArgumentParser(description = "Generate clean performance dashboard")
 parser$add_argument("--outDir", type = "character", required = TRUE)
 parser$add_argument("--resultDir", type = "character", required = TRUE)
 parser$add_argument("--outputFile", type = "character", default = "dashboard.html")
-parser$add_argument("--title", type = "character", default = "FoodNet Trends Dashboard")
+parser$add_argument("--title", type = "character", default = "FoodNetTrends Dashboard")
 parser$add_argument("--debug", dest = "debug", action = "store_true")
 
 args <- parser$parse_args()
@@ -245,6 +248,7 @@ body.dark-mode .data-table tr:nth-child(even) {
 body.dark-mode .summary-text {
   background: #333;
   border-left-color: #555;
+  color: #e0e0e0;
 }
 
 body.dark-mode .tab {
@@ -704,9 +708,22 @@ generate_pathogen_summaries <- function(ir_data_list, summary_data_list) {
     return('<div class="section"><h2>Pathogen Data Analysis</h2><p>No analysis data found.</p></div>')
   }
   
-  # Get unique pathogens
-  pathogens <- unique(sapply(ir_data_list, function(x) if(!is.null(x)) x$pathogen[1] else NULL))
-  pathogens <- pathogens[!is.null(pathogens)]
+  # Get unique pathogens from both IR data and summary data
+  ir_pathogens <- unique(sapply(ir_data_list, function(x) if(!is.null(x)) x$pathogen[1] else NULL))
+  ir_pathogens <- ir_pathogens[!is.null(ir_pathogens)]
+  
+  summary_pathogens <- unique(sapply(summary_data_list, function(x) if(!is.null(x)) x$pathogen else NULL))
+  summary_pathogens <- summary_pathogens[!is.null(summary_pathogens)]
+  
+  # Combine and get all unique pathogens
+  pathogens <- unique(c(ir_pathogens, summary_pathogens))
+  pathogens <- sort(pathogens[!is.null(pathogens) & pathogens != ""])
+  
+  if (args$debug) {
+    cat("Debug - IR pathogens found:", paste(ir_pathogens, collapse=", "), "\n")
+    cat("Debug - Summary pathogens found:", paste(summary_pathogens, collapse=", "), "\n")
+    cat("Debug - All pathogens for tabs:", paste(pathogens, collapse=", "), "\n")
+  }
   
   html <- '<div class="section"><h2>Pathogen Data Analysis</h2>'
   
@@ -814,18 +831,38 @@ cat("Processing result data...\n")
 # Read IR data
 ir_data_list <- list()
 for (ir_file in result_data$ir_files) {
+  if (args$debug) {
+    cat("Processing IR file:", ir_file, "\n")
+  }
   data <- read_ir_data(ir_file)
   if (!is.null(data)) {
+    if (args$debug) {
+      cat("  - Successfully loaded with pathogen:", data$pathogen[1], "\n")
+    }
     ir_data_list[[length(ir_data_list) + 1]] <- data
+  } else {
+    if (args$debug) {
+      cat("  - Failed to load\n")
+    }
   }
 }
 
 # Read summary data  
 summary_data_list <- list()
 for (summary_file in result_data$summary_files) {
+  if (args$debug) {
+    cat("Processing summary file:", summary_file, "\n")
+  }
   data <- read_summary_data(summary_file)
   if (!is.null(data)) {
+    if (args$debug) {
+      cat("  - Successfully loaded with pathogen:", data$pathogen, "\n")
+    }
     summary_data_list[[length(summary_data_list) + 1]] <- data
+  } else {
+    if (args$debug) {
+      cat("  - Failed to load\n")
+    }
   }
 }
 
@@ -848,7 +885,7 @@ dashboard_html <- paste0('<!DOCTYPE html>
         <div class="header">
             <div class="dark-mode-toggle" onclick="toggleDarkMode()">🌙 Dark Mode</div>
             <h1>FoodNetTrends Report</h1>
-            <div class="subtitle">Analysis: ', args$title, '</div>
+            <div class="subtitle">Analysis: ', gsub("^.*?([0-9]{8}_[0-9]{6}).*$", "\\1", args$title), '</div>
         </div>
         
         ', generate_overview(result_data, ir_data_list), '
@@ -858,7 +895,7 @@ dashboard_html <- paste0('<!DOCTYPE html>
         ', generate_pathogen_summaries(ir_data_list, summary_data_list), '
         
         <div class="footer">
-            Generated on ', Sys.time(), ' by FoodNet Trends Pipeline v2.0
+            Generated on ', Sys.time(), ' by FoodNetTrends Pipeline v1.0
         </div>
     </div>
     

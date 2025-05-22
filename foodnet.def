@@ -4,7 +4,7 @@ From: rocker/r-ver:4.4
 %labels
     author Josh Forstedt
     date 2025-5-18
-    description FoodNet Trends container with necessary R packages
+    description FoodNetTrends container with necessary R packages
     version v1.0
 
 %post
@@ -64,8 +64,8 @@ From: rocker/r-ver:4.4
     export PATH=/opt/conda/bin:$PATH
     
 %runscript
-    echo "FoodNet Trends Analysis Pipeline v1.0"
-    echo "This container provides the environment for running the FoodNet Trends pipeline."
+    echo "FoodNetTrends Analysis Pipeline v1.0"
+    echo "This container provides the environment for running the FoodNetTrends pipeline."
     echo "For usage, see the README.md file at https://github.com/CDC-DIDRI/FoodNetTrends"
     echo ""
     echo "Available commands:"
@@ -74,10 +74,10 @@ From: rocker/r-ver:4.4
     echo ""
 
 %help
-    FoodNet Trends Analysis Pipeline v1.0
+    FoodNetTrends Analysis Pipeline v1.0
     
     This Singularity container provides all required dependencies for running
-    the FoodNet Trends pipeline, which performs Bayesian modeling of foodborne
+    the FoodNetTrends pipeline, which performs Bayesian modeling of foodborne
     disease surveillance data.
     
     Main dependencies:

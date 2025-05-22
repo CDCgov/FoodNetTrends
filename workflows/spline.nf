@@ -1,26 +1,33 @@
 /*
-=========================================
- FoodNet Trends: Spline Analysis Workflow
-=========================================
-
-This workflow implements food-borne disease trend analysis using 
-hierarchical Bayesian models with splines.
-
-Key features:
-1. Handles all pathogens in FoodNet surveillance
-2. Applies Bayesian spline models for flexible trend analysis
-3. Produces standardized incidence rates and relative risk metrics
-4. Generates state-specific and overall trend visualizations
-5. Create an interactive HTML dashboard for result exploration
-
-Version: 1.0
-Date:    May 2025
-*/
+ * ==================================================================
+ * FoodNetTrends v1.0 - Main Analysis Workflow
+ * ==================================================================
+ *
+ * Purpose:
+ *   Orchestrates the complete FoodNetTrends analysis pipeline from
+ *   data validation through Bayesian modeling to dashboard generation.
+ *   Implements hierarchical spline models for foodborne disease trends.
+ *
+ * Workflow Steps:
+ *   1. Input validation and census file discovery
+ *   2. Pathogen-specific Bayesian modeling (parallel execution)
+ *   3. Result aggregation and visualization generation
+ *   4. Interactive dashboard creation
+ *
+ * Key Features:
+ *   - Multi-pathogen parallel processing
+ *   - Automatic resource optimization
+ *   - Comprehensive error handling and logging
+ *   - Self-contained output with embedded visualizations
+ *
+ * Last updated: 2025-05-22
+ * ==================================================================
+ */
 
 // Import required modules
 include { PREPROCESS } from './preprocess'
 include { TRENDY } from '../modules/local/trendy'
-include { GENERATE_DASHBOARD } from '../modules/local/generate_dashboard_clean'
+include { GENERATE_DASHBOARD } from '../modules/local/dashboard'
 
 // Define the main workflow
 workflow SPLINE {
@@ -79,7 +86,7 @@ workflow SPLINE {
         }
     }
     
-    log.info "Running FoodNet Trends Spline Analysis Workflow v1.0"
+    log.info "Running FoodNetTrends Spline Analysis Workflow v1.0"
     log.info "Analyzing ${pathogenList.size()} pathogens: ${pathogenList.join(', ')}"
     
     // Create mmwrFile as file value with existence check
@@ -262,7 +269,7 @@ workflow SPLINE {
     
     // Dashboard templates - required files
     def dashboardTemplateVal = file("${workflow.projectDir}/assets/dashboard_template.html", checkIfExists: false)
-    def dashboardScriptVal = file("${workflow.projectDir}/bin/generate_dashboard_clean.R", checkIfExists: false)
+    def dashboardScriptVal = file("${workflow.projectDir}/bin/dashboard.R", checkIfExists: false)
     
     // Verify dashboard files exist and set fallbacks if needed
     if (!dashboardTemplateVal.exists()) {
@@ -282,7 +289,7 @@ workflow SPLINE {
             }
         }
         
-        // If still not found, we'll rely on the fallback in generate_dashboard.nf
+        // If still not found, we'll rely on the fallback in dashboard.nf
         if (!dashboardTemplateVal.exists()) {
             log.warn "No dashboard template found in any location. Will use built-in fallback."
         }
@@ -292,8 +299,8 @@ workflow SPLINE {
         log.warn "Dashboard script file not found: ${dashboardScriptVal}"
         // Try alternate locations for script
         def altScripts = [
-            file("${workflow.projectDir}/scripts/generate_dashboard_clean.R", checkIfExists: false),
-            file("${workflow.launchDir}/bin/generate_dashboard_clean.R", checkIfExists: false)
+            file("${workflow.projectDir}/scripts/dashboard.R", checkIfExists: false),
+            file("${workflow.launchDir}/bin/dashboard.R", checkIfExists: false)
         ]
         
         // Use first alternate that exists
@@ -351,7 +358,7 @@ workflow SPLINE {
 
         log.info """
         ==============================================
-        FoodNet Trends Analysis: ${status}
+        FoodNetTrends Analysis: ${status}
         ==============================================
         Completed at     : ${now}
         Duration         : ${w?.duration ?: 'unknown'}
