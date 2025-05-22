@@ -487,12 +487,57 @@ discover_pathogens() {
         fi
     fi
     
-    # Fallback: scan MMWR file directly
+    # Fallback: scan MMWR file directly using R for robust CSV parsing
     if [[ -f "$mmwr_file" ]]; then
         show_pipeline_progress 2 3 "Data Discovery" "Scanning MMWR data"
         
-        # Extract unique pathogens from first column (assuming CSV format)
-        local discovered_pathogens=$(awk -F',' 'NR>1 && $1!="" {pathogens[toupper($1)]++} END {for(p in pathogens) printf "%s,", p}' "$mmwr_file" | sed 's/,$//')
+        # Use R to properly parse CSV and find pathogen column
+        local discovered_pathogens=$(Rscript -e "
+            tryCatch({
+                data <- read.csv('$mmwr_file', stringsAsFactors = FALSE, nrows = 1000)
+                
+                # Look for pathogen column (case insensitive)
+                pathogen_col <- NULL
+                for (col in names(data)) {
+                    if (grepl('^pathogen$|^organism$|^etiology$', col, ignore.case = TRUE)) {
+                        pathogen_col <- col
+                        break
+                    }
+                }
+                
+                if (is.null(pathogen_col)) {
+                    # Try first few columns that might contain pathogen data
+                    for (i in 1:min(5, ncol(data))) {
+                        col_values <- unique(toupper(as.character(data[[i]])))
+                        col_values <- col_values[col_values != '' & !is.na(col_values)]
+                        
+                        # Check if this looks like pathogen data
+                        known_pathogens <- c('SALMONELLA', 'CAMPYLOBACTER', 'SHIGA', 'STEC', 'ECOLI', 'CYCLOSPORA', 'LISTERIA', 'VIBRIO', 'YERSINIA')
+                        matches <- sum(sapply(known_pathogens, function(p) any(grepl(p, col_values))))
+                        
+                        if (matches > 0) {
+                            pathogen_col <- names(data)[i]
+                            break
+                        }
+                    }
+                }
+                
+                if (!is.null(pathogen_col)) {
+                    pathogens <- unique(toupper(as.character(data[[pathogen_col]])))
+                    pathogens <- pathogens[pathogens != '' & !is.na(pathogens)]
+                    
+                    # Clean up pathogen names - keep only alphanumeric and common symbols
+                    pathogens <- gsub('[^A-Z0-9 _-]', '', pathogens)
+                    pathogens <- pathogens[nchar(pathogens) > 0 & nchar(pathogens) < 50]
+                    
+                    cat(paste(pathogens, collapse=','))
+                } else {
+                    cat('')
+                }
+            }, error = function(e) {
+                cat('')
+            })
+        " 2>/dev/null)
         
         if [[ -n "$discovered_pathogens" ]]; then
             echo "$discovered_pathogens"
@@ -500,8 +545,9 @@ discover_pathogens() {
         fi
     fi
     
-    # Emergency fallback - return empty to trigger manual entry
-    echo ""
+    # Emergency fallback - provide common FoodNet pathogens for manual selection
+    show_pipeline_progress 3 3 "Data Discovery" "Using fallback pathogen list"
+    echo "SALMONELLA,CAMPYLOBACTER,SHIGA,STEC,CYCLOSPORA,LISTERIA,VIBRIO,YERSINIA"
     return 1
 }
 
@@ -1100,14 +1146,34 @@ echo "Discovering available pathogens from your data..."
 available_pathogens=$(discover_pathogens "$mmwrFile" "$preprocessed_metadata")
 complete_pipeline_stage "Pathogen discovery"
 
+# Validate discovered pathogens - check for garbage data
+valid_pathogens=""
 if [[ -n "$available_pathogens" ]]; then
-    echo "Available pathogens in this dataset:"
     IFS=',' read -ra PATHOGEN_ARRAY <<< "$available_pathogens"
+    for p in "${PATHOGEN_ARRAY[@]}"; do
+        if [[ -n "$p" ]]; then
+            # Filter out obvious garbage - check length and known pathogen patterns
+            clean_p=$(echo "$p" | tr -d '"' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+            if [[ ${#clean_p} -le 30 ]] && [[ "$clean_p" =~ ^[A-Z0-9][A-Z0-9 _-]*$ ]] && [[ ! "$clean_p" =~ (TRAVEL|FAMILY|PFGE|DAYCARE|UNKNOWN|ONSET|MOM|FATHER|DIALYSIS) ]]; then
+                if [[ -n "$valid_pathogens" ]]; then
+                    valid_pathogens="$valid_pathogens,$clean_p"
+                else
+                    valid_pathogens="$clean_p"
+                fi
+            fi
+        fi
+    done
+fi
+
+if [[ -n "$valid_pathogens" ]]; then
+    echo "Available pathogens in this dataset:"
+    IFS=',' read -ra PATHOGEN_ARRAY <<< "$valid_pathogens"
     for p in "${PATHOGEN_ARRAY[@]}"; do
         if [[ -n "$p" ]]; then
             echo "- $p"
         fi
     done
+    available_pathogens="$valid_pathogens"
     echo ""
     
     echo "1) Run ALL available pathogens"
@@ -1137,14 +1203,32 @@ if [[ -n "$available_pathogens" ]]; then
         fi
     fi
 else
-    echo "Could not automatically discover pathogens from data."
-    echo "Please enter pathogens manually (e.g., CAMPYLOBACTER,SALMONELLA):"
-    read -p "Pathogens: " pathogens
+    echo "⚠️  Could not automatically discover valid pathogens from data."
+    echo ""
+    echo "This may be due to:"
+    echo "- Unexpected data format or column structure"
+    echo "- Missing pathogen column in the data file"
+    echo "- Data quality issues"
+    echo ""
+    echo "Common FoodNet pathogens include:"
+    echo "- SALMONELLA"
+    echo "- CAMPYLOBACTER" 
+    echo "- SHIGA (or STEC)"
+    echo "- CYCLOSPORA"
+    echo "- LISTERIA"
+    echo "- VIBRIO"
+    echo "- YERSINIA"
+    echo ""
+    echo "Please enter pathogens manually from your data:"
+    read -p "Pathogens (comma-separated): " pathogens
     
     if [[ -z "$pathogens" ]]; then
-        echo "Error: No pathogens specified"
+        echo "Error: No pathogens specified. Cannot proceed with analysis."
         exit 1
     fi
+    
+    # Clean up manually entered pathogens
+    pathogens=$(echo "$pathogens" | tr '[:lower:]' '[:upper:]' | sed 's/[[:space:]]//g')
 fi
 
 # Advanced pathogen configuration - serotypes and serogroups
