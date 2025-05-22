@@ -1152,9 +1152,16 @@ if [[ -n "$available_pathogens" ]]; then
     IFS=',' read -ra PATHOGEN_ARRAY <<< "$available_pathogens"
     for p in "${PATHOGEN_ARRAY[@]}"; do
         if [[ -n "$p" ]]; then
-            # Filter out obvious garbage - check length and known pathogen patterns
+            # Filter out obvious garbage - check length and exclude comment-like text
             clean_p=$(echo "$p" | tr -d '"' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
-            if [[ ${#clean_p} -le 30 ]] && [[ "$clean_p" =~ ^[A-Z0-9][A-Z0-9 _-]*$ ]] && [[ ! "$clean_p" =~ (TRAVEL|FAMILY|PFGE|DAYCARE|UNKNOWN|ONSET|MOM|FATHER|DIALYSIS) ]]; then
+            
+            # Simple validation: reasonable length and not obviously a comment
+            if [[ ${#clean_p} -ge 3 ]] && [[ ${#clean_p} -le 30 ]] && \
+               [[ ! "$clean_p" =~ TRAVEL ]] && [[ ! "$clean_p" =~ FAMILY ]] && \
+               [[ ! "$clean_p" =~ PFGE ]] && [[ ! "$clean_p" =~ DAYCARE ]] && \
+               [[ ! "$clean_p" =~ ONSET ]] && [[ ! "$clean_p" =~ MOM ]] && \
+               [[ ! "$clean_p" =~ FATHER ]] && [[ ! "$clean_p" =~ DIALYSIS ]] && \
+               [[ ! "$clean_p" =~ "=" ]] && [[ ! "$clean_p" =~ "\"" ]]; then
                 if [[ -n "$valid_pathogens" ]]; then
                     valid_pathogens="$valid_pathogens,$clean_p"
                 else
