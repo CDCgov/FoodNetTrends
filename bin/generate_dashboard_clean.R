@@ -194,6 +194,78 @@ body {
   background: #fafafa;
   color: #2c3e50;
   line-height: 1.6;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Dark mode styles */
+body.dark-mode {
+  background: #1a1a1a;
+  color: #e0e0e0;
+}
+
+body.dark-mode .header {
+  background: linear-gradient(135deg, #2c2c2c 0%, #1a1a1a 100%);
+}
+
+body.dark-mode .section {
+  background: #2c2c2c;
+  border-left-color: #555;
+}
+
+body.dark-mode .stat-card {
+  background: #333;
+  border-left-color: #4a90e2;
+}
+
+body.dark-mode .stat-number {
+  color: #5dade2;
+}
+
+body.dark-mode .pathogen-card {
+  background: #2c2c2c;
+  border-color: #555;
+}
+
+body.dark-mode .pathogen-header {
+  background: linear-gradient(45deg, #555, #444);
+}
+
+body.dark-mode .image-item {
+  background: #2c2c2c;
+}
+
+body.dark-mode .data-table th {
+  background: #555;
+}
+
+body.dark-mode .data-table tr:nth-child(even) {
+  background: #333;
+}
+
+body.dark-mode .summary-text {
+  background: #333;
+  border-left-color: #555;
+}
+
+body.dark-mode .tab {
+  background: #333;
+  border-color: #555;
+  color: #e0e0e0;
+}
+
+body.dark-mode .tab:hover {
+  background: #444;
+}
+
+body.dark-mode .tab.active {
+  background: #2c2c2c;
+  border-color: #666;
+  color: #fff;
+}
+
+body.dark-mode .tab-content {
+  background: #2c2c2c;
+  border-color: #555;
 }
 
 .container {
@@ -209,6 +281,7 @@ body {
   margin-bottom: 30px;
   border-radius: 8px;
   box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+  position: relative;
 }
 
 .header h1 {
@@ -223,6 +296,35 @@ body {
   font-size: 1.1em;
   opacity: 0.9;
   margin-top: 10px;
+}
+
+/* Dark mode toggle button */
+.dark-mode-toggle {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  background: rgba(255,255,255,0.2);
+  border: 1px solid rgba(255,255,255,0.3);
+  border-radius: 20px;
+  padding: 8px 16px;
+  color: white;
+  cursor: pointer;
+  font-size: 0.9em;
+  transition: all 0.3s ease;
+}
+
+.dark-mode-toggle:hover {
+  background: rgba(255,255,255,0.3);
+  transform: translateY(-1px);
+}
+
+body.dark-mode .dark-mode-toggle {
+  background: rgba(0,0,0,0.3);
+  border-color: rgba(255,255,255,0.2);
+}
+
+body.dark-mode .dark-mode-toggle:hover {
+  background: rgba(0,0,0,0.5);
 }
 
 .section {
@@ -353,9 +455,17 @@ body {
 .modal-content {
   display: block;
   margin: auto;
-  max-width: 95%;
-  max-height: 95%;
+  max-width: 90%;
+  max-height: 90%;
   margin-top: 2.5%;
+  background: white;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+}
+
+body.dark-mode .modal-content {
+  background: #666;
 }
 
 .close {
@@ -366,6 +476,7 @@ body {
   font-size: 40px;
   font-weight: bold;
   cursor: pointer;
+  z-index: 1001;
 }
 
 .close:hover {
@@ -639,26 +750,25 @@ generate_pathogen_summaries <- function(ir_data_list, summary_data_list) {
       n_obs <- nrow(pathogen_ir)
       html <- paste0(html, '<p><strong>Total Observations:</strong> ', n_obs, '</p>')
       
-      # Add comprehensive data table
+      # Add comprehensive data table with full scrolling
       if (n_obs > 0) {
         display_data <- pathogen_ir
         # Remove pathogen column for display
         display_data$pathogen <- NULL
         
-        # Limit to 20 rows for performance
-        if (n_obs > 20) {
-          display_data <- head(display_data, 20)
-        }
-        
-        html <- paste0(html, '<div style="overflow-x: auto; margin: 15px 0;">')
-        html <- paste0(html, '<table class="data-table">')
+        # Create scrollable container for full data
+        html <- paste0(html, '<div style="overflow: auto; max-height: 400px; margin: 15px 0; border: 1px solid #ecf0f1; border-radius: 4px;">')
+        html <- paste0(html, '<table class="data-table" style="margin: 0;">')
         if (ncol(display_data) > 0) {
+          # Sticky header for better scrolling experience
+          html <- paste0(html, '<thead style="position: sticky; top: 0; background: #95a5a6; z-index: 10;">')
           html <- paste0(html, '<tr>')
           for (col_name in names(display_data)) {
-            html <- paste0(html, '<th>', col_name, '</th>')
+            html <- paste0(html, '<th style="position: sticky; top: 0;">', col_name, '</th>')
           }
-          html <- paste0(html, '</tr>')
+          html <- paste0(html, '</tr></thead><tbody>')
           
+          # Include ALL rows - no limit
           for (i in 1:nrow(display_data)) {
             html <- paste0(html, '<tr>')
             for (col_name in names(display_data)) {
@@ -670,12 +780,12 @@ generate_pathogen_summaries <- function(ir_data_list, summary_data_list) {
             }
             html <- paste0(html, '</tr>')
           }
+          html <- paste0(html, '</tbody>')
         }
         html <- paste0(html, '</table></div>')
         
-        if (n_obs > 20) {
-          html <- paste0(html, '<p><em>Showing first 20 of ', n_obs, ' observations</em></p>')
-        }
+        # Show total count
+        html <- paste0(html, '<p><em>Showing all ', n_obs, ' observations (scroll to view all data)</em></p>')
       }
     }
     
@@ -736,8 +846,9 @@ dashboard_html <- paste0('<!DOCTYPE html>
 <body>
     <div class="container">
         <div class="header">
+            <div class="dark-mode-toggle" onclick="toggleDarkMode()">🌙 Dark Mode</div>
             <h1>FoodNetTrends Report</h1>
-            <div class="subtitle">', args$title, '</div>
+            <div class="subtitle">Analysis: ', args$title, '</div>
         </div>
         
         ', generate_overview(result_data, ir_data_list), '
@@ -796,6 +907,33 @@ dashboard_html <- paste0('<!DOCTYPE html>
     document.addEventListener("keydown", function(event) {
         if (event.key === "Escape") {
             closeModal();
+        }
+    });
+    
+    // Dark mode toggle functionality
+    function toggleDarkMode() {
+        var body = document.body;
+        var toggle = document.querySelector(".dark-mode-toggle");
+        
+        body.classList.toggle("dark-mode");
+        
+        if (body.classList.contains("dark-mode")) {
+            toggle.innerHTML = "☀️ Light Mode";
+            localStorage.setItem("darkMode", "enabled");
+        } else {
+            toggle.innerHTML = "🌙 Dark Mode";
+            localStorage.setItem("darkMode", "disabled");
+        }
+    }
+    
+    // Check for saved dark mode preference on page load
+    document.addEventListener("DOMContentLoaded", function() {
+        var darkMode = localStorage.getItem("darkMode");
+        var toggle = document.querySelector(".dark-mode-toggle");
+        
+        if (darkMode === "enabled") {
+            document.body.classList.add("dark-mode");
+            toggle.innerHTML = "☀️ Light Mode";
         }
     });
     </script>
