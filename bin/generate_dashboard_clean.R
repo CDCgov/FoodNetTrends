@@ -328,6 +328,48 @@ body {
   height: auto;
   border-radius: 4px;
   border: 1px solid #ecf0f1;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.image-item img:hover {
+  transform: scale(1.02);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+/* Modal for full-size image viewing */
+.modal {
+  display: none;
+  position: fixed;
+  z-index: 1000;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0,0,0,0.9);
+  cursor: pointer;
+}
+
+.modal-content {
+  display: block;
+  margin: auto;
+  max-width: 95%;
+  max-height: 95%;
+  margin-top: 2.5%;
+}
+
+.close {
+  position: absolute;
+  top: 20px;
+  right: 35px;
+  color: #fff;
+  font-size: 40px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.close:hover {
+  color: #ccc;
 }
 
 .image-caption {
@@ -381,11 +423,63 @@ body {
   border-top: 1px solid #ecf0f1;
 }
 
+/* Tabbed data table styling */
+.tabs {
+  display: flex;
+  border-bottom: 2px solid #ecf0f1;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.tab {
+  background: #f8f9fa;
+  border: 1px solid #ecf0f1;
+  border-bottom: none;
+  padding: 12px 20px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-right: 2px;
+  font-weight: 500;
+  border-radius: 4px 4px 0 0;
+}
+
+.tab:hover {
+  background: #e9ecef;
+}
+
+.tab.active {
+  background: white;
+  border-color: #95a5a6;
+  border-bottom: 2px solid white;
+  margin-bottom: -2px;
+  color: #2c3e50;
+}
+
+.tab-content {
+  display: none;
+  background: white;
+  border-radius: 0 4px 4px 4px;
+  padding: 20px;
+  border: 1px solid #ecf0f1;
+}
+
+.tab-content.active {
+  display: block;
+}
+
+.tab-content h4 {
+  color: #34495e;
+  margin-bottom: 15px;
+  font-size: 1.2em;
+}
+
 @media (max-width: 768px) {
   .container { padding: 10px; }
   .header h1 { font-size: 2em; }
   .stats-grid { grid-template-columns: 1fr; }
   .pathogen-grid { grid-template-columns: 1fr; }
+  .tabs { flex-direction: column; }
+  .tab { margin-right: 0; margin-bottom: 2px; border-radius: 4px; }
 }
 </style>
 ')
@@ -478,10 +572,11 @@ generate_image_gallery <- function(png_files) {
       base64_img <- embed_image(image_path)
       
       if (base64_img != "") {
+        image_id <- paste0("img_", pathogen, "_", gsub("[^A-Za-z0-9]", "_", type))
         html <- paste0(html, '
 <div class="image-item">
-  <img src="', base64_img, '" alt="', pathogen, ' - ', type, '">
-  <div class="image-caption">', pathogen, ' - ', type, '</div>
+  <img src="', base64_img, '" alt="', pathogen, ' - ', type, '" onclick="openModal(\'', image_id, '\')">
+  <div class="image-caption">', pathogen, ' - ', type, ' (click to expand)</div>
 </div>')
       }
     }
@@ -492,19 +587,32 @@ generate_image_gallery <- function(png_files) {
   return(html)
 }
 
-#' Generate pathogen summary cards
+#' Generate tabbed pathogen data interface
 generate_pathogen_summaries <- function(ir_data_list, summary_data_list) {
   if (length(ir_data_list) == 0) {
-    return('<div class="section"><h2>Pathogen Analysis</h2><p>No analysis data found.</p></div>')
+    return('<div class="section"><h2>Pathogen Data Analysis</h2><p>No analysis data found.</p></div>')
   }
-  
-  html <- '<div class="section"><h2>Pathogen Analysis</h2><div class="pathogen-grid">'
   
   # Get unique pathogens
   pathogens <- unique(sapply(ir_data_list, function(x) if(!is.null(x)) x$pathogen[1] else NULL))
   pathogens <- pathogens[!is.null(pathogens)]
   
-  for (pathogen in pathogens) {
+  html <- '<div class="section"><h2>Pathogen Data Analysis</h2>'
+  
+  # Generate tabs
+  html <- paste0(html, '<div class="tabs">')
+  for (i in seq_along(pathogens)) {
+    pathogen <- pathogens[i]
+    active_class <- if (i == 1) " active" else ""
+    html <- paste0(html, '<div class="tab', active_class, '" onclick="showTab(\'', pathogen, '\')">', pathogen, '</div>')
+  }
+  html <- paste0(html, '</div>')
+  
+  # Generate tab content
+  for (i in seq_along(pathogens)) {
+    pathogen <- pathogens[i]
+    active_class <- if (i == 1) " active" else ""
+    
     # Find data for this pathogen
     pathogen_ir <- NULL
     pathogen_summary <- NULL
@@ -523,21 +631,26 @@ generate_pathogen_summaries <- function(ir_data_list, summary_data_list) {
       }
     }
     
-    html <- paste0(html, '<div class="pathogen-card">')
-    html <- paste0(html, '<div class="pathogen-header">', pathogen, '</div>')
-    html <- paste0(html, '<div class="pathogen-content">')
+    html <- paste0(html, '<div id="', pathogen, '" class="tab-content', active_class, '">')
+    html <- paste0(html, '<h4>', pathogen, ' Analysis Results</h4>')
     
-    # Add basic statistics
+    # Add statistics and data table
     if (!is.null(pathogen_ir)) {
       n_obs <- nrow(pathogen_ir)
-      html <- paste0(html, '<p><strong>Observations:</strong> ', n_obs, '</p>')
+      html <- paste0(html, '<p><strong>Total Observations:</strong> ', n_obs, '</p>')
       
-      # Add basic data table (first 10 rows)
+      # Add comprehensive data table
       if (n_obs > 0) {
-        display_data <- head(pathogen_ir, 10)
+        display_data <- pathogen_ir
         # Remove pathogen column for display
         display_data$pathogen <- NULL
         
+        # Limit to 20 rows for performance
+        if (n_obs > 20) {
+          display_data <- head(display_data, 20)
+        }
+        
+        html <- paste0(html, '<div style="overflow-x: auto; margin: 15px 0;">')
         html <- paste0(html, '<table class="data-table">')
         if (ncol(display_data) > 0) {
           html <- paste0(html, '<tr>')
@@ -546,7 +659,7 @@ generate_pathogen_summaries <- function(ir_data_list, summary_data_list) {
           }
           html <- paste0(html, '</tr>')
           
-          for (i in 1:min(5, nrow(display_data))) {
+          for (i in 1:nrow(display_data)) {
             html <- paste0(html, '<tr>')
             for (col_name in names(display_data)) {
               value <- display_data[i, col_name]
@@ -558,25 +671,25 @@ generate_pathogen_summaries <- function(ir_data_list, summary_data_list) {
             html <- paste0(html, '</tr>')
           }
         }
-        html <- paste0(html, '</table>')
+        html <- paste0(html, '</table></div>')
         
-        if (n_obs > 5) {
-          html <- paste0(html, '<p><em>Showing first 5 of ', n_obs, ' observations</em></p>')
+        if (n_obs > 20) {
+          html <- paste0(html, '<p><em>Showing first 20 of ', n_obs, ' observations</em></p>')
         }
       }
     }
     
     # Add summary text if available
     if (!is.null(pathogen_summary) && length(pathogen_summary$content) > 0) {
-      # Show first few lines of summary
-      summary_text <- paste(head(pathogen_summary$content, 10), collapse = "\n")
+      html <- paste0(html, '<h5>Analysis Summary:</h5>')
+      summary_text <- paste(head(pathogen_summary$content, 15), collapse = "\n")
       html <- paste0(html, '<div class="summary-text">', gsub("\n", "<br>", summary_text), '</div>')
     }
     
-    html <- paste0(html, '</div></div>')
+    html <- paste0(html, '</div>')
   }
   
-  html <- paste0(html, '</div></div>')
+  html <- paste0(html, '</div>')
   return(html)
 }
 
@@ -623,8 +736,8 @@ dashboard_html <- paste0('<!DOCTYPE html>
 <body>
     <div class="container">
         <div class="header">
-            <h1>', args$title, '</h1>
-            <div class="subtitle">Clean Performance Dashboard</div>
+            <h1>FoodNetTrends Report</h1>
+            <div class="subtitle">', args$title, '</div>
         </div>
         
         ', generate_overview(result_data, ir_data_list), '
@@ -637,6 +750,55 @@ dashboard_html <- paste0('<!DOCTYPE html>
             Generated on ', Sys.time(), ' by FoodNet Trends Pipeline v2.0
         </div>
     </div>
+    
+    <!-- Modal for image viewing -->
+    <div id="imageModal" class="modal" onclick="closeModal()">
+        <span class="close" onclick="closeModal()">&times;</span>
+        <img class="modal-content" id="modalImage">
+    </div>
+    
+    <script>
+    // Image modal functionality
+    function openModal(imgId) {
+        var modal = document.getElementById("imageModal");
+        var modalImg = document.getElementById("modalImage");
+        var img = event.target;
+        modal.style.display = "block";
+        modalImg.src = img.src;
+    }
+    
+    function closeModal() {
+        document.getElementById("imageModal").style.display = "none";
+    }
+    
+    // Tab switching functionality
+    function showTab(pathogenName) {
+        // Hide all tab contents
+        var contents = document.getElementsByClassName("tab-content");
+        for (var i = 0; i < contents.length; i++) {
+            contents[i].classList.remove("active");
+        }
+        
+        // Remove active class from all tabs
+        var tabs = document.getElementsByClassName("tab");
+        for (var i = 0; i < tabs.length; i++) {
+            tabs[i].classList.remove("active");
+        }
+        
+        // Show selected tab content
+        document.getElementById(pathogenName).classList.add("active");
+        
+        // Add active class to clicked tab
+        event.target.classList.add("active");
+    }
+    
+    // Close modal on escape key
+    document.addEventListener("keydown", function(event) {
+        if (event.key === "Escape") {
+            closeModal();
+        }
+    });
+    </script>
 </body>
 </html>')
 
