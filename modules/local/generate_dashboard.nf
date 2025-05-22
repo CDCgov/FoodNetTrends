@@ -256,7 +256,15 @@ ERRORTEMPLATE
         echo "Working directory: \$(pwd)" >> ${projID}_data_quality.log
         echo "Available files: \$(ls -la)" >> ${projID}_data_quality.log
         
+        # CRITICAL: Force all errors to be captured
         set +e
+        
+        # Create multiple copies of the error log to prevent loss
+        echo "STARTING R SCRIPT EXECUTION" > dashboard_generation.log
+        echo "STARTING R SCRIPT EXECUTION" > r_script_error.log
+        echo "STARTING R SCRIPT EXECUTION" > ${projID}_r_errors.log
+        
+        # Run R script with maximum error capture
         Rscript \\
           "${workflow.projectDir}/bin/generate_dashboard_enhanced.R" \\
           --outDir="${resultDir}" \\
@@ -267,9 +275,27 @@ ERRORTEMPLATE
           --qualityDataPath="${projID}_data_quality.json" \\
           --memoryLimit=14 \\
           --theme="${params.dashboard_theme}" \\
-          --debug 2>&1 | tee -a dashboard_generation.log
+          --debug 2>&1 | tee -a dashboard_generation.log | tee -a r_script_error.log | tee -a ${projID}_r_errors.log
           
         SCRIPT_EXIT_CODE=\$?
+        
+        # Force error capture to multiple locations
+        echo "R SCRIPT EXIT CODE: \$SCRIPT_EXIT_CODE" >> dashboard_generation.log
+        echo "R SCRIPT EXIT CODE: \$SCRIPT_EXIT_CODE" >> r_script_error.log
+        echo "R SCRIPT EXIT CODE: \$SCRIPT_EXIT_CODE" >> ${projID}_r_errors.log
+        echo "R SCRIPT EXIT CODE: \$SCRIPT_EXIT_CODE" >> ${projID}_data_quality.log
+        
+        # Copy error logs to multiple safe locations
+        cp dashboard_generation.log debuginfo/ 2>/dev/null || true
+        cp r_script_error.log debuginfo/ 2>/dev/null || true
+        cp ${projID}_r_errors.log debuginfo/ 2>/dev/null || true
+        
+        # Also copy to the output directory to survive cleanup
+        mkdir -p "${params.outdir}/${projID}/debug_logs" 2>/dev/null || true
+        cp dashboard_generation.log "${params.outdir}/${projID}/debug_logs/" 2>/dev/null || true
+        cp r_script_error.log "${params.outdir}/${projID}/debug_logs/" 2>/dev/null || true
+        cp ${projID}_r_errors.log "${params.outdir}/${projID}/debug_logs/" 2>/dev/null || true
+        
         set -e
         
         echo "R script exit code: \$SCRIPT_EXIT_CODE" >> ${projID}_data_quality.log

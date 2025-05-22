@@ -339,9 +339,6 @@ workflow SPLINE {
             // This ensures dashboard only runs after ALL TRENDY processes complete
             def all_results = results.collect()
             
-            // Verify we have results before proceeding
-            log.info "All analyses complete. Generating dashboard."
-            
             // Now pass the collected results to the dashboard
             GENERATE_DASHBOARD(
                 all_results,  // This will wait for ALL results before starting
