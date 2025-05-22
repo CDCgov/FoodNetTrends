@@ -320,7 +320,7 @@ ERRORTEMPLATE
             echo "    <p><strong>Analysis time:</strong> ${currentDate}</p>" >> ${projID}_dashboard.html
             
             # Continue with static content
-            cat >> ${projID}_dashboard.html << ERRORTEMPLATE    
+            cat >> ${projID}_dashboard.html << ERRORTEMPLATE
     <h4>Possible solutions:</h4>
     <ul>
       <li>Check that all required result files exist</li>
@@ -390,7 +390,7 @@ ERRORTEMPLATE
         echo "    <p><strong>Analysis completed at:</strong> ${currentDate}</p>" >> ${projID}_dashboard.html
         
         # Complete the HTML structure
-        cat >> ${projID}_dashboard.html << ERRORTEMPLATE    
+        cat >> ${projID}_dashboard.html << ERRORTEMPLATE
     <h4>Diagnostic Information</h4>
     <p>Diagnostic information has been saved to the 'debuginfo' directory.</p>
     
