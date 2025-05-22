@@ -47,18 +47,19 @@ process GENERATE_DASHBOARD {
     echo "" >> ${projID}_data_quality.log
     
     # Initialize JSON structure for data quality metadata
-    cat > ${projID}_data_quality.json << JSONTEMPLATE
-    {
-      "projectId": "${projID}",
-      "generationDate": "${currentDate}",
-      "dataQuality": {
-        "usesPlaceholderData": false,
-        "affectedPathogens": [],
-        "warnings": [],
-        "dataConsistency": {}
-      }
-    }
-    JSONTEMPLATE
+    # Create JSON without here-document to avoid shell parsing issues
+    cat > ${projID}_data_quality.json << 'EOF'
+{
+  "projectId": "${projID}",
+  "generationDate": "${currentDate}",
+  "dataQuality": {
+    "usesPlaceholderData": false,
+    "affectedPathogens": [],
+    "warnings": [],
+    "dataConsistency": {}
+  }
+}
+EOF
     
     # Check for placeholder data warnings in any result files
     echo "Checking for data quality issues..." >> ${projID}_data_quality.log
