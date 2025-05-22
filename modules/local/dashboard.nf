@@ -85,8 +85,8 @@ EOF
     find . -name "*.png" -type l >> ${projID}_data_quality.log 2>/dev/null || echo "No PNG symlinks found" >> ${projID}_data_quality.log
     find . -name "*summary.txt" -type l >> ${projID}_data_quality.log 2>/dev/null || echo "No summary symlinks found" >> ${projID}_data_quality.log
     
-    # Use the clean dashboard script
-    CLEAN_SCRIPT="${workflow.projectDir}/bin/dashboard.R"
+    # Use the dashboard script discovered by workflow (with fallback logic)
+    CLEAN_SCRIPT="${dashboardScript}"
     
     if [ ! -f "\$CLEAN_SCRIPT" ]; then
         echo "ERROR: Clean dashboard script not found" >> ${projID}_data_quality.log

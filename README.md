@@ -41,16 +41,19 @@ FoodNetTrends/
 │   ├── trendy.R              # Main Bayesian modeling script
 │   ├── functions.R           # Shared statistical functions
 │   ├── preprocess.R          # Data preprocessing script
-│   └── generate_dashboard.R  # Interactive dashboard generator
+│   ├── dashboard.R           # Interactive dashboard generator
+│   └── progress.R            # Progress tracking utilities
 ├── conf/                     # Configuration profiles
 ├── modules/                  # Nextflow processes
 │   └── local/
 │       ├── trendy.nf         # Bayesian modeling process
-│       └── preprocess.nf     # Data preprocessing process
+│       ├── preprocess.nf     # Data preprocessing process
+│       └── dashboard.nf      # Dashboard generation process
 ├── workflows/                # Workflow definitions
 │   ├── spline.nf             # Main spline analysis workflow
-│   └── preprocess.nf         # Data preprocessing workflow
-└── run_workflow.sh           # Interactive execution script
+│   ├── preprocess.nf         # Data preprocessing workflow
+│   └── dashboard.nf          # Dashboard generation workflow
+└── run_pipeline.sh           # Pipeline execution script
 ```
 
 ## Output Files
@@ -153,11 +156,10 @@ After pipeline completion, the dashboard can be found in the project output dire
 
 ### Dashboard Customization
 
-The dashboard appearance and behavior can be customized through pipeline parameters:
+The dashboard generation can be controlled through pipeline profiles:
 
-- `--enable_dashboard`: Enable/disable dashboard generation (default: true)
-- `--dashboard_title`: Custom title for the dashboard
-- `--dashboard_logo`: Path to custom logo image for branding
+- Use `-profile no_dashboard` to disable dashboard generation
+- Dashboard is enabled by default in all other profiles
 
 ## Requirements
 
@@ -206,7 +208,7 @@ Before running the pipeline, you need to build the Singularity container from th
 
 2. **Make the workflow script executable**:
    ```bash
-   chmod +x run_workflow.sh
+   chmod +x run_pipeline.sh
    ```
 
 ## Quick Start
@@ -216,7 +218,7 @@ Before running the pipeline, you need to build the Singularity container from th
 The easiest way to run the pipeline is using the interactive script:
 
 ```bash
-./run_workflow.sh
+./run_pipeline.sh
 ```
 
 This guides you through configuring the pipeline with prompts for:
@@ -256,7 +258,7 @@ To preprocess data without performing analysis:
 ```bash
 nextflow run main.nf \
   -profile singularity \
-  -entry PREPROCESS_WORKFLOW \
+  -entry PREPROCESS_ONLY \
   --mmwrFile "path/to/mmwr9624_May2025.sas7bdat" \
   --outdir "preprocessed" \
   --outputBase "foodnet_data" \
@@ -311,7 +313,7 @@ The MMWR file should contain the following key columns:
 | `--censusFileB` | Path to census file for bacterial pathogens | (Required) |
 | `--censusFileP` | Path to census file for parasitic pathogens | (Required) |
 | `--outdir` | Output directory | `output` |
-| `--pathogen` | Comma-separated list of pathogens to analyze | `CAMPYLOBACTER,CYCLOSPORA` |
+| `--pathogen` | Comma-separated list of pathogens to analyze | (Required) |
 
 ### Filtering Parameters
 
@@ -350,51 +352,38 @@ The MMWR file should contain the following key columns:
 
 ## Monitoring Progress
 
-The pipeline includes a robust, environment-agnostic progress tracking system that works reliably in any environment (local, HPC, containers, etc.):
+You can monitor pipeline progress using Nextflow's built-in logging and progress tracking:
 
-### Using the Progress Monitor Script
+### Real-time Monitoring
 
-A dedicated monitoring script provides real-time progress visualization:
+Track pipeline execution in real-time:
 
 ```bash
-# Basic usage - monitor current directory
-./bin/monitor_progress.sh
+# Monitor running pipeline
+nextflow log <run_name> -f
 
-# Monitor specific directory
-./bin/monitor_progress.sh -d /path/to/results
+# View pipeline status
+nextflow log
 
-# Monitor continuously, updating every 5 seconds
-./bin/monitor_progress.sh --follow
-
-# Monitor only a specific pathogen
-./bin/monitor_progress.sh --pathogen SALMONELLA
-
-# All options
-./bin/monitor_progress.sh --dir /path/to/results --pathogen CAMPYLOBACTER --follow --interval 10
+# Monitor specific fields
+nextflow log <run_name> -f name,status,exit,submit,duration
 ```
 
-**Script Options:**
+### Pipeline Reports
 
-| Option | Description |
-|--------|-------------|
-| `-d, --dir DIR` | Directory to monitor for progress files (default: current dir) |
-| `-p, --pathogen NAME` | Only show progress for specific pathogen |
-| `-f, --follow` | Continuously update (like 'tail -f') |
-| `-i, --interval SEC` | Refresh interval in seconds (default: 5) |
-| `-h, --help` | Show help message |
+Nextflow automatically generates execution reports:
 
-The monitor script provides a detailed, color-coded view of:
-- Overall progress percentage for each pathogen with visual progress bar
-- Current analysis stage and milestone
-- Elapsed time and estimated time remaining
-- Recent activity logs for context
-- Files generated so far
+```bash
+# Generate execution report after completion
+nextflow log <run_name> -t execution_report.html
 
-### Progress File System
+# View timeline
+nextflow log <run_name> -t timeline.html
+```
 
-The progress tracking system generates three types of files during pipeline execution:
+### Progress Tracking Files
 
-1. **`[PATHOGEN]_progress.txt`**: Structured progress information including:
+The R scripts generate progress files during execution:
    - Current percentage completion
    - Processing stage
    - Status message
@@ -405,59 +394,19 @@ The progress tracking system generates three types of files during pipeline exec
 
 3. **`[PATHOGEN]_percent.txt`**: Simple file containing only the percentage completion number, designed for easy polling by other monitoring systems.
 
-### Integration with Custom Monitoring Systems
+### Output Files Monitoring
 
-The progress files use a simple format that can be easily integrated with custom monitoring systems, dashboards, or notification scripts:
+Monitor analysis progress by checking output files as they are created:
 
 ```bash
-# Example: Simple script to send notification when analysis reaches 75%
-watch -n 60 'for f in *_percent.txt; do
-  pct=$(cat $f);
-  if [ "$pct" -ge 75 ] && [ "$pct" -lt 76 ]; then
-    pathogen=${f%_percent.txt};
-    echo "$pathogen analysis is 75% complete" | mail -s "Analysis Progress" user@example.com;
-  fi;
-done'
+# Check for output files
+ls -la results/*/
+watch -n 30 'ls -la results/*/'
+
+# Monitor log files
+tail -f .nextflow.log
 ```
 
-### Monitoring in HPC Environments
-
-In HPC environments where direct terminal access might be limited, the progress tracking system provides several options:
-
-1. **Scheduled Status Checks**: Set up a periodic job to run `monitor_progress.sh` and output to a file
-2. **File-Based Monitoring**: Check the progress files directly from a shared filesystem
-3. **Email Notifications**: Create a simple script to send email alerts at specific milestones
-
-The file-based progress tracking ensures visibility into analysis progress regardless of the execution environment.
-
-### Troubleshooting Progress Monitoring
-
-If you're having trouble seeing progress information:
-
-1. **Check Work Directories**: Progress files are created in the Nextflow work directories. Use:
-   ```bash
-   find $(pwd) -name "*_progress.txt" -o -name "*_percent.txt"
-   ```
-   
-2. **Monitor Multiple Directories**: On HPC systems, specify multiple directories to monitor:
-   ```bash
-   ./bin/monitor_progress.sh -d /scicomp/scratch/username/nextflow/work
-   ```
-   
-3. **Increase Search Depth**: Use the recursive option in find command:
-   ```bash
-   find /scicomp/scratch/username/nextflow/work -maxdepth 5 -name "*_progress.txt"
-   ```
-
-4. **Check Permissions**: Ensure that progress files are being created with appropriate permissions:
-   ```bash
-   ls -la $(find . -name "*_progress.txt" | head -1)
-   ```
-
-5. **Terminal Compatibility**: If progress bars appear garbled, use the `--no-color` option to disable colored output.
-   ```bash
-   ./bin/monitor_progress.sh --dir /path/to/work --no-color
-   ```
 
 ## Troubleshooting
 
@@ -469,7 +418,7 @@ If you're having trouble seeing progress information:
 | **Failed jobs** | Use `-resume` flag to continue from point of failure |
 | **Container errors** | Rebuild container with `singularity build --force foodnet.sif foodnet.def` |
 | **R package errors** | Check `foodnet.yml` for package compatibility |
-| **No progress visible** | Use `./bin/monitor_progress.sh` to check progress files |
+| **No progress visible** | Use `nextflow log -f name,status` to check pipeline progress |
 
 ### Common Error Messages
 

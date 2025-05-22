@@ -16,7 +16,7 @@
 #   6. Write processed data to CSV
 #
 # Usage:
-#   Rscript calcIR.R --mmwrFile <path_to_raw_SAS_file> --outputFile <path_to_output_csv> [--generate_metadata true/false]
+#   Rscript preprocess.R --mmwrFile <path_to_raw_SAS_file> --outputFile <path_to_output_csv> [--generate_metadata true/false]
 #
 # Output:
 #   - Cleaned CSV file with standardized format

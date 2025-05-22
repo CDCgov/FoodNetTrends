@@ -66,6 +66,10 @@ workflow SPLINE {
     }
     
     // Define pathogen list from parameter
+    if (!params.pathogen) {
+        log.error "Missing required parameter: --pathogen. Please specify comma-separated pathogen list."
+        exit 1
+    }
     def pathogenList = params.pathogen.split(',').collect { it.trim().toUpperCase() }
     
     // Set a consistent project ID for output naming
@@ -227,22 +231,17 @@ workflow SPLINE {
         }
     }
     
-    // Validate required files and provide descriptive error messages
+    // Validate required files - both census files are required for analysis
     if (!censusFileBVal) {
         log.error "Cannot find bacterial census file in any location. Please provide --censusFileB parameter."
-        log.error "This file is required for calculating incidence rates for bacterial pathogens."
+        log.error "This file is required for calculating incidence rates."
         exit 1
     }
     
     if (!censusFilePVal) {
-        log.warn "Cannot find parasitic census file in any location. Will proceed without parasitic census data."
-        log.warn "Incidence rates for parasitic pathogens may not be accurate without this file."
-        
-        // Use bacterial file as fallback for parasitic (only if available) - this is not ideal but better than nothing
-        if (censusFileBVal) {
-            log.warn "Using bacterial census file as a fallback for parasitic pathogens."
-            censusFilePVal = censusFileBVal
-        }
+        log.error "Cannot find parasitic census file in any location. Please provide --censusFileP parameter."
+        log.error "This file is required for calculating incidence rates."
+        exit 1
     }
     
     log.info "========== Census File Validation Success ==========="
@@ -251,10 +250,17 @@ workflow SPLINE {
     log.info "  Parasitic census: ${censusFilePVal}"
     log.info "====================================================="
     
-    // Run TRENDY with input data - properly separate pathogen and mmwrFile
+    // Run TRENDY with input data - split tuples while maintaining synchronization
+    pathogens_ch
+        .multiMap { pth, mmwr ->
+            pathogen: pth
+            mmwrFile: mmwr
+        }
+        .set { trendy_inputs }
+    
     TRENDY(
-        pathogens_ch.map { pth, mmwr -> pth },  // Just extract pathogen
-        pathogens_ch.map { pth, mmwr -> mmwr },  // Just extract mmwrFile
+        trendy_inputs.pathogen,
+        trendy_inputs.mmwrFile,
         censusFileBVal,
         censusFilePVal,
         scripts_pathVal

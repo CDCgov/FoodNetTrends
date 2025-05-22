@@ -23,7 +23,7 @@
  */
 
 // Import required modules
-include { GENERATE_DASHBOARD } from '../modules/local/generate_dashboard'
+include { GENERATE_DASHBOARD } from '../modules/local/dashboard'
 
 // Define the main workflow
 workflow DASHBOARD_ONLY {
@@ -91,11 +91,11 @@ workflow DASHBOARD_ONLY {
     }
     
     // Find dashboard script
-    def dashboardScriptVal = file("${workflow.projectDir}/bin/generate_dashboard.R", checkIfExists: false)
+    def dashboardScriptVal = file("${workflow.projectDir}/bin/dashboard.R", checkIfExists: false)
     if (!dashboardScriptVal.exists()) {
         log.warn "Dashboard script not found: ${dashboardScriptVal}"
         def altScripts = [
-            file("${workflow.launchDir}/bin/generate_dashboard.R", checkIfExists: false)
+            file("${workflow.launchDir}/bin/dashboard.R", checkIfExists: false)
         ]
         
         for (alt in altScripts) {
