@@ -544,6 +544,11 @@ main <- function() {
     }
   }
   
+  # Highlight census file creation
+  cat("Preprocessed census files created:\n")
+  cat("- Bacterial census (state-level):", census_b_path, "\n")
+  cat("- Parasitic census (state-level):", census_p_path, "\n")
+  
   # Final preprocessing summary
   cat("\n========== Preprocessing Summary ==========\n")
   cat("MMWR data:", args$outputFile, "\n")

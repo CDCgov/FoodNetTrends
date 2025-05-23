@@ -1029,6 +1029,29 @@ if [[ "$workflow_mode" == "1" ]]; then
         censusFileP="$potential_census_p"
     fi
     
+    # CRITICAL CHECK: Ensure cleaned census files are being used for analysis
+    # This prevents the pipeline from using raw county-level data which causes join explosion
+    if [[ ! -f "$potential_census_b" || ! -f "$potential_census_p" ]]; then
+        echo ""
+        echo "ERROR: Preprocessed census files not found!"
+        echo "Expected files:"
+        echo "  - Bacterial: $potential_census_b"
+        echo "  - Parasitic: $potential_census_p"
+        echo ""
+        echo "The preprocessing step should have created state-level aggregated census files."
+        echo "Using raw county-level census data will cause analysis failures."
+        echo ""
+        echo "Possible solutions:"
+        echo "1. Check if preprocessing completed successfully"
+        echo "2. Verify census files were created in the preprocessing output"
+        echo "3. Re-run preprocessing if census files are missing"
+        echo ""
+        echo "Cannot proceed with analysis using raw census data."
+        exit 1
+    fi
+    
+    echo "✓ Using preprocessed (state-level) census files for analysis"
+    
 # Mode 2: Use existing preprocessed data
 elif [[ "$workflow_mode" == "2" ]]; then
     echo ""
