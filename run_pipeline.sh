@@ -213,9 +213,9 @@ validate_analysis_outputs() {
         "${pathogen}_foodnettrends_comparison.png"
     )
     
-    # Check critical files
+    # Check critical files - look in pathogen subdirectory
     for file in "${expected_files[@]}"; do
-        local file_path="${output_dir}/${file}"
+        local file_path="${output_dir}/${pathogen}/${file}"
         if [[ ! -f "$file_path" ]]; then
             missing_files+=("$file")
         elif [[ ! -s "$file_path" ]]; then
@@ -223,13 +223,13 @@ validate_analysis_outputs() {
         fi
     done
     
-    # Check visualization files
+    # Check visualization files - look in pathogen subdirectory
     for file in "${viz_files[@]}"; do
-        local file_path="${output_dir}/${file}"
+        local file_path="${output_dir}/${pathogen}/${file}"
         if [[ ! -f "$file_path" ]]; then
             # Check for error versions
             local error_file="${file%.*}_error.${file##*.}"
-            if [[ -f "${output_dir}/${error_file}" ]]; then
+            if [[ -f "${output_dir}/${pathogen}/${error_file}" ]]; then
                 warning_files+=("$file (error plot generated)")
             else
                 missing_files+=("$file")
@@ -268,7 +268,7 @@ verify_spline_trends() {
     
     local spline_generated=0
     for file in "${spline_files[@]}"; do
-        if [[ -f "${output_dir}/${file}" ]]; then
+        if [[ -f "${output_dir}/${pathogen}/${file}" ]]; then
             spline_generated=1
             break
         fi

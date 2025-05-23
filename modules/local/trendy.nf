@@ -31,15 +31,9 @@ process TRENDY {
     
     container 'foodnet.sif'
     
-    publishDir "${params.outdir}/results/${pathogen}", 
-        pattern: "${pathogen}*.{csv,txt,log}", 
-        mode: 'copy'
-    publishDir "${params.outdir}/figures/${pathogen}", 
-        pattern: "${pathogen}*.{png,pdf}", 
-        mode: 'copy'
-    publishDir "${params.outdir}/models/${pathogen}", 
-        pattern: "${pathogen}*.{Rds,rds}", 
-        mode: 'copy'
+    publishDir "${params.outdir}/${pathogen}", 
+        pattern: "${pathogen}*", 
+        mode: params.publish_dir_mode
     
     input:
     val pathogen
