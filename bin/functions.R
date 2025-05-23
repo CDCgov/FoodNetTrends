@@ -960,7 +960,7 @@ linpred_draw <- function(data, model) {
     }
     
     # Compute predicted incidence (per 100,000)
-    draws <- draws %>% mutate(pred_incidence = .epred / (Population / 100000))
+    draws <- draws %>% mutate(pred_incidence = (.epred / Population) * 100000)
     
     return(draws)
   }, error = function(e) {

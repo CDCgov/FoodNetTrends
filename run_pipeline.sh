@@ -198,9 +198,9 @@ validate_analysis_outputs() {
     local warning_files=()
     
     echo "Validating analysis outputs for $pathogen..."
-    echo "Looking in directory: ${output_dir}/${pathogen}/"
+    echo "Looking in directory: ${output_dir}/"
     echo "Directory contents:"
-    ls -la "${output_dir}/${pathogen}/" 2>/dev/null || echo "  Directory does not exist"
+    ls -la "${output_dir}/" 2>/dev/null || echo "  Directory does not exist"
     
     # Check for critical output files
     local expected_files=(
@@ -216,9 +216,9 @@ validate_analysis_outputs() {
         "${pathogen}_foodnettrends_comparison.png"
     )
     
-    # Check critical files - look in pathogen subdirectory
+    # Check critical files - look in output directory
     for file in "${expected_files[@]}"; do
-        local file_path="${output_dir}/${pathogen}/${file}"
+        local file_path="${output_dir}/${file}"
         if [[ ! -f "$file_path" ]]; then
             missing_files+=("$file")
         elif [[ ! -s "$file_path" ]]; then
@@ -226,13 +226,13 @@ validate_analysis_outputs() {
         fi
     done
     
-    # Check visualization files - look in pathogen subdirectory
+    # Check visualization files - look in output directory
     for file in "${viz_files[@]}"; do
-        local file_path="${output_dir}/${pathogen}/${file}"
+        local file_path="${output_dir}/${file}"
         if [[ ! -f "$file_path" ]]; then
             # Check for error versions
             local error_file="${file%.*}_error.${file##*.}"
-            if [[ -f "${output_dir}/${pathogen}/${error_file}" ]]; then
+            if [[ -f "${output_dir}/${error_file}" ]]; then
                 warning_files+=("$file (error plot generated)")
             else
                 missing_files+=("$file")
@@ -271,7 +271,7 @@ verify_spline_trends() {
     
     local spline_generated=0
     for file in "${spline_files[@]}"; do
-        if [[ -f "${output_dir}/${pathogen}/${file}" ]]; then
+        if [[ -f "${output_dir}/${file}" ]]; then
             spline_generated=1
             break
         fi
