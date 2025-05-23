@@ -50,6 +50,8 @@ process PREPROCESS {
     // Using consistent naming pattern across all outputs
     path "${outputBase}.csv", emit: cleanedData
     path "${outputBase}_metadata.json", optional: true, emit: metadata
+    path "${outputBase}_census_bacterial.csv", emit: census_bacterial
+    path "${outputBase}_census_parasitic.csv", emit: census_parasitic
     path "${outputBase}_*.log", emit: logs, optional: true
 
     script:
