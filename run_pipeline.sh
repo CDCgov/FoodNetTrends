@@ -198,6 +198,9 @@ validate_analysis_outputs() {
     local warning_files=()
     
     echo "Validating analysis outputs for $pathogen..."
+    echo "Looking in directory: ${output_dir}/${pathogen}/"
+    echo "Directory contents:"
+    ls -la "${output_dir}/${pathogen}/" 2>/dev/null || echo "  Directory does not exist"
     
     # Check for critical output files
     local expected_files=(
@@ -791,12 +794,9 @@ echo "2) Analysis only (use existing preprocessed data)"
 read -p "Enter selection [1]: " workflow_mode
 workflow_mode=${workflow_mode:-1}
 
-# Convert old mode 3 to mode 2, remove confusing mode 2
+# Maintain backward compatibility with legacy mode numbering
 if [[ "$workflow_mode" == "3" ]]; then
     workflow_mode=2
-elif [[ "$workflow_mode" == "2" ]]; then
-    echo "Mode 2 has been simplified. Use mode 1 for full pipeline."
-    workflow_mode=1
 fi
 
 echo "Mode selected: $workflow_mode"
@@ -1134,9 +1134,28 @@ elif [[ "$workflow_mode" == "2" ]]; then
         censusFileP="$potential_census_p"
     fi
     
-    if [[ -z "$censusFileB" || -z "$censusFileP" ]]; then
-        echo "Census files will be discovered from the metadata file"
+    # CRITICAL CHECK: Ensure preprocessed census files are available for analysis
+    # This prevents the pipeline from using raw county-level data which causes join explosion
+    if [[ ! -f "$potential_census_b" || ! -f "$potential_census_p" ]]; then
+        echo ""
+        echo "ERROR: Preprocessed census files not found!"
+        echo "Expected files:"
+        echo "  - Bacterial: $potential_census_b"
+        echo "  - Parasitic: $potential_census_p"
+        echo ""
+        echo "When using existing preprocessed data, the census files should have been"
+        echo "preprocessed to state-level aggregation in the same directory."
+        echo ""
+        echo "Possible solutions:"
+        echo "1. Use Option 1 (Full preprocessing workflow) instead"
+        echo "2. Manually preprocess census files to state level"
+        echo "3. Check if files exist with different naming patterns"
+        echo ""
+        echo "Cannot proceed with analysis using potentially raw census data."
+        exit 1
     fi
+    
+    echo "✓ Using preprocessed (state-level) census files for analysis"
 
     # Search for preprocessed JSON metadata files
     echo ""
@@ -2046,6 +2065,8 @@ if [[ "$execute" =~ ^[Yy]$ ]]; then
     # Validate outputs after successful execution
     echo ""
     echo "======== Output Validation ========"
+    echo "Output directory structure:"
+    ls -la "$outDir" 2>/dev/null || echo "Output directory does not exist: $outDir"
     
     # Parse pathogens to validate each one
     IFS=',' read -ra PATHOGEN_LIST <<< "$pathogens"

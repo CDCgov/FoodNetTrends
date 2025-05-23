@@ -32,8 +32,8 @@ process TRENDY {
     container 'foodnet.sif'
     
     publishDir "${params.outdir}/${pathogen}", 
-        pattern: "${pathogen}*", 
-        mode: params.publish_dir_mode
+        mode: params.publish_dir_mode,
+        enabled: true
     
     input:
     val pathogen
