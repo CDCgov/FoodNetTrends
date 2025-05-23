@@ -980,8 +980,9 @@ if [[ "$workflow_mode" == "1" ]]; then
     fi
     
     # Set paths to preprocessed data and metadata in the new directory structure
-    preprocessed_data="${preprocessedDir}/${outputBase}.csv"
-    preprocessed_metadata="${preprocessedDir}/${outputBase}_metadata.json"
+    # Files are published to preprocessed/ subdirectory by the Nextflow module
+    preprocessed_data="${preprocessedDir}/preprocessed/${outputBase}.csv"
+    preprocessed_metadata="${preprocessedDir}/preprocessed/${outputBase}_metadata.json"
     
     # Check for metadata in alternate location (for backward compatibility)
     if [ ! -f "${preprocessed_metadata}" ] && [ -f "${preprocessedDir}/preprocessed/metadata/${outputBase}_metadata.json" ]; then
