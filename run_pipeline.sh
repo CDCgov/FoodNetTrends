@@ -864,8 +864,9 @@ if [[ "$workflow_mode" == "1" ]]; then
     echo ""
     echo "======== Output Settings ========"
     
-    # Default output directory for preprocessed data
-    defaultPreprocessedDir="preprocessed_$(date +%Y%m%d_%H%M%S)"
+    # Organize preprocessed data in a clean directory structure
+    timestamp=$(date +%Y%m%d_%H%M%S)
+    defaultPreprocessedDir="preprocessed/${timestamp}"
     read -p "Output directory for preprocessed data [${defaultPreprocessedDir}]: " preprocessedDir
     preprocessedDir=${preprocessedDir:-$defaultPreprocessedDir}
     
@@ -978,9 +979,9 @@ if [[ "$workflow_mode" == "1" ]]; then
         exit 1
     fi
     
-    # Set paths to preprocessed data and metadata
-    preprocessed_data="${preprocessedDir}/preprocessed/${outputBase}.csv"
-    preprocessed_metadata="${preprocessedDir}/preprocessed/${outputBase}_metadata.json"
+    # Set paths to preprocessed data and metadata in the new directory structure
+    preprocessed_data="${preprocessedDir}/${outputBase}.csv"
+    preprocessed_metadata="${preprocessedDir}/${outputBase}_metadata.json"
     
     # Check for metadata in alternate location (for backward compatibility)
     if [ ! -f "${preprocessed_metadata}" ] && [ -f "${preprocessedDir}/preprocessed/metadata/${outputBase}_metadata.json" ]; then
@@ -1057,13 +1058,12 @@ elif [[ "$workflow_mode" == "2" ]]; then
     echo ""
     echo "======== Input Files ========"
 
-    # Search for preprocessed CSV files
+    # Search for preprocessed CSV files in the organized directory structure
     echo "Searching for preprocessed CSV files..."
     mapfile -t found_csv < <(find . -type f \( \
-        -path "*/preprocessed/*.csv" -o \
+        -path "./preprocessed/*/foodnet_data_*.csv" -o \
         -path "preprocessed_*/preprocessed/*.csv" -o \
         -path "preprocessed_*/*.csv" -o \
-        -name "*preprocessed*.csv" -o \
         -name "*mmwr*.csv" \
         \) 2>/dev/null)
     if [[ ${#found_csv[@]} -gt 0 ]]; then
@@ -1080,8 +1080,28 @@ elif [[ "$workflow_mode" == "2" ]]; then
             read -p "Preprocessed data file: " preprocessed_data
         fi
     else
-        echo "No preprocessed CSV files found. Please enter the path manually."
-        read -p "Preprocessed data file: " preprocessed_data
+        echo ""
+        echo "No preprocessed CSV files found in expected locations."
+        echo "Searched in:"
+        echo "  - ./preprocessed/*/foodnet_data_*.csv"
+        echo "  - ./preprocessed_*/preprocessed/*.csv (legacy)"
+        echo "  - ./preprocessed_*/*.csv (legacy)"
+        echo ""
+        echo "Options:"
+        echo "1) Go back and run full preprocessing workflow"
+        echo "2) Enter preprocessed data file path manually"
+        read -p "Select option [1]: " no_data_choice
+        no_data_choice=${no_data_choice:-1}
+        
+        if [[ "$no_data_choice" == "1" ]]; then
+            echo "Returning to workflow selection..."
+            echo ""
+            # Reset workflow mode to trigger main menu
+            workflow_mode=""
+            exec "$0" "$@"
+        else
+            read -p "Preprocessed data file: " preprocessed_data
+        fi
     fi
 
     # Validate file exists

@@ -199,18 +199,9 @@ path_analysis <- function(mmwrdata, census) {
         }
       }
       
-      # If still missing, create placeholder
+      # If still missing, raise error
       if (!col %in% names(census)) {
-        warning(paste("Required column", col, "not found in census, raising error (required column)"))
-        if (col == "state") {
-          census$state <- "UNKNOWN"
-        } else if (col == "year") {
-          census$year <- 2020
-        } else if (col == "population") {
-          census$population <- 5000000
-        } else if (col == "pathogentype") {
-          census$pathogentype <- "Bacterial"
-        }
+        stop(paste("CRITICAL ERROR: Required column", col, "not found in census data. Cannot proceed."))
       }
     }
   }
@@ -241,25 +232,7 @@ path_analysis <- function(mmwrdata, census) {
   
   # Verify bacterial pathogentype entries in census
   if (sum(census$pathogentype == "Bacterial", na.rm = TRUE) == 0) {
-    warning("No Bacterial pathogentype found in census data. Creating synthetic entries.")
-    # Generate a synthetic bacterial census subset
-    states <- unique(mmwrdata$state)
-    years <- unique(mmwrdata$year)
-    
-    if (length(states) == 0) states <- c("CA", "NY", "GA")
-    if (length(years) == 0) years <- 2016:2023
-    
-    synthetic_census <- expand.grid(
-      state = states,
-      year = years,
-      stringsAsFactors = FALSE
-    )
-    synthetic_census$population <- 5000000
-    synthetic_census$pathogentype <- "Bacterial"
-    
-    # Add to census
-    census <- rbind(census, synthetic_census)
-    warning("Added ", nrow(synthetic_census), " synthetic bacterial census records")
+    stop("CRITICAL ERROR: No Bacterial pathogentype found in census data. Cannot proceed without census data.")
   }
   
   # Create a data frame with counts per year, state, and pathogen
@@ -268,14 +241,7 @@ path_analysis <- function(mmwrdata, census) {
     filter(pathogen %in% pathogens)
   
   if (nrow(filtered_data) == 0) {
-    warning("No matching pathogen data found in MMWR data. Using placeholder data.")
-    # Create synthetic data
-    filtered_data <- data.frame(
-      pathogen = rep(pathogens[1], 10),
-      state = rep(c("CA", "NY"), 5),
-      year = rep(2016:2020, each = 2),
-      stringsAsFactors = FALSE
-    )
+    stop("CRITICAL ERROR: No matching pathogen data found in MMWR data. Cannot proceed with analysis.")
   }
   
   message("Aggregating pathogen counts by year, state, and pathogen")
@@ -321,11 +287,8 @@ path_analysis <- function(mmwrdata, census) {
     print(paste("pathogen_counts columns:", paste(names(pathogen_counts_complete), collapse=", ")))
     print(paste("census_bacterial columns:", paste(names(census_bacterial), collapse=", ")))
     
-    # Create emergency join columns if needed
-    if (!"year" %in% names(pathogen_counts_complete)) pathogen_counts_complete$year <- 2020
-    if (!"state" %in% names(pathogen_counts_complete)) pathogen_counts_complete$state <- "UNKNOWN"
-    if (!"year" %in% names(census_bacterial)) census_bacterial$year <- 2020
-    if (!"state" %in% names(census_bacterial)) census_bacterial$state <- "UNKNOWN"
+    # Cannot proceed without essential join columns
+    stop("CRITICAL ERROR: Essential join columns (state, year) missing from data. Check data structure and preprocessing.")
   }
   
   # Perform the join
@@ -345,8 +308,12 @@ path_analysis <- function(mmwrdata, census) {
   # Check for missing population values
   na_population_count <- sum(is.na(selectDf$population))
   if (na_population_count > 0) {
-    warning(paste(na_population_count, "rows have missing population values after join. Using default value 5000000."))
-    selectDf$population[is.na(selectDf$population)] <- 5000000
+    warning(paste(na_population_count, "rows have missing population values after join. These will be excluded."))
+    # Exclude rows with missing population
+    selectDf <- selectDf[!is.na(selectDf$population), ]
+    if (nrow(selectDf) == 0) {
+      stop("CRITICAL ERROR: No complete data (with population) available after join.")
+    }
   }
   
   # Add pathogentype if missing
@@ -428,18 +395,9 @@ cyclospora_analysis <- function(mmwrdata, census) {
         }
       }
       
-      # If still missing, create placeholder
+      # If still missing, raise error
       if (!col %in% names(census)) {
-        warning(paste("Required column", col, "not found in census, raising error (required column)"))
-        if (col == "state") {
-          census$state <- "UNKNOWN"
-        } else if (col == "year") {
-          census$year <- 2020
-        } else if (col == "population") {
-          census$population <- 5000000
-        } else if (col == "pathogentype") {
-          census$pathogentype <- "Parasitic"  # Default to Parasitic for Cyclospora
-        }
+        stop(paste("CRITICAL ERROR: Required column", col, "not found in census data. Cannot proceed."))
       }
     }
   }
@@ -470,25 +428,7 @@ cyclospora_analysis <- function(mmwrdata, census) {
   
   # Verify parasitic pathogentype entries in census
   if (sum(toupper(census$pathogentype) == "PARASITIC", na.rm = TRUE) == 0) {
-    warning("No Parasitic pathogentype found in census data. Creating synthetic entries.")
-    # Generate a synthetic parasitic census subset
-    states <- unique(mmwrdata$state)
-    years <- unique(mmwrdata$year)
-    
-    if (length(states) == 0) states <- c("CA", "NY", "GA")
-    if (length(years) == 0) years <- 2016:2023
-    
-    synthetic_census <- expand.grid(
-      state = states,
-      year = years,
-      stringsAsFactors = FALSE
-    )
-    synthetic_census$population <- 5000000
-    synthetic_census$pathogentype <- "Parasitic"
-    
-    # Add to census
-    census <- rbind(census, synthetic_census)
-    warning("Added ", nrow(synthetic_census), " synthetic parasitic census records")
+    stop("CRITICAL ERROR: No Parasitic pathogentype found in census data. Cannot proceed without census data.")
   }
   
   # Filter for Cyclospora
@@ -497,14 +437,7 @@ cyclospora_analysis <- function(mmwrdata, census) {
     filter(toupper(pathogen) == "CYCLOSPORA")
   
   if (nrow(cyclospora_data) == 0) {
-    warning("No CYCLOSPORA data found! Creating synthetic data.")
-    # Create synthetic data to prevent errors
-    cyclospora_data <- data.frame(
-      pathogen = rep("CYCLOSPORA", 10),
-      state = rep(c("CA", "NY"), 5),
-      year = rep(2016:2020, each = 2),
-      stringsAsFactors = FALSE
-    )
+    stop("CRITICAL ERROR: No CYCLOSPORA data found in MMWR data. Cannot proceed with analysis.")
   }
   
   message("Aggregating Cyclospora counts by year and state")
@@ -585,11 +518,8 @@ cyclospora_analysis <- function(mmwrdata, census) {
     print(paste("cyclo_counts columns:", paste(names(cyclo_counts_complete), collapse=", ")))
     print(paste("census_parasitic columns:", paste(names(census_parasitic), collapse=", ")))
     
-    # Create emergency join columns if needed
-    if (!"year" %in% names(cyclo_counts_complete)) cyclo_counts_complete$year <- 2020
-    if (!"state" %in% names(cyclo_counts_complete)) cyclo_counts_complete$state <- "UNKNOWN"
-    if (!"year" %in% names(census_parasitic)) census_parasitic$year <- 2020
-    if (!"state" %in% names(census_parasitic)) census_parasitic$state <- "UNKNOWN"
+    # Cannot proceed without essential join columns
+    stop("CRITICAL ERROR: Essential join columns (state, year) missing from data. Check data structure and preprocessing.")
   }
   
   # Perform the join
@@ -606,11 +536,22 @@ cyclospora_analysis <- function(mmwrdata, census) {
     warning(paste("Join changed row count from", pre_join_rows, "to", post_join_rows))
   }
   
-  # Check for missing population values
+  # Handle missing population values - exclude incomplete data rather than fabricate
   na_population_count <- sum(is.na(cyclo$population))
   if (na_population_count > 0) {
-    warning(paste(na_population_count, "rows have missing population values after join. Using default value 5000000."))
-    cyclo$population[is.na(cyclo$population)] <- 5000000
+    excluded_data <- cyclo[is.na(cyclo$population), c("state", "year")]
+    warning(paste("EXCLUDING", na_population_count, "rows due to missing population data:"))
+    if (nrow(excluded_data) > 0) {
+      excluded_summary <- excluded_data %>%
+        group_by(state) %>%
+        summarise(missing_years = paste(sort(unique(year)), collapse=", "), .groups = "drop")
+      for(i in 1:nrow(excluded_summary)) {
+        warning(paste("  State", excluded_summary$state[i], "missing years:", excluded_summary$missing_years[i]))
+      }
+    }
+    # Remove incomplete records
+    cyclo <- cyclo[!is.na(cyclo$population), ]
+    message(paste("Analysis will proceed with", nrow(cyclo), "complete records"))
   }
   
   # Add pathogentype if missing
@@ -692,18 +633,9 @@ salmonella_analysis <- function(mmwrdata, census) {
         }
       }
       
-      # If still missing, create placeholder
+      # If still missing, raise error
       if (!col %in% names(census)) {
-        warning(paste("Required column", col, "not found in census, raising error (required column)"))
-        if (col == "state") {
-          census$state <- "UNKNOWN"
-        } else if (col == "year") {
-          census$year <- 2020
-        } else if (col == "population") {
-          census$population <- 5000000
-        } else if (col == "pathogentype") {
-          census$pathogentype <- "Bacterial"  # Default to Bacterial for Salmonella
-        }
+        stop(paste("CRITICAL ERROR: Required column", col, "not found in census data. Cannot proceed."))
       }
     }
   }
@@ -734,25 +666,7 @@ salmonella_analysis <- function(mmwrdata, census) {
   
   # Verify bacterial pathogentype entries in census
   if (sum(toupper(census$pathogentype) == "BACTERIAL", na.rm = TRUE) == 0) {
-    warning("No Bacterial pathogentype found in census data. Creating synthetic entries.")
-    # Generate a synthetic bacterial census subset
-    states <- unique(mmwrdata$state)
-    years <- unique(mmwrdata$year)
-    
-    if (length(states) == 0) states <- c("CA", "NY", "GA")
-    if (length(years) == 0) years <- 2016:2023
-    
-    synthetic_census <- expand.grid(
-      state = states,
-      year = years,
-      stringsAsFactors = FALSE
-    )
-    synthetic_census$population <- 5000000
-    synthetic_census$pathogentype <- "Bacterial"
-    
-    # Add to census
-    census <- rbind(census, synthetic_census)
-    warning("Added ", nrow(synthetic_census), " synthetic bacterial census records")
+    stop("CRITICAL ERROR: No Bacterial pathogentype found in census data. Cannot proceed without census data.")
   }
   
   # Filter for Salmonella
@@ -761,14 +675,7 @@ salmonella_analysis <- function(mmwrdata, census) {
     filter(toupper(pathogen) == "SALMONELLA")
   
   if (nrow(salmonella_data) == 0) {
-    warning("No SALMONELLA data found! Creating synthetic data.")
-    # Create synthetic data to prevent errors
-    salmonella_data <- data.frame(
-      pathogen = rep("SALMONELLA", 10),
-      state = rep(c("CA", "NY"), 5),
-      year = rep(2016:2020, each = 2),
-      stringsAsFactors = FALSE
-    )
+    stop("CRITICAL ERROR: No SALMONELLA data found in MMWR data. Cannot proceed with analysis.")
   }
   
   message("Aggregating Salmonella counts by year and state")
@@ -813,11 +720,8 @@ salmonella_analysis <- function(mmwrdata, census) {
     print(paste("sal_counts columns:", paste(names(sal_counts_complete), collapse=", ")))
     print(paste("census_bacterial columns:", paste(names(census_bacterial), collapse=", ")))
     
-    # Create emergency join columns if needed
-    if (!"year" %in% names(sal_counts_complete)) sal_counts_complete$year <- 2020
-    if (!"state" %in% names(sal_counts_complete)) sal_counts_complete$state <- "UNKNOWN"
-    if (!"year" %in% names(census_bacterial)) census_bacterial$year <- 2020
-    if (!"state" %in% names(census_bacterial)) census_bacterial$state <- "UNKNOWN"
+    # Cannot proceed without essential join columns
+    stop("CRITICAL ERROR: Essential join columns (state, year) missing from data. Check data structure and preprocessing.")
   }
   
   # Perform the join
@@ -837,8 +741,12 @@ salmonella_analysis <- function(mmwrdata, census) {
   # Check for missing population values
   na_population_count <- sum(is.na(sal$population))
   if (na_population_count > 0) {
-    warning(paste(na_population_count, "rows have missing population values after join. Using default value 5000000."))
-    sal$population[is.na(sal$population)] <- 5000000
+    warning(paste(na_population_count, "rows have missing population values after join. These will be excluded."))
+    # Exclude rows with missing population
+    sal <- sal[!is.na(sal$population), ]
+    if (nrow(sal) == 0) {
+      stop("CRITICAL ERROR: No complete data (with population) available after join.")
+    }
   }
   
   # Add pathogentype if missing
@@ -908,81 +816,7 @@ proposed_bm <- function(data, cores = 16, chains = 2, iterations = 500,
   
   # Handle zero-count data
   if (all(data$count == 0) || sum(data$count) == 0) {
-    message("All counts are zero. Creating a dummy model with synthetic data.")
-    
-    # Create dummy data with synthetic counts
-    states <- unique(data$state)
-    n_states <- length(states)
-    
-    # Create synthetic data with small counts that are integers
-    synthetic_data <- data.frame(
-      count = c(rep(1L, n_states), rep(2L, n_states), rep(1L, n_states)),
-      year = rep(c(2000, 2010, 2020), each = n_states),
-      state = rep(states, 3),
-      population = rep(1000000, 3 * n_states)
-    )
-    
-    # Create a simple intercept-only model
-    dummy_model <- tryCatch({
-      brm(
-        count ~ 1 + (1|state) + offset(log(population)),
-        data = synthetic_data,
-        family = negbinomial(),
-        chains = 1,
-        iter = 10,
-        cores = 1,
-        seed = seed,
-        control = list(adapt_delta = 0.8, max_treedepth = 5),
-        backend = "rstan"
-      )
-    }, error = function(e) {
-      # If that fails, try an even simpler model
-      message("First dummy model failed. Trying simpler model. Error was: ", e$message)
-      
-      # Create very simple data with just one state
-      very_simple_data <- data.frame(
-        count = c(1L, 2L, 3L),
-        year = c(2000, 2010, 2020),
-        state = c("CA", "CA", "CA"),
-        population = c(1000000, 1000000, 1000000)
-      )
-      
-      tryCatch({
-        brm(
-          count ~ 1 + offset(log(population)),
-          data = very_simple_data,
-          family = poisson(),  # Try poisson instead of negative binomial
-          chains = 1,
-          iter = 10,
-          cores = 1,
-          seed = seed,
-          backend = "rstan"
-        )
-      }, error = function(e2) {
-        # If even that fails, create a minimal model manually
-        message("Even simpler model failed. Creating manual model. Error was: ", e2$message)
-        
-        # Create a dummy model structure without actually fitting
-        dummy_model <- list(
-          family = list(family = "negbinomial"),
-          data = very_simple_data
-        )
-        class(dummy_model) <- c("brmsfit", "list")
-        
-        # Add attributes to indicate this is a fully synthetic model
-        attr(dummy_model, "is_manual_dummy") <- TRUE
-        attr(dummy_model, "reason") <- paste("Could not fit any model. Errors:", 
-                                             e$message, e2$message)
-        
-        return(dummy_model)
-      })
-    })
-    
-    # Add attributes to indicate this is a dummy model
-    attr(dummy_model, "is_dummy") <- TRUE
-    attr(dummy_model, "reason") <- "All zero counts"
-    
-    return(dummy_model)
+    stop("CRITICAL ERROR: All pathogen counts are zero. Cannot fit model without positive case counts.")
   }
   
   # Ensure year is numeric (not factor) for the spline
@@ -1034,52 +868,9 @@ proposed_bm <- function(data, cores = 16, chains = 2, iterations = 500,
       
       return(simpler_model)
     }, error = function(e2) {
-      # If even the simpler model fails, create a dummy model with synthetic data
-      message("Even simpler model failed. Creating dummy model. Error was: ", e2$message)
-      
-      # Create simple data
-      synthetic_data <- data.frame(
-        count = c(1L, 2L, 3L),
-        year = c(2000, 2010, 2020),
-        state = factor(c("CA", "CA", "CA")),
-        population = c(1000000, 2000000, 3000000)
-      )
-      
-      tryCatch({
-        minimal_model <- brm(
-          count ~ 1 + offset(log(population)),
-          data = synthetic_data,
-          family = negbinomial(),
-          chains = 1,
-          iter = 10,
-          cores = 1,
-          seed = seed,
-          backend = "rstan"
-        )
-        
-        attr(minimal_model, "is_dummy") <- TRUE
-        attr(minimal_model, "reason") <- paste("Both models failed. Original error:", e$message, 
-                                               "Secondary error:", e2$message)
-        
-        return(minimal_model)
-      }, error = function(e3) {
-        # If even that fails, create a minimal model manually
-        message("Even minimal model failed. Creating manual model. Error was: ", e3$message)
-        
-        # Create a dummy model structure without actually fitting
-        dummy_model <- list(
-          family = list(family = "negbinomial"),
-          data = synthetic_data
-        )
-        class(dummy_model) <- c("brmsfit", "list")
-        
-        # Add attributes to indicate this is a fully synthetic model
-        attr(dummy_model, "is_manual_dummy") <- TRUE
-        attr(dummy_model, "reason") <- paste("Could not fit any model. Errors:", 
-                                             e$message, e2$message, e3$message)
-        
-        return(dummy_model)
-      })
+      # If even the simpler model fails, stop with error
+      stop(paste("CRITICAL ERROR: Unable to fit any model. Primary error:", e$message, 
+                 "Secondary error:", e2$message))
     })
   })
   
@@ -1097,64 +888,12 @@ proposed_bm <- function(data, cores = 16, chains = 2, iterations = 500,
 linpred_draw <- function(data, model) {
   # Handle manually created dummy model
   if (!is.null(attr(model, "is_manual_dummy")) && attr(model, "is_manual_dummy")) {
-    message("Using fully synthetic model to generate synthetic predictions.")
-    
-    # Convert data to tibble, ungroup
-    data <- as_tibble(data) %>% ungroup()
-    
-    # Create synthetic draws
-    draw_count <- 100  # Number of posterior draws to simulate
-    
-    # Create a dataframe with multiple draws
-    synthetic_draws <- data %>%
-      mutate(
-        .row = row_number(),
-        Population = if ("Population" %in% names(.)) {
-          as.numeric(Population)
-        } else if ("population" %in% names(.)) {
-          as.numeric(population)
-        } else {
-          rep(1000000, n())  # Default population if missing
-        }
-      ) %>%
-      crossing(.draw = 1:draw_count) %>%
-      # Generate very small random values close to zero
-      mutate(.epred = runif(n(), 0.001, 0.1)) %>%
-      # Calculate predicted incidence
-      mutate(pred_incidence = .epred / (Population / 100000))
-    
-    return(synthetic_draws)
+    stop("CRITICAL ERROR: Cannot generate predictions from a dummy model. Model fitting failed.")
   }
   
   # Handle dummy model created by proposed_bm
   if (!is.null(attr(model, "is_dummy")) && attr(model, "is_dummy")) {
-    message("Using dummy model to generate synthetic predictions.")
-    
-    # Convert data to tibble, ungroup
-    data <- as_tibble(data) %>% ungroup()
-    
-    # Create synthetic draws
-    draw_count <- 100  # Number of posterior draws to simulate
-    
-    # Create a dataframe with multiple draws
-    synthetic_draws <- data %>%
-      mutate(
-        .row = row_number(),
-        Population = if ("Population" %in% names(.)) {
-          as.numeric(Population)
-        } else if ("population" %in% names(.)) {
-          as.numeric(population)
-        } else {
-          rep(1000000, n())  # Default population if missing
-        }
-      ) %>%
-      crossing(.draw = 1:draw_count) %>%
-      # Generate very small random values close to zero
-      mutate(.epred = runif(n(), 0.001, 0.1)) %>%
-      # Calculate predicted incidence
-      mutate(pred_incidence = .epred / (Population / 100000))
-    
-    return(synthetic_draws)
+    stop("CRITICAL ERROR: Cannot generate predictions from a dummy model. Model fitting failed.")
   }
 
   # Regular processing for normal models
@@ -1225,21 +964,8 @@ linpred_draw <- function(data, model) {
     
     return(draws)
   }, error = function(e) {
-    # If prediction fails, create synthetic draws
-    message("Error generating predictions: ", e$message, ". Creating synthetic predictions.")
-    
-    # Create synthetic draws
-    draw_count <- 100  # Number of posterior draws to simulate
-    
-    # Create a dataframe with multiple draws
-    synthetic_draws <- data %>%
-      crossing(.draw = 1:draw_count) %>%
-      # Generate very small random values close to zero
-      mutate(.epred = runif(n(), 0.001, 0.1)) %>%
-      # Calculate predicted incidence
-      mutate(pred_incidence = .epred / (Population / 100000))
-    
-    return(synthetic_draws)
+    # If prediction fails, raise error
+    stop(paste("CRITICAL ERROR: Failed to generate predictions from model:", e$message))
   })
 }
 
@@ -1548,41 +1274,7 @@ save_pathogen_model <- function(model, pathogen, output_dir = ".", output_suffix
     cat("Saved model for", pathogen, "to", filepath, "\n")
     TRUE
   }, error = function(e) {
-    cat("Error saving model for", pathogen, ":", e$message, "\n")
-    cat("Attempting fallback save method...\n")
-    
-    # Fallback: try with a simplified dummy model
-    dummy_model <- list(
-      family = list(family = "negbinomial"),
-      data = model$data,
-      pathogen = pathogen,
-      creation_time = Sys.time(),
-      is_dummy = TRUE,
-      reason = paste("Original model couldn't be saved:", e$message)
-    )
-    class(dummy_model) <- c("brmsfit", "list")
-    
-    # Try saving the fallback model
-    tryCatch({
-      saveRDS(dummy_model, file = filepath)
-      cat("Saved fallback dummy model for", pathogen, "to", filepath, "\n")
-      TRUE
-    }, error = function(e2) {
-      cat("CRITICAL ERROR: Even fallback model couldn't be saved for", pathogen, ":", e2$message, "\n")
-      # Last resort: Create an empty Rds file to satisfy the pipeline
-      dummy <- list(
-        is_empty_model = TRUE,
-        pathogen = pathogen,
-        creation_time = Sys.time()
-      )
-      
-      # Write to file directly using write for ultimate fallback
-      con <- file(filepath, "wb")
-      serialize(dummy, con)
-      close(con)
-      cat("Created minimal placeholder model file for", pathogen, "\n")
-      TRUE
-    })
+    stop(paste("CRITICAL ERROR: Failed to save model for", pathogen, ":", e$message))
   })
   
   # Final verification

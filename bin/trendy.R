@@ -519,13 +519,8 @@ if (pathogen == "CYCLOSPORA") {
     
     # Check if we have any data
     if (nrow(pathogen_data) == 0) {
-      log_message("WARNING", "No Cyclospora data found, creating synthetic data")
-      pathogen_data <- data.frame(
-        pathogen = rep("CYCLOSPORA", 10),
-        state = rep(c("CA", "NY"), 5),
-        year = rep(2016:2020, each = 2),
-        stringsAsFactors = FALSE
-      )
+      log_message("ERROR", "No Cyclospora data found in dataset")
+      stop(paste("Analysis terminated: No data available for", pathogen))
     }
     
     # Aggregate data
@@ -539,16 +534,8 @@ if (pathogen == "CYCLOSPORA") {
     # Verify census data before joining
     if (is.null(censusPdata)) {
       log_message("ERROR", paste("CRITICAL: No valid parasitic census data available for", pathogen))
-      log_message("ERROR", "USING PLACEHOLDER DATA - Results will NOT be valid for production")
-      
-      # Create emergency census data matching the states and years in pathogen_counts
-      censusPdata <- expand.grid(
-        state = unique(pathogen_counts$state),
-        year = unique(pathogen_counts$year),
-        stringsAsFactors = FALSE
-      )
-      censusPdata$population <- 5000000
-      censusPdata$pathogentype <- "Parasitic"
+      log_message("ERROR", "Cannot proceed with analysis - census data is required for rate calculations")
+      stop(paste("Analysis terminated: Missing parasitic census data for", pathogen))
     } else {
       log_message("INFO", "Using real parasitic census data for population values")
     }
@@ -559,16 +546,8 @@ if (pathogen == "CYCLOSPORA") {
       log_message("ERROR", paste("CRITICAL: Census parasitic data missing required columns:", 
                                paste(missing_cols, collapse=", ")))
       log_message("ERROR", paste("Available columns:", paste(names(censusPdata), collapse=", ")))
-      log_message("ERROR", "USING PLACEHOLDER DATA - Results will NOT be valid for production")
-      
-      # Create emergency census data matching the states and years in pathogen_counts
-      censusPdata <- expand.grid(
-        state = unique(pathogen_counts$state),
-        year = unique(pathogen_counts$year),
-        stringsAsFactors = FALSE
-      )
-      censusPdata$population <- 5000000
-      censusPdata$pathogentype <- "Parasitic"
+      log_message("ERROR", "Cannot proceed - census data must have state, year, and population columns")
+      stop(paste("Analysis terminated: Census data structure invalid for", pathogen))
     }
     
     # Log column information before joining for debugging
@@ -585,11 +564,22 @@ if (pathogen == "CYCLOSPORA") {
     }
     analysis_data <- left_join(pathogen_counts, censusPdata, by = c("state", "year"))
     
-    # Handle missing population values
+    # Handle missing population values - exclude incomplete records
     missing_pop_count <- sum(is.na(analysis_data$population))
     if (missing_pop_count > 0) {
-      log_message("WARNING", paste(missing_pop_count, "missing population values found, using defaults"))
-      analysis_data$population[is.na(analysis_data$population)] <- 5000000
+      log_message("WARNING", paste(missing_pop_count, "records have missing population values and will be excluded"))
+      excluded_data <- analysis_data[is.na(analysis_data$population), c("state", "year")]
+      if (nrow(excluded_data) > 0) {
+        excluded_summary <- excluded_data %>%
+          group_by(state) %>%
+          summarise(years = paste(sort(unique(year)), collapse=", "), .groups = "drop")
+        for(i in 1:nrow(excluded_summary)) {
+          log_message("WARNING", paste("  Excluding", excluded_summary$state[i], "years:", excluded_summary$years[i]))
+        }
+      }
+      # Remove incomplete records
+      analysis_data <- analysis_data[!is.na(analysis_data$population), ]
+      log_message("INFO", paste("Proceeding with", nrow(analysis_data), "complete records"))
     }
     
     # Verify successful join
@@ -654,13 +644,8 @@ if (pathogen == "CYCLOSPORA") {
     
     # Check if we have any data
     if (nrow(pathogen_data) == 0) {
-      log_message("WARNING", paste("No", pathogen, "data found, creating synthetic data"))
-      pathogen_data <- data.frame(
-        pathogen = rep(pathogen, 10),
-        state = rep(c("CA", "NY"), 5),
-        year = rep(2016:2020, each = 2),
-        stringsAsFactors = FALSE
-      )
+      log_message("ERROR", paste("No", pathogen, "data found in dataset"))
+      stop(paste("Analysis terminated: No data available for", pathogen))
     }
     
     # Aggregate data
@@ -674,16 +659,8 @@ if (pathogen == "CYCLOSPORA") {
     # Verify census data before joining
     if (is.null(censusBdata)) {
       log_message("ERROR", paste("CRITICAL: No valid bacterial census data available for", pathogen))
-      log_message("ERROR", "USING PLACEHOLDER DATA - Results will NOT be valid for production")
-      
-      # Create emergency census data matching the states and years in pathogen_counts
-      censusBdata <- expand.grid(
-        state = unique(pathogen_counts$state),
-        year = unique(pathogen_counts$year),
-        stringsAsFactors = FALSE
-      )
-      censusBdata$population <- 5000000
-      censusBdata$pathogentype <- "Bacterial"
+      log_message("ERROR", "Cannot proceed with analysis - census data is required for rate calculations")
+      stop(paste("Analysis terminated: Missing bacterial census data for", pathogen))
     } else {
       log_message("INFO", "Using real bacterial census data for population values")
     }
@@ -694,16 +671,8 @@ if (pathogen == "CYCLOSPORA") {
       log_message("ERROR", paste("CRITICAL: Census bacterial data missing required columns:", 
                                paste(missing_cols, collapse=", ")))
       log_message("ERROR", paste("Available columns:", paste(names(censusBdata), collapse=", ")))
-      log_message("ERROR", "USING PLACEHOLDER DATA - Results will NOT be valid for production")
-      
-      # Create emergency census data matching the states and years in pathogen_counts
-      censusBdata <- expand.grid(
-        state = unique(pathogen_counts$state),
-        year = unique(pathogen_counts$year),
-        stringsAsFactors = FALSE
-      )
-      censusBdata$population <- 5000000
-      censusBdata$pathogentype <- "Bacterial"
+      log_message("ERROR", "Cannot proceed - census data must have state, year, and population columns")
+      stop(paste("Analysis terminated: Census data structure invalid for", pathogen))
     }
     
     # Log column information before joining for debugging
@@ -717,11 +686,22 @@ if (pathogen == "CYCLOSPORA") {
     analysis_data <- left_join(pathogen_counts, censusBdata, by = c("state", "year"))
   }
   
-  # Handle missing population values
+  # Handle missing population values - exclude incomplete records
   missing_pop_count <- sum(is.na(analysis_data$population))
   if (missing_pop_count > 0) {
-    log_message("WARNING", paste(missing_pop_count, "missing population values found, using defaults"))
-    analysis_data$population[is.na(analysis_data$population)] <- 5000000
+    log_message("WARNING", paste(missing_pop_count, "records have missing population values and will be excluded"))
+    excluded_data <- analysis_data[is.na(analysis_data$population), c("state", "year")]
+    if (nrow(excluded_data) > 0) {
+      excluded_summary <- excluded_data %>%
+        group_by(state) %>%
+        summarise(years = paste(sort(unique(year)), collapse=", "), .groups = "drop")
+      for(i in 1:nrow(excluded_summary)) {
+        log_message("WARNING", paste("  Excluding", excluded_summary$state[i], "years:", excluded_summary$years[i]))
+      }
+    }
+    # Remove incomplete records
+    analysis_data <- analysis_data[!is.na(analysis_data$population), ]
+    log_message("INFO", paste("Proceeding with", nrow(analysis_data), "complete records"))
   }
   
   # Verify successful join
@@ -763,13 +743,8 @@ if (pathogen == "CYCLOSPORA") {
   
   # Check if we have data
   if (nrow(pathogen_data) == 0) {
-    log_message("WARNING", paste("No", pathogen, "data found, creating synthetic data"))
-    pathogen_data <- data.frame(
-      pathogen = rep(pathogen, 10),
-      state = rep(c("CA", "NY"), 5),
-      year = rep(2016:2020, each = 2),
-      stringsAsFactors = FALSE
-    )
+    log_message("ERROR", paste("No", pathogen, "data found in dataset"))
+    stop(paste("Analysis terminated: No data available for", pathogen))
   }
   
   # Aggregate data
@@ -783,16 +758,8 @@ if (pathogen == "CYCLOSPORA") {
   # Verify census data before joining
   if (is.null(censusBdata)) {
     log_message("ERROR", paste("CRITICAL: No valid bacterial census data available for", pathogen))
-    log_message("ERROR", "USING PLACEHOLDER DATA - Results will NOT be valid for production")
-    
-    # Create emergency census data matching the states and years in pathogen_counts
-    censusBdata <- expand.grid(
-      state = unique(pathogen_counts$state),
-      year = unique(pathogen_counts$year),
-      stringsAsFactors = FALSE
-    )
-    censusBdata$population <- 5000000
-    censusBdata$pathogentype <- "Bacterial"
+    log_message("ERROR", "Cannot proceed with analysis - census data is required for rate calculations")
+    stop(paste("Analysis terminated: Missing bacterial census data for", pathogen))
   } else {
     log_message("INFO", "Using real bacterial census data for population values")
   }
@@ -803,16 +770,8 @@ if (pathogen == "CYCLOSPORA") {
     log_message("ERROR", paste("CRITICAL: Census bacterial data missing required columns:", 
                              paste(missing_cols, collapse=", ")))
     log_message("ERROR", paste("Available columns:", paste(names(censusBdata), collapse=", ")))
-    log_message("ERROR", "USING PLACEHOLDER DATA - Results will NOT be valid for production")
-    
-    # Create emergency census data matching the states and years in pathogen_counts
-    censusBdata <- expand.grid(
-      state = unique(pathogen_counts$state),
-      year = unique(pathogen_counts$year),
-      stringsAsFactors = FALSE
-    )
-    censusBdata$population <- 5000000
-    censusBdata$pathogentype <- "Bacterial"
+    log_message("ERROR", "Cannot proceed - census data must have state, year, and population columns")
+    stop(paste("Analysis terminated: Census data structure invalid for", pathogen))
   }
   
   # Log column information before joining for debugging
@@ -828,8 +787,15 @@ if (pathogen == "CYCLOSPORA") {
   # Handle missing population values
   missing_pop_count <- sum(is.na(analysis_data$population))
   if (missing_pop_count > 0) {
-    log_message("WARNING", paste(missing_pop_count, "missing population values found, using defaults"))
-    analysis_data$population[is.na(analysis_data$population)] <- 5000000
+    log_message("ERROR", paste(missing_pop_count, "missing population values found"))
+    # Exclude rows with missing population data
+    analysis_data <- analysis_data[!is.na(analysis_data$population), ]
+    log_message("INFO", paste("Excluded", missing_pop_count, "rows with missing population data"))
+    
+    # Check if we still have data after exclusion
+    if (nrow(analysis_data) == 0) {
+      stop(paste("Analysis terminated: No complete data (with population) available for", pathogen))
+    }
   }
   
   # Verify successful join
@@ -1217,13 +1183,14 @@ ir_data <- tryCatch({
 }, error = function(e) {
   log_message("ERROR", paste("IR calculation failed:", e$message))
   
-  # Create placeholder IR data
+  # Return empty data frame on IR calculation failure
+  log_message("ERROR", "IR calculation failed - returning empty results")
   data.frame(
-    state = c("CA", "NY", "GA"),
-    year = rep(max(analysis_data$year, na.rm=TRUE), 3),
-    ir = c(0.5, 0.6, 0.4),
-    ir_lower = c(0.3, 0.4, 0.2),
-    ir_upper = c(0.7, 0.8, 0.6),
+    state = character(),
+    year = numeric(),
+    ir = numeric(),
+    ir_lower = numeric(),
+    ir_upper = numeric(),
     stringsAsFactors = FALSE
   )
 })

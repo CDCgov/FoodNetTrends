@@ -50,16 +50,16 @@ class WorkflowSpline {
     // Generate methods description for MultiQC
     //
     public static String toolCitationText(params) {
-        // TODO nf-core: Optionally add tool citation text
+        // Tool citations for FoodNetTrends analysis
         def citation_text = ""
-        citation_text += "TODO Add tool citations here if available. Make sure to cite any databases or datasets that were used."
+        citation_text += "FoodNetTrends uses Bayesian hierarchical spline models implemented in R with Stan/brms for surveillance trend analysis."
         return citation_text
     }
 
     public static String methodsDescriptionText(params) {
-        // TODO nf-core: Optionally add methods text
+        // Methods description for FoodNetTrends
         def methods_text = ""
-        methods_text += "TODO Add methods description here if available."
+        methods_text += "Bayesian hierarchical spline modeling approach for analyzing foodborne illness surveillance trends across multiple pathogens and geographic regions."
         return methods_text
     }
 

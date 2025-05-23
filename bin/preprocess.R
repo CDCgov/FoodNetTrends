@@ -185,6 +185,123 @@ clean_mmwr_data <- function(raw_data) {
   return(data)
 }
 
+#' Safely infer geographic regions from state codes
+#' 
+#' @param state_codes Vector of state abbreviations
+#' @return Vector of region names
+infer_region <- function(state_codes) {
+  # Define state to region mapping based on US Census regions
+  region_map <- list(
+    Northeast = c("CT", "ME", "MA", "NH", "RI", "VT", "NJ", "NY", "PA"),
+    Midwest = c("IL", "IN", "MI", "OH", "WI", "IA", "KS", "MN", "MO", "NE", "ND", "SD"),
+    South = c("DE", "FL", "GA", "MD", "NC", "SC", "VA", "DC", "WV", "AL", "KY", "MS", "TN", "AR", "LA", "OK", "TX"),
+    West = c("AZ", "CO", "ID", "MT", "NV", "NM", "UT", "WY", "AK", "CA", "HI", "OR", "WA")
+  )
+  
+  # Convert mapping to lookup vector
+  state_to_region <- character()
+  for (region in names(region_map)) {
+    states <- region_map[[region]]
+    state_to_region[states] <- region
+  }
+  
+  # Apply mapping
+  regions <- state_to_region[toupper(state_codes)]
+  regions[is.na(regions)] <- "Unknown"
+  return(regions)
+}
+
+#' Safely infer temporal groupings from dates
+#' 
+#' @param years Numeric vector of years
+#' @param months Numeric vector of months (optional)
+#' @return Data frame with temporal groupings
+infer_temporal_groups <- function(years, months = NULL) {
+  result <- data.frame(year = years)
+  
+  # Add quarter if months available
+  if (!is.null(months) && length(months) == length(years)) {
+    result$quarter <- ceiling(pmin(pmax(months, 1), 12) / 3)
+    result$season <- ifelse(months %in% c(12, 1, 2), "Winter",
+                           ifelse(months %in% c(3, 4, 5), "Spring",
+                                  ifelse(months %in% c(6, 7, 8), "Summer", "Fall")))
+  }
+  
+  # Add epidemiological groupings
+  result$year_group <- cut(years, 
+                          breaks = c(-Inf, 2000, 2005, 2010, 2015, 2020, Inf),
+                          labels = c("Pre-2000", "2001-2005", "2006-2010", 
+                                   "2011-2015", "2016-2020", "2021+"))
+  
+  return(result)
+}
+
+#' Safely infer age groups from numeric ages
+#' 
+#' @param ages Numeric vector of ages
+#' @return Data frame with age groupings
+infer_age_groups <- function(ages) {
+  result <- data.frame(age = ages)
+  
+  # Standard age groups
+  result$age_group_5yr <- cut(ages, 
+                             breaks = c(-1, 4, 9, 14, 19, 24, 29, 34, 39, 44, 49, 54, 59, 64, 69, 74, 79, 84, Inf),
+                             labels = c("0-4", "5-9", "10-14", "15-19", "20-24", "25-29", "30-34", "35-39",
+                                      "40-44", "45-49", "50-54", "55-59", "60-64", "65-69", "70-74", 
+                                      "75-79", "80-84", "85+"))
+  
+  # Pediatric vs adult
+  result$age_category <- ifelse(ages < 18, "Pediatric", "Adult")
+  
+  # Broader groups for analysis
+  result$age_group_broad <- cut(ages,
+                               breaks = c(-1, 4, 17, 49, 64, Inf),
+                               labels = c("<5", "5-17", "18-49", "50-64", "65+"))
+  
+  return(result)
+}
+
+#' Apply safe inferences to cleaned data
+#' 
+#' @param data Cleaned MMWR data
+#' @return Data with additional inferred fields
+apply_safe_inferences <- function(data) {
+  cat("Applying safe geographic and temporal inferences...\n")
+  
+  # Infer regions from states
+  if ("state" %in% names(data)) {
+    data$region <- infer_region(data$state)
+    cat("  - Inferred regions for", sum(data$region != "Unknown"), "records\n")
+  }
+  
+  # Infer temporal groupings
+  if ("year" %in% names(data)) {
+    temporal_data <- infer_temporal_groups(
+      data$year, 
+      if("month" %in% names(data)) data$month else NULL
+    )
+    data$quarter <- temporal_data$quarter
+    data$season <- temporal_data$season
+    data$year_group <- temporal_data$year_group
+    cat("  - Added temporal groupings (quarter, season, year_group)\n")
+  }
+  
+  # Infer age groups if age is available
+  if ("age" %in% names(data)) {
+    # Only apply to non-missing ages
+    valid_ages <- !is.na(data$age) & data$age >= 0 & data$age <= 120
+    if (sum(valid_ages) > 0) {
+      age_data <- infer_age_groups(data$age[valid_ages])
+      data$age_group_5yr[valid_ages] <- as.character(age_data$age_group_5yr)
+      data$age_category[valid_ages] <- age_data$age_category
+      data$age_group_broad[valid_ages] <- as.character(age_data$age_group_broad)
+      cat("  - Inferred age groups for", sum(valid_ages), "records\n")
+    }
+  }
+  
+  return(data)
+}
+
 #' Generate metadata from cleaned data
 #' 
 #' @param data Cleaned MMWR data
@@ -205,6 +322,19 @@ generate_metadata <- function(data, source_file, census_file_b = NULL, census_fi
     source_file = source_file,
     record_count = nrow(data)
   )
+  
+  # Add inferred field information if available
+  if ("region" %in% names(data)) {
+    metadata$regions = sort(unique(data$region[data$region != "Unknown"]))
+  }
+  
+  if ("age_category" %in% names(data)) {
+    metadata$has_age_groups = TRUE
+  }
+  
+  if ("quarter" %in% names(data)) {
+    metadata$has_temporal_groups = TRUE
+  }
   
   # Add preprocessed census file paths to metadata - these are state-level aggregated files
   if (!is.null(census_file_b)) {
@@ -257,6 +387,9 @@ main <- function() {
   
   # Clean data
   cleaned_data <- clean_mmwr_data(mmwrdata)
+  
+  # Apply safe inferences
+  cleaned_data <- apply_safe_inferences(cleaned_data)
 
   # Load and standardize census files for coverage check
   cat("Loading census files for coverage check...\n")
@@ -476,6 +609,34 @@ main <- function() {
     print(census_not_in_mmwr)
   }
 
+  # Check for population consistency across pathogen types
+  cat('\nPREPROCESS CHECK: Verifying population consistency across pathogen types...\n')
+  
+  # Compare bacterial and parasitic census for same state-year combinations
+  pop_comparison <- inner_join(
+    census_b_state %>% select(state, year, pop_bacterial = population),
+    census_p_state %>% select(state, year, pop_parasitic = population),
+    by = c("state", "year")
+  )
+  
+  # Find discrepancies
+  pop_comparison$pop_diff <- abs(pop_comparison$pop_bacterial - pop_comparison$pop_parasitic)
+  pop_comparison$pct_diff <- round(100 * pop_comparison$pop_diff / pmax(pop_comparison$pop_bacterial, pop_comparison$pop_parasitic), 2)
+  
+  # Flag significant discrepancies (>1% difference)
+  discrepancies <- pop_comparison[pop_comparison$pct_diff > 1, ]
+  
+  if (nrow(discrepancies) > 0) {
+    cat('  WARNING: Population inconsistencies found between bacterial and parasitic census data!\n')
+    cat('  State-year combinations with >1% population difference:\n')
+    print(discrepancies[order(-discrepancies$pct_diff), c("state", "year", "pop_bacterial", "pop_parasitic", "pct_diff")])
+    cat('\n  This indicates potential data quality issues. Population should be consistent for the same state-year.\n')
+    cat('  Consider reviewing the source census files for accuracy.\n')
+  } else {
+    cat('  ✓ Population data is consistent across pathogen types (all differences <1%)\n')
+    cat('  This confirms population inference across pathogen types is valid.\n')
+  }
+  
   # Write detailed report to file
   coverage_report_file <- file.path(dirname(args$outputFile), "state_year_coverage_report.txt")
   cat("Writing coverage report to:", coverage_report_file, "\n")
@@ -507,6 +668,20 @@ main <- function() {
 
   cat("IMPORTANT: Records with (state, year) pairs found in MMWR but not in census will be DROPPED\n")
   cat("from analysis because population data is required for rate calculations.\n\n")
+  
+  cat("Population Consistency Check:\n")
+  cat("==============================\n")
+  if (exists("discrepancies") && nrow(discrepancies) > 0) {
+    cat("WARNING: Inconsistent population values found between bacterial and parasitic census data\n")
+    cat("The following state-year combinations show >1% difference:\n\n")
+    print(discrepancies[order(-discrepancies$pct_diff), ])
+    cat("\nRecommendation: Review source census files for data quality issues\n")
+  } else {
+    cat("✓ All population values are consistent between bacterial and parasitic census data\n")
+    cat("  Maximum difference: <1%\n") 
+    cat("  This validates that population inference across pathogen types is appropriate\n")
+  }
+  cat("\n")
 
   cat("End of report\n")
   sink()
