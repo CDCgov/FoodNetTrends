@@ -1054,8 +1054,27 @@ elif [[ "$workflow_mode" == "2" ]]; then
     # Set MMWR file to preprocessed data
     mmwrFile=$preprocessed_data
     
-    # Census files will be discovered via metadata file later, but tell the user
-    echo "Census files can be automatically discovered from the metadata file"
+    # Try to discover census files in the same directory as preprocessed data
+    preprocessed_dir=$(dirname "${preprocessed_data}")
+    preprocessed_basename=$(basename "${preprocessed_data}" .csv)
+    
+    # Look for preprocessed census files with expected naming pattern
+    potential_census_b="${preprocessed_dir}/${preprocessed_basename}_census_bacterial.csv"
+    potential_census_p="${preprocessed_dir}/${preprocessed_basename}_census_parasitic.csv"
+    
+    if [[ -f "$potential_census_b" ]]; then
+        echo "Found preprocessed bacterial census file: $potential_census_b"
+        censusFileB="$potential_census_b"
+    fi
+    
+    if [[ -f "$potential_census_p" ]]; then
+        echo "Found preprocessed parasitic census file: $potential_census_p"
+        censusFileP="$potential_census_p"
+    fi
+    
+    if [[ -z "$censusFileB" || -z "$censusFileP" ]]; then
+        echo "Census files will be discovered from the metadata file"
+    fi
 
     # Search for preprocessed JSON metadata files
     echo ""
@@ -1122,22 +1141,49 @@ if [[ -n "${preprocessed_metadata}" && -f "${preprocessed_metadata}" ]]; then
         echo "Metadata contains Salmonella serotype information."
     fi
     
-    # Extract census file paths from metadata
-    census_bacterial_path=$(parse_metadata_json "${preprocessed_metadata}" "census_file_bacterial")
-    if [[ -n "$census_bacterial_path" && -f "$census_bacterial_path" ]]; then
-        echo "Found bacterial census file path in metadata: $census_bacterial_path"
-        if [[ -z "${censusFileB}" || ! -f "${censusFileB}" ]]; then
+    # Extract preprocessed census file paths from metadata
+    # These are now state-level aggregated files in the same directory as preprocessed data
+    preprocessed_dir=$(dirname "${preprocessed_data}")
+    
+    # Try new metadata fields first (preprocessed census files)
+    census_bacterial_filename=$(parse_metadata_json "${preprocessed_metadata}" "census_file_bacterial_preprocessed")
+    if [[ -n "$census_bacterial_filename" ]]; then
+        census_bacterial_path="${preprocessed_dir}/${census_bacterial_filename}"
+        if [[ -f "$census_bacterial_path" ]]; then
+            echo "Found preprocessed bacterial census file: $census_bacterial_path"
             censusFileB="$census_bacterial_path"
-            echo "Using bacterial census file from metadata"
+            echo "Using preprocessed bacterial census file (state-level aggregated)"
         fi
     fi
     
-    census_parasitic_path=$(parse_metadata_json "${preprocessed_metadata}" "census_file_parasitic")
-    if [[ -n "$census_parasitic_path" && -f "$census_parasitic_path" ]]; then
-        echo "Found parasitic census file path in metadata: $census_parasitic_path"
-        if [[ -z "${censusFileP}" || ! -f "${censusFileP}" ]]; then
+    # If not found, try legacy metadata fields (raw census paths)
+    if [[ -z "${censusFileB}" || ! -f "${censusFileB}" ]]; then
+        census_bacterial_path=$(parse_metadata_json "${preprocessed_metadata}" "census_file_bacterial")
+        if [[ -n "$census_bacterial_path" && -f "$census_bacterial_path" ]]; then
+            echo "Warning: Using legacy raw census file path from metadata: $census_bacterial_path"
+            echo "Note: This may cause join issues - consider re-preprocessing"
+            censusFileB="$census_bacterial_path"
+        fi
+    fi
+    
+    # Same for parasitic census
+    census_parasitic_filename=$(parse_metadata_json "${preprocessed_metadata}" "census_file_parasitic_preprocessed")
+    if [[ -n "$census_parasitic_filename" ]]; then
+        census_parasitic_path="${preprocessed_dir}/${census_parasitic_filename}"
+        if [[ -f "$census_parasitic_path" ]]; then
+            echo "Found preprocessed parasitic census file: $census_parasitic_path"
             censusFileP="$census_parasitic_path"
-            echo "Using parasitic census file from metadata"
+            echo "Using preprocessed parasitic census file (state-level aggregated)"
+        fi
+    fi
+    
+    # If not found, try legacy metadata fields
+    if [[ -z "${censusFileP}" || ! -f "${censusFileP}" ]]; then
+        census_parasitic_path=$(parse_metadata_json "${preprocessed_metadata}" "census_file_parasitic")
+        if [[ -n "$census_parasitic_path" && -f "$census_parasitic_path" ]]; then
+            echo "Warning: Using legacy raw census file path from metadata: $census_parasitic_path"
+            echo "Note: This may cause join issues - consider re-preprocessing"
+            censusFileP="$census_parasitic_path"
         fi
     fi
     

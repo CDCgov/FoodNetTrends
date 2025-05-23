@@ -532,6 +532,42 @@ cyclospora_analysis <- function(mmwrdata, census) {
   
   message("Number of parasitic census records: ", nrow(census_parasitic))
   
+  # Check if census data needs aggregation (county to state level)
+  # Preprocessed census files are already state-level, raw files need aggregation
+  needs_aggregation <- FALSE
+  
+  # Check for county-level indicators
+  if ("county" %in% tolower(names(census_parasitic)) || 
+      "cofip" %in% tolower(names(census_parasitic)) ||
+      "n_counties" %in% names(census_parasitic)) {
+    # If n_counties exists, data is already aggregated from preprocessing
+    if ("n_counties" %in% names(census_parasitic)) {
+      message("Census data is already aggregated to state level (from preprocessing)")
+    } else {
+      needs_aggregation <- TRUE
+      message("Census data appears to be county-level, aggregation needed")
+    }
+  }
+  
+  if (needs_aggregation) {
+    # PIPELINE FIX: Aggregate county-level census to state-level to prevent join duplication
+    # Raw census files contain county-level rows causing massive row multiplication during join
+    message("Aggregating census data to state-year level")
+    pre_agg_rows <- nrow(census_parasitic)
+    
+    census_parasitic <- census_parasitic %>%
+      group_by(state, year) %>%
+      summarise(
+        population = sum(population, na.rm = TRUE),
+        pathogentype = first(pathogentype),
+        n_counties = n(),  # Track aggregation
+        .groups = "drop"
+      )
+    message("Census records: aggregated ", pre_agg_rows, " county records to ", nrow(census_parasitic), " state records")
+  } else {
+    message("Census data is already at state level, no aggregation needed")
+  }
+  
   if (nrow(census_parasitic) == 0) {
     warning("No parasitic census records found after filtering. Using all census records.")
     census_parasitic <- census

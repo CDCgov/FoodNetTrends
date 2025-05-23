@@ -206,19 +206,19 @@ generate_metadata <- function(data, source_file, census_file_b = NULL, census_fi
     record_count = nrow(data)
   )
   
-  # Add census file paths to metadata if available - ensuring they are stored as strings
+  # Add preprocessed census file paths to metadata - these are state-level aggregated files
   if (!is.null(census_file_b)) {
-    cat("Adding bacterial census file path to metadata:", census_file_b, "\n")
-    # Ensure the path is stored as a simple string, not an array
-    metadata$census_file_bacterial <- as.character(normalizePath(census_file_b, mustWork = FALSE))
-    cat("Bacterial census path type:", class(metadata$census_file_bacterial), "\n")
+    cat("Adding preprocessed bacterial census file path to metadata:", census_file_b, "\n")
+    # Store relative path from output directory for portability
+    metadata$census_file_bacterial_preprocessed <- basename(census_file_b)
+    cat("Bacterial census path stored as:", metadata$census_file_bacterial_preprocessed, "\n")
   }
   
   if (!is.null(census_file_p)) {
-    cat("Adding parasitic census file path to metadata:", census_file_p, "\n")
-    # Ensure the path is stored as a simple string, not an array
-    metadata$census_file_parasitic <- as.character(normalizePath(census_file_p, mustWork = FALSE))
-    cat("Parasitic census path type:", class(metadata$census_file_parasitic), "\n")
+    cat("Adding preprocessed parasitic census file path to metadata:", census_file_p, "\n")
+    # Store relative path from output directory for portability  
+    metadata$census_file_parasitic_preprocessed <- basename(census_file_p)
+    cat("Parasitic census path stored as:", metadata$census_file_parasitic_preprocessed, "\n")
   }
   
   # Add counts for basic statistics
@@ -347,12 +347,112 @@ main <- function() {
     return(census_data)
   }
   
+  # Extract base name early for census file naming
+  output_base <- tools::file_path_sans_ext(basename(args$outputFile))
+  output_dir <- dirname(args$outputFile)
+  
   # Process both census files
   census_b <- standardize_census(args$censusFileB, "Bacterial")
   census_p <- standardize_census(args$censusFileP, "Parasitic")
   
-  # Combine data for analysis
-  census <- dplyr::bind_rows(census_b, census_p)
+  # PIPELINE FIX: Aggregate county-level census to state-level to prevent join issues
+  # Census files contain county-level data but analysis requires state-level totals
+  # This aggregation prevents row multiplication during joins in downstream analysis
+  cat("\nAggregating census data from county to state level...\n")
+  
+  # Aggregate bacterial census to state-year level
+  census_b_state <- census_b %>%
+    dplyr::group_by(state, year, pathogentype) %>%
+    dplyr::summarise(
+      population = sum(population, na.rm = TRUE),
+      n_counties = dplyr::n(),  # Track aggregation for validation
+      .groups = "drop"
+    )
+  cat(paste("Bacterial census: aggregated", nrow(census_b), "county records to", nrow(census_b_state), "state records\n"))
+  
+  # Aggregate parasitic census to state-year level  
+  census_p_state <- census_p %>%
+    dplyr::group_by(state, year, pathogentype) %>%
+    dplyr::summarise(
+      population = sum(population, na.rm = TRUE),
+      n_counties = dplyr::n(),  # Track aggregation for validation
+      .groups = "drop"
+    )
+  cat(paste("Parasitic census: aggregated", nrow(census_p), "county records to", nrow(census_p_state), "state records\n"))
+  
+  # Save preprocessed census files for downstream analysis
+  census_b_filename <- paste0(output_base, "_census_bacterial.csv")
+  census_b_path <- file.path(output_dir, census_b_filename)
+  cat("Saving preprocessed bacterial census to:", census_b_path, "\n")
+  write.csv(census_b_state, census_b_path, row.names = FALSE)
+  
+  # Save parasitic census
+  census_p_filename <- paste0(output_base, "_census_parasitic.csv")
+  census_p_path <- file.path(output_dir, census_p_filename)
+  cat("Saving preprocessed parasitic census to:", census_p_path, "\n")
+  write.csv(census_p_state, census_p_path, row.names = FALSE)
+  
+  # VALIDATION: Verify census aggregation worked correctly
+  cat("\n=== Census Preprocessing Validation ===\n")
+  
+  # Check bacterial census
+  if (file.exists(census_b_path)) {
+    saved_census_b <- read.csv(census_b_path)
+    cat("✓ Bacterial census file created:\n")
+    cat("  - Records:", nrow(saved_census_b), "(from", nrow(census_b), "county records)\n")
+    cat("  - States:", length(unique(saved_census_b$state)), "\n")
+    cat("  - Years:", paste(range(saved_census_b$year), collapse="-"), "\n")
+    cat("  - Has n_counties column:", "n_counties" %in% names(saved_census_b), "\n")
+    
+    # Verify no county-level columns remain
+    county_cols <- grep("county|cofip|fips", tolower(names(saved_census_b)), value = TRUE)
+    if (length(county_cols) > 0) {
+      cat("  ⚠ WARNING: County-level columns still present:", paste(county_cols, collapse=", "), "\n")
+    }
+  } else {
+    cat("✗ ERROR: Bacterial census file not created!\n")
+  }
+  
+  # Check parasitic census  
+  if (file.exists(census_p_path)) {
+    saved_census_p <- read.csv(census_p_path)
+    cat("\n✓ Parasitic census file created:\n")
+    cat("  - Records:", nrow(saved_census_p), "(from", nrow(census_p), "county records)\n")
+    cat("  - States:", length(unique(saved_census_p$state)), "\n")
+    cat("  - Years:", paste(range(saved_census_p$year), collapse="-"), "\n")
+    cat("  - Has n_counties column:", "n_counties" %in% names(saved_census_p), "\n")
+    
+    # Verify no county-level columns remain
+    county_cols <- grep("county|cofip|fips", tolower(names(saved_census_p)), value = TRUE)
+    if (length(county_cols) > 0) {
+      cat("  ⚠ WARNING: County-level columns still present:", paste(county_cols, collapse=", "), "\n")
+    }
+  } else {
+    cat("✗ ERROR: Parasitic census file not created!\n")
+  }
+  
+  # Validate aggregation ratios
+  if (nrow(census_b) > 0 && nrow(census_b_state) > 0) {
+    aggregation_ratio_b <- round(nrow(census_b) / nrow(census_b_state), 1)
+    cat("\n✓ Bacterial aggregation ratio:", aggregation_ratio_b, "counties per state-year\n")
+    if (aggregation_ratio_b < 1.5) {
+      cat("  ⚠ WARNING: Low aggregation ratio - data may already be state-level\n")
+    }
+  }
+  
+  if (nrow(census_p) > 0 && nrow(census_p_state) > 0) {
+    aggregation_ratio_p <- round(nrow(census_p) / nrow(census_p_state), 1)
+    cat("✓ Parasitic aggregation ratio:", aggregation_ratio_p, "counties per state-year\n")
+    if (aggregation_ratio_p < 1.5) {
+      cat("  ⚠ WARNING: Low aggregation ratio - data may already be state-level\n")
+    }
+  }
+  
+  cat("\n✓ Census preprocessing validation complete\n")
+  cat("=====================================\n")
+  
+  # Combine for validation checks (using state-level data now)
+  census <- dplyr::bind_rows(census_b_state, census_p_state)
   census_pairs <- unique(census[, c("state", "year")])
   cleaned_data$state <- toupper(as.character(cleaned_data$state))
   cleaned_data$year <- as.numeric(as.character(cleaned_data$year))
@@ -411,9 +511,7 @@ main <- function() {
   cat("End of report\n")
   sink()
 
-  # Extract base name without extension for consistent naming
-  output_base <- tools::file_path_sans_ext(basename(args$outputFile))
-  output_dir <- dirname(args$outputFile)
+  # Note: output_base and output_dir already extracted earlier for census files
   
   # Generate metadata if requested
   if(args$generate_metadata) {
@@ -421,12 +519,13 @@ main <- function() {
     metadata_filename <- get_output_filename(output_base, "metadata", "json")
     metadata_file <- file.path(output_dir, metadata_filename)
     
-    # Generate metadata with census file paths
+    # Generate metadata with preprocessed census file paths
+    # Pass the paths to the aggregated state-level census files
     metadata <- generate_metadata(
       cleaned_data, 
       args$mmwrFile,
-      args$censusFileB,  # Pass bacterial census file path
-      args$censusFileP   # Pass parasitic census file path
+      census_b_path,  # Pass preprocessed bacterial census file path
+      census_p_path   # Pass preprocessed parasitic census file path
     )
     
     # Write metadata JSON
@@ -444,6 +543,26 @@ main <- function() {
       cat("Metadata saved to:", metadata_file, "\n")
     }
   }
+  
+  # Final preprocessing summary
+  cat("\n========== Preprocessing Summary ==========\n")
+  cat("MMWR data:", args$outputFile, "\n")
+  cat("  - Records:", nrow(cleaned_data), "\n")
+  cat("  - Pathogens:", length(unique(cleaned_data$pathogen)), "\n")
+  cat("  - States:", length(unique(cleaned_data$state)), "\n")
+  cat("  - Years:", paste(range(cleaned_data$year, na.rm=TRUE), collapse="-"), "\n")
+  
+  cat("\nCensus files (preprocessed):\n")
+  cat("  - Bacterial:", census_b_path, "\n")
+  cat("  - Parasitic:", census_p_path, "\n")
+  
+  if(args$generate_metadata && exists("metadata_file")) {
+    cat("\nMetadata file:", metadata_file, "\n")
+    cat("  - Contains preprocessed census paths: YES\n")
+  }
+  
+  cat("\n✓ All files ready for analysis pipeline\n")
+  cat("==========================================\n")
 }
 
 # Run the main function
