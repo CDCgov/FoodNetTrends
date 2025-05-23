@@ -1011,6 +1011,24 @@ if [[ "$workflow_mode" == "1" ]]; then
     # Set the MMWR file for analysis to the preprocessed data
     mmwrFile=$preprocessed_data
     
+    # Update census files to use preprocessed (aggregated) versions created during preprocessing
+    # This ensures analysis uses state-level data instead of county-level raw data
+    preprocessed_dir=$(dirname "${preprocessed_data}")
+    preprocessed_basename=$(basename "${preprocessed_data}" .csv)
+    
+    potential_census_b="${preprocessed_dir}/${preprocessed_basename}_census_bacterial.csv"
+    potential_census_p="${preprocessed_dir}/${preprocessed_basename}_census_parasitic.csv"
+    
+    if [[ -f "$potential_census_b" ]]; then
+        echo "Switching to preprocessed bacterial census file: $potential_census_b"
+        censusFileB="$potential_census_b"
+    fi
+    
+    if [[ -f "$potential_census_p" ]]; then
+        echo "Switching to preprocessed parasitic census file: $potential_census_p"
+        censusFileP="$potential_census_p"
+    fi
+    
 # Mode 2: Use existing preprocessed data
 elif [[ "$workflow_mode" == "2" ]]; then
     echo ""
@@ -1217,6 +1235,14 @@ fi
 # Clean up any leading commas from pathogen list
 ALL_PATHOGENS=$(echo "$ALL_PATHOGENS" | sed 's/^,//')
 
+# Validate all files after census file discovery is complete
+echo ""
+echo "======== File Validation ========"
+if ! validate_required_files; then
+    echo "Cannot proceed with missing or invalid files. Please check the file paths and try again."
+    exit 1
+fi
+
 # Get travel status filter
 echo ""
 echo "======== Travel Status Filter ========"
@@ -1272,14 +1298,6 @@ case $cidt_choice in
         cidt="CIDT+,CX+,PARASITIC"
         ;;
 esac
-
-# Validate all files before proceeding with analysis
-echo ""
-echo "======== File Validation ========"
-if ! validate_required_files; then
-    echo "Cannot proceed with missing or invalid files. Please check the file paths and try again."
-    exit 1
-fi
 
 # Get pathogen selection
 echo ""
