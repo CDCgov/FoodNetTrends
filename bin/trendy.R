@@ -191,7 +191,7 @@ tryCatch({
   if (file.exists(progress_path)) {
     source(progress_path)
     cat("Progress tracking enabled using milestone-based progress bars\n")
-    has_progress_tracking <- TRUE
+    has_progress_tracking <- FALSE  # Disabled due to brms callback incompatibility
   } else {
     # Define fallback log_message function if progress.R is not found
     log_message <- function(stage, message=NULL, ...) {

@@ -1018,7 +1018,13 @@ elif [[ "$workflow_mode" == "2" ]]; then
 
     # Search for preprocessed CSV files
     echo "Searching for preprocessed CSV files..."
-    mapfile -t found_csv < <(find . -type f -path "*/preprocessed/*.csv" -o -path "preprocessed_*/preprocessed/*.csv" 2>/dev/null)
+    mapfile -t found_csv < <(find . -type f \( \
+        -path "*/preprocessed/*.csv" -o \
+        -path "preprocessed_*/preprocessed/*.csv" -o \
+        -path "preprocessed_*/*.csv" -o \
+        -name "*preprocessed*.csv" -o \
+        -name "*mmwr*.csv" \
+        \) 2>/dev/null)
     if [[ ${#found_csv[@]} -gt 0 ]]; then
         echo "Found the following preprocessed CSV files:"
         for i in "${!found_csv[@]}"; do
