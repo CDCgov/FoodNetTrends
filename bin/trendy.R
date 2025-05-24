@@ -519,6 +519,23 @@ if (pathogen == "CYCLOSPORA") {
     # Filter for Cyclospora cases
     pathogen_data <- mmwrdata[toupper(mmwrdata$pathogen) == "CYCLOSPORA", ]
     
+    # Apply states filtering if specified
+    if (!is.null(args$states) && args$states != "ALL") {
+      # Split comma-separated states
+      target_states <- trimws(unlist(strsplit(args$states, ",")))
+      log_message("INFO", paste("Filtering data for states:", paste(target_states, collapse=", ")))
+      
+      # Check if state column exists
+      if ("state" %in% names(pathogen_data)) {
+        initial_count <- nrow(pathogen_data)
+        pathogen_data <- pathogen_data[toupper(pathogen_data$state) %in% toupper(target_states), ]
+        final_count <- nrow(pathogen_data)
+        log_message("INFO", paste("States filtering reduced data from", initial_count, "to", final_count, "cases"))
+      } else {
+        log_message("WARNING", "State column not found - states filtering skipped")
+      }
+    }
+    
     # Check if we have any data
     if (nrow(pathogen_data) == 0) {
       log_message("ERROR", "No Cyclospora data found in dataset")
@@ -644,6 +661,23 @@ if (pathogen == "CYCLOSPORA") {
       }
     }
     
+    # Apply states filtering if specified
+    if (!is.null(args$states) && args$states != "ALL") {
+      # Split comma-separated states
+      target_states <- trimws(unlist(strsplit(args$states, ",")))
+      log_message("INFO", paste("Filtering data for states:", paste(target_states, collapse=", ")))
+      
+      # Check if state column exists
+      if ("state" %in% names(pathogen_data)) {
+        initial_count <- nrow(pathogen_data)
+        pathogen_data <- pathogen_data[toupper(pathogen_data$state) %in% toupper(target_states), ]
+        final_count <- nrow(pathogen_data)
+        log_message("INFO", paste("States filtering reduced data from", initial_count, "to", final_count, "cases"))
+      } else {
+        log_message("WARNING", "State column not found - states filtering skipped")
+      }
+    }
+    
     # Check if we have any data
     if (nrow(pathogen_data) == 0) {
       log_message("ERROR", paste("No", pathogen, "data found in dataset"))
@@ -740,6 +774,23 @@ if (pathogen == "CYCLOSPORA") {
       } else {
         log_message("WARNING", "Serogroup column not found - serogroup filtering skipped")
       }
+    }
+  }
+  
+  # Apply states filtering if specified
+  if (!is.null(args$states) && args$states != "ALL") {
+    # Split comma-separated states
+    target_states <- trimws(unlist(strsplit(args$states, ",")))
+    log_message("INFO", paste("Filtering data for states:", paste(target_states, collapse=", ")))
+    
+    # Check if state column exists
+    if ("state" %in% names(pathogen_data)) {
+      initial_count <- nrow(pathogen_data)
+      pathogen_data <- pathogen_data[toupper(pathogen_data$state) %in% toupper(target_states), ]
+      final_count <- nrow(pathogen_data)
+      log_message("INFO", paste("States filtering reduced data from", initial_count, "to", final_count, "cases"))
+    } else {
+      log_message("WARNING", "State column not found - states filtering skipped")
     }
   }
   
@@ -975,17 +1026,36 @@ model_fit <- tryCatch({
       return(TRUE)  # Must return TRUE to continue sampling
     }
     
-    # Set informative priors for sparse data stability
-    # Using student_t priors for robustness with heavy tails
-    model_priors <- c(
-      # Prior for spline smoothness - controls wiggliness
-      # student_t(3, 0, 5) allows flexibility but prevents extreme values
-      prior(student_t(3, 0, 5), class = sds),
-      # Prior for intercept - centered around reasonable log counts
-      prior(normal(0, 5), class = Intercept),
-      # Prior for fixed effects
-      prior(normal(0, 2), class = b)
-    )
+    # Calculate empirical properties of the data for data-driven prior specification
+    # Paper specifies priors should scale with "standard deviation of transformed response"
+    log_counts <- log(analysis_data$count + 1)  # Add 1 to handle zeros
+    empirical_sd <- sd(log_counts, na.rm = TRUE)
+    empirical_mean <- mean(log_counts, na.rm = TRUE)
+    
+    # Set priors based on empirical data properties
+    if (empirical_sd > 5) {
+      # High variance data requires more conservative priors
+      log_message("INFO", paste("High variance detected (SD=", round(empirical_sd, 2), 
+                               ") - using conservative priors"))
+      model_priors <- c(
+        # Spline smoothness prior scaled to data variance
+        prior(student_t(3, 0, empirical_sd), class = sds),
+        # Intercept centered on empirical mean
+        prior(normal(empirical_mean, empirical_sd), class = Intercept),
+        # Fixed effects constrained relative to data scale
+        prior(normal(0, empirical_sd/2), class = b)
+      )
+    } else {
+      # Standard priors for well-behaved data
+      model_priors <- c(
+        prior(student_t(3, 0, 5), class = sds),
+        prior(normal(0, 5), class = Intercept),
+        prior(normal(0, 2), class = b)
+      )
+    }
+    
+    log_message("INFO", paste("Prior specification based on data: mean=", 
+                             round(empirical_mean, 2), ", sd=", round(empirical_sd, 2)))
     
     log_message("INFO", "CONFIGURATION: Using informative priors:")
     log_message("INFO", "  - student_t(3, 0, 5) for spline smoothness (sds)")
@@ -1011,12 +1081,36 @@ model_fit <- tryCatch({
       callback = mcmc_progress
     )
   } else {
-    # Set informative priors for sparse data stability
-    model_priors <- c(
-      prior(student_t(3, 0, 5), class = sds),
-      prior(normal(0, 5), class = Intercept),
-      prior(normal(0, 2), class = b)
-    )
+    # Calculate empirical properties of the data for data-driven prior specification
+    # Paper specifies priors should scale with "standard deviation of transformed response"
+    log_counts <- log(analysis_data$count + 1)  # Add 1 to handle zeros
+    empirical_sd <- sd(log_counts, na.rm = TRUE)
+    empirical_mean <- mean(log_counts, na.rm = TRUE)
+    
+    # Set priors based on empirical data properties
+    if (empirical_sd > 5) {
+      # High variance data requires more conservative priors
+      log_message("INFO", paste("High variance detected (SD=", round(empirical_sd, 2), 
+                               ") - using conservative priors"))
+      model_priors <- c(
+        # Spline smoothness prior scaled to data variance
+        prior(student_t(3, 0, empirical_sd), class = sds),
+        # Intercept centered on empirical mean
+        prior(normal(empirical_mean, empirical_sd), class = Intercept),
+        # Fixed effects constrained relative to data scale
+        prior(normal(0, empirical_sd/2), class = b)
+      )
+    } else {
+      # Standard priors for well-behaved data
+      model_priors <- c(
+        prior(student_t(3, 0, 5), class = sds),
+        prior(normal(0, 5), class = Intercept),
+        prior(normal(0, 2), class = b)
+      )
+    }
+    
+    log_message("INFO", paste("Prior specification based on data: mean=", 
+                             round(empirical_mean, 2), ", sd=", round(empirical_sd, 2)))
     
     log_message("INFO", "CONFIGURATION: Using informative priors:")
     log_message("INFO", "  - student_t(3, 0, 5) for spline smoothness (sds)")
