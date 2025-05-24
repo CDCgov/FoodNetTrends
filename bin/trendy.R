@@ -1244,41 +1244,110 @@ ir_data <- tryCatch({
     state_pops <- aggregate(population ~ state, data = analysis_data, FUN = mean)
     pred_grid <- merge(pred_grid, state_pops, by = "state")
     
-    # Extract smooth predictions from fitted Bayesian model
-    # fitted() returns posterior mean and credible intervals
+    # CRITICAL FIX: Use posterior_epred to get predictions on response scale
+    # This avoids the astronomical values caused by exponentiating log-scale predictions
     fitted_summary <- tryCatch({
-      fitted(model_fit, newdata = pred_grid, summary = TRUE, allow_new_levels = TRUE)
-    }, error = function(e) {
-      log_message("WARNING", paste("Model prediction failed, trying fallback approaches:", e$message))
+      # Use posterior_epred to get predictions on response scale (counts)
+      epred_matrix <- posterior_epred(model_fit, 
+                                      newdata = pred_grid, 
+                                      re_formula = NA)  # Include all effects
       
-      # Try simpler prediction approach
+      # Summarize posterior draws
+      data.frame(
+        Estimate = apply(epred_matrix, 2, median),
+        Q2.5 = apply(epred_matrix, 2, quantile, probs = 0.025),
+        Q97.5 = apply(epred_matrix, 2, quantile, probs = 0.975)
+      ) %>% as.matrix()
+      
+    }, error = function(e) {
+      log_message("WARNING", paste("posterior_epred failed, trying predict():", e$message))
+      
+      # Fallback to predict with response type
       tryCatch({
-        predict(model_fit, newdata = pred_grid, summary = TRUE, allow_new_levels = TRUE)
+        predictions <- predict(model_fit, 
+                              newdata = pred_grid, 
+                              type = "response",
+                              summary = TRUE)
+        
+        # Format as matrix
+        if (is.matrix(predictions)) {
+          predictions
+        } else {
+          cbind(
+            Estimate = predictions[,"Estimate"],
+            Q2.5 = predictions[,"Q2.5"],
+            Q97.5 = predictions[,"Q97.5"]
+          )
+        }
       }, error = function(e2) {
-        log_message("WARNING", "All prediction methods failed, using linear trend fallback")
+        log_message("WARNING", paste("predict() also failed:", e2$message))
+        log_message("WARNING", "Using fitted() with manual transformation as last resort")
         
-        # Implement simple linear trend as backup
-        linear_trend <- lm(count ~ year + state + offset(log(population)), data = analysis_data)
-        linear_pred <- predict(linear_trend, newdata = pred_grid, se.fit = TRUE)
-        
-        # Convert to summary format similar to brms
-        fitted_df <- data.frame(
-          Estimate = linear_pred$fit,
-          Q2.5 = linear_pred$fit - 1.96 * linear_pred$se.fit,
-          Q97.5 = linear_pred$fit + 1.96 * linear_pred$se.fit
-        )
-        
-        log_message("INFO", "Using linear trend fallback for spline visualization")
-        return(as.matrix(fitted_df))
+        # Last resort: use fitted() but cap the exponential transformation
+        tryCatch({
+          fitted_vals <- fitted(model_fit, newdata = pred_grid, summary = TRUE, allow_new_levels = TRUE)
+          
+          # fitted() returns log-scale predictions, so we need to transform
+          # But cap the values before exponentiating to prevent overflow
+          log_predictions <- fitted_vals[, "Estimate"]
+          log_lower <- fitted_vals[, "Q2.5"]
+          log_upper <- fitted_vals[, "Q97.5"]
+          
+          # Cap log values at reasonable maximum (log of 1 million)
+          max_log_val <- log(1e6)
+          log_predictions <- pmin(log_predictions, max_log_val)
+          log_lower <- pmin(log_lower, max_log_val)
+          log_upper <- pmin(log_upper, max_log_val)
+          
+          # Now safe to exponentiate
+          cbind(
+            Estimate = exp(log_predictions),
+            Q2.5 = exp(log_lower),
+            Q97.5 = exp(log_upper)
+          )
+        }, error = function(e3) {
+          log_message("WARNING", "All prediction methods failed, using linear trend fallback")
+          
+          # Implement simple linear trend as backup
+          linear_trend <- lm(count ~ year + state + offset(log(population)), data = analysis_data)
+          linear_pred <- predict(linear_trend, newdata = pred_grid, se.fit = TRUE)
+          
+          # Convert to summary format similar to brms
+          fitted_df <- data.frame(
+            Estimate = linear_pred$fit,
+            Q2.5 = linear_pred$fit - 1.96 * linear_pred$se.fit,
+            Q97.5 = linear_pred$fit + 1.96 * linear_pred$se.fit
+          )
+          
+          log_message("INFO", "Using linear trend fallback for spline visualization")
+          return(as.matrix(fitted_df))
+        })
       })
     })
     
     if (!is.null(fitted_summary)) {
-      # Convert predictions to incidence rates (per 100,000)
-      pred_grid$predicted_count <- exp(fitted_summary[, "Estimate"])
+      # Predictions are now counts (not log counts)
+      pred_grid$predicted_count <- fitted_summary[, "Estimate"]
+      
+      # Cap predictions at reasonable maximum
+      # No more than 10% of population can be infected
+      max_count <- pred_grid$population * 0.1
+      pred_grid$predicted_count <- pmin(pred_grid$predicted_count, max_count)
+      
+      # Also cap the confidence intervals
+      fitted_summary[, "Q2.5"] <- pmin(fitted_summary[, "Q2.5"], max_count)
+      fitted_summary[, "Q97.5"] <- pmin(fitted_summary[, "Q97.5"], max_count)
+      
+      # Calculate incidence rates (per 100,000)
       pred_grid$ir <- (pred_grid$predicted_count / pred_grid$population) * 100000
-      pred_grid$ir_lower <- (exp(fitted_summary[, "Q2.5"]) / pred_grid$population) * 100000
-      pred_grid$ir_upper <- (exp(fitted_summary[, "Q97.5"]) / pred_grid$population) * 100000
+      pred_grid$ir_lower <- (fitted_summary[, "Q2.5"] / pred_grid$population) * 100000
+      pred_grid$ir_upper <- (fitted_summary[, "Q97.5"] / pred_grid$population) * 100000
+      
+      # Final safety check - cap rates at 100,000 per 100,000 (100%)
+      pred_grid$ir <- pmin(pred_grid$ir, 100000)
+      pred_grid$ir_lower <- pmin(pred_grid$ir_lower, 100000)
+      pred_grid$ir_upper <- pmin(pred_grid$ir_upper, 100000)
+      
       pred_grid$type <- "spline_trend"
       
       # Include original observed data points
@@ -1300,8 +1369,26 @@ ir_data <- tryCatch({
       
       log_message("INFO", paste("Generated", nrow(pred_grid), "spline trend points and", 
                                nrow(observed_data), "observed data points"))
+      
+      # Log diagnostic information about the predictions
+      max_ir <- max(ir_results$ir, na.rm = TRUE)
+      if (max_ir > 10000) {
+        log_message("WARNING", paste("Maximum incidence rate is very high:", round(max_ir, 2), "per 100,000"))
+        log_message("WARNING", "This may indicate a data quality issue or modeling problem")
+      } else {
+        log_message("INFO", paste("Maximum incidence rate:", round(max_ir, 2), "per 100,000 (reasonable)"))
+      }
+      
+      # Check for any remaining Inf values
+      inf_count <- sum(is.infinite(ir_results$ir))
+      if (inf_count > 0) {
+        log_message("WARNING", paste("Found", inf_count, "infinite values in predictions - replacing with NA"))
+        ir_results$ir[is.infinite(ir_results$ir)] <- NA
+        ir_results$ir_lower[is.infinite(ir_results$ir_lower)] <- NA
+        ir_results$ir_upper[is.infinite(ir_results$ir_upper)] <- NA
+      }
     } else {
-      # Fallback if model prediction fails
+      # Fallback if model prediction fails entirely
       log_message("WARNING", "Falling back to observed data only")
       years <- sort(unique(analysis_data$year))
       states <- unique(analysis_data$state)
@@ -1753,3 +1840,4 @@ if (exists("has_progress_tracking") && has_progress_tracking) {
 } else {
   log_message("COMPLETE", paste("FoodNetTrends analysis completed successfully for", pathogen))
 }
+                
