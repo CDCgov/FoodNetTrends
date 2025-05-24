@@ -942,7 +942,21 @@ data_quality <- validate_data_quality(analysis_data, pathogen)
 # Fit model with error handling
 model_fit <- tryCatch({
   # Set up model formula
-  formula <- count ~ s(year, by = state) + state + offset(log(population))
+  # Use adaptive basis dimension based on data availability
+  # This helps prevent overfitting in sparse data regions
+  years_per_state <- analysis_data %>%
+    group_by(state) %>%
+    summarise(n_years = n_distinct(year)) %>%
+    pull(n_years)
+  
+  # Set k (basis dimension) adaptively - minimum 4, maximum 10
+  # Lower k for states with less data prevents wild extrapolation
+  k_value <- min(10, max(4, floor(min(years_per_state) * 0.8)))
+  
+  # Formula with constrained basis dimension
+  formula <- as.formula(sprintf("count ~ s(year, by = state, k = %d) + state + offset(log(population))", k_value))
+  
+  log_message("INFO", paste("Using adaptive spline basis dimension k =", k_value, "based on data availability"))
   
   # Set up MCMC callback for progress tracking
   if (exists("has_progress_tracking") && has_progress_tracking) {
@@ -958,11 +972,24 @@ model_fit <- tryCatch({
       return(TRUE)  # Must return TRUE to continue sampling
     }
     
+    # Set informative priors for sparse data stability
+    # Using student_t priors for robustness with heavy tails
+    model_priors <- c(
+      # Prior for spline smoothness - controls wiggliness
+      # student_t(3, 0, 5) allows flexibility but prevents extreme values
+      prior(student_t(3, 0, 5), class = sds),
+      # Prior for intercept - centered around reasonable log counts
+      prior(normal(0, 5), class = Intercept),
+      # Prior for fixed effects
+      prior(normal(0, 2), class = b)
+    )
+    
     # Fit model with progress callback using command-line parameters
     brm(
       formula = formula,
       data = analysis_data,
       family = "negbinomial",
+      prior = model_priors,
       cores = args$cores,
       chains = args$chains,
       iter = args$iterations,
@@ -976,11 +1003,19 @@ model_fit <- tryCatch({
       callback = mcmc_progress
     )
   } else {
+    # Set informative priors for sparse data stability
+    model_priors <- c(
+      prior(student_t(3, 0, 5), class = sds),
+      prior(normal(0, 5), class = Intercept),
+      prior(normal(0, 2), class = b)
+    )
+    
     # Fit model without progress tracking using command-line parameters
     brm(
       formula = formula,
       data = analysis_data,
       family = "negbinomial",
+      prior = model_priors,
       cores = args$cores,
       chains = args$chains,
       iter = args$iterations,
