@@ -488,9 +488,9 @@ main <- function() {
   census_b <- standardize_census(args$censusFileB, "Bacterial")
   census_p <- standardize_census(args$censusFileP, "Parasitic")
   
-  # PIPELINE FIX: Aggregate county-level census to state-level to prevent join issues
-  # Census files contain county-level data but analysis requires state-level totals
-  # This aggregation prevents row multiplication during joins in downstream analysis
+  # Aggregate county-level census data to state-level totals for downstream analysis
+  # Census files contain county-level data but surveillance analysis requires state-level totals
+  # This aggregation ensures proper data structure for statistical modeling processes
   cat("\nAggregating census data from county to state level...\n")
   
   # Aggregate bacterial census to state-year level

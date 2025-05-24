@@ -787,22 +787,45 @@ echo "         v1.0.0-rc.1                    "
 echo "========================================="
 echo ""
 
-# Ask for workflow mode
-echo "Select workflow:"
-echo "1) Full analysis (raw data → preprocessing → analysis → dashboard)"
-echo "2) Analysis only (use existing preprocessed data)" 
-read -p "Enter selection [1]: " workflow_mode
-workflow_mode=${workflow_mode:-1}
+# Enhanced workflow selection with metadata-first approach
+echo "Select data input method:"
+echo "1) Load from metadata JSON (recommended - auto-loads all files)"
+echo "2) Manual file selection (raw data → preprocessing → analysis)"
+echo "3) Use existing preprocessed data (manual selection)"
+echo "4) Load saved configuration"
+read -p "Enter selection [1]: " input_method
+input_method=${input_method:-1}
 
-# Maintain backward compatibility with legacy mode numbering
-if [[ "$workflow_mode" == "3" ]]; then
-    workflow_mode=2
+# Map input method to workflow mode
+if [[ "$input_method" == "1" || "$input_method" == "3" ]]; then
+    workflow_mode=2  # Use existing preprocessed data
+elif [[ "$input_method" == "2" ]]; then
+    workflow_mode=1  # Full preprocessing
+elif [[ "$input_method" == "4" ]]; then
+    # Load saved configuration
+    echo ""
+    echo "Available configurations:"
+    if [[ -d "./configs" ]]; then
+        ls -1 ./configs/*.sh 2>/dev/null | nl -w2 -s') '
+        echo ""
+        read -p "Select configuration file number: " config_choice
+        config_file=$(ls -1 ./configs/*.sh 2>/dev/null | sed -n "${config_choice}p")
+        if [[ -f "$config_file" ]]; then
+            echo "Loading configuration from: $config_file"
+            source "$config_file"
+            # Configuration loaded, skip to parameter validation
+            workflow_mode=2
+        else
+            echo "Invalid selection. Starting manual setup."
+            input_method=2
+            workflow_mode=1
+        fi
+    else
+        echo "No saved configurations found. Starting manual setup."
+        input_method=2
+        workflow_mode=1
+    fi
 fi
-
-echo "Mode selected: $workflow_mode"
-
-# Data-driven discovery - no hardcoded lists
-# Pathogens and states will be discovered from metadata files
 
 # Initialize variables
 preprocessed_data=""
@@ -810,6 +833,91 @@ preprocessed_metadata=""
 mmwrFile=""
 censusFileB=""
 censusFileP=""
+
+# Handle metadata-first approach
+if [[ "$input_method" == "1" ]]; then
+    echo ""
+    echo "======== Metadata JSON Loading ========"
+    
+    # Find available metadata files
+    echo "Searching for metadata JSON files..."
+    mapfile -t found_json < <(find . -type f -name "*_metadata.json" 2>/dev/null | grep -E "(preprocessed|output)" | sort -r)
+    
+    if [[ ${#found_json[@]} -gt 0 ]]; then
+        echo "Found metadata files:"
+        for i in "${!found_json[@]}"; do
+            # Show file with modification time for context
+            mod_time=$(stat -c "%y" "${found_json[$i]}" 2>/dev/null | cut -d' ' -f1,2 | cut -d'.' -f1)
+            printf "%2d) %s (modified: %s)\n" $((i+1)) "${found_json[$i]}" "$mod_time"
+        done
+        echo ""
+        read -p "Select metadata file [1]: " json_choice
+        json_choice=${json_choice:-1}
+        
+        if [[ "$json_choice" -ge 1 && "$json_choice" -le ${#found_json[@]} ]]; then
+            preprocessed_metadata="${found_json[$((json_choice-1))]}"
+        else
+            echo "Invalid selection. Exiting."
+            exit 1
+        fi
+    else
+        read -p "Enter path to metadata JSON file: " preprocessed_metadata
+        if [[ ! -f "$preprocessed_metadata" ]]; then
+            echo "Metadata file not found. Exiting."
+            exit 1
+        fi
+    fi
+    
+    echo ""
+    echo "Loading data from metadata: $preprocessed_metadata"
+    echo ""
+    
+    # Extract all file paths from metadata
+    metadata_dir=$(dirname "$preprocessed_metadata")
+    
+    # Load MMWR data file
+    mmwr_filename=$(parse_metadata_json "$preprocessed_metadata" "output_file")
+    if [[ -n "$mmwr_filename" ]]; then
+        mmwrFile="${metadata_dir}/${mmwr_filename}"
+        if [[ ! -f "$mmwrFile" ]]; then
+            # Try without directory prefix
+            mmwrFile="$mmwr_filename"
+        fi
+        if [[ -f "$mmwrFile" ]]; then
+            echo "✓ MMWR data file: $mmwrFile"
+            preprocessed_data="$mmwrFile"
+        else
+            echo "✗ MMWR data file not found: $mmwr_filename"
+            exit 1
+        fi
+    fi
+    
+    # Load census files
+    census_b_file=$(parse_metadata_json "$preprocessed_metadata" "census_file_bacterial_preprocessed")
+    if [[ -n "$census_b_file" ]]; then
+        censusFileB="${metadata_dir}/${census_b_file}"
+        if [[ -f "$censusFileB" ]]; then
+            echo "✓ Bacterial census: $censusFileB"
+        else
+            echo "✗ Bacterial census not found: $census_b_file"
+            exit 1
+        fi
+    fi
+    
+    census_p_file=$(parse_metadata_json "$preprocessed_metadata" "census_file_parasitic_preprocessed")
+    if [[ -n "$census_p_file" ]]; then
+        censusFileP="${metadata_dir}/${census_p_file}"
+        if [[ -f "$censusFileP" ]]; then
+            echo "✓ Parasitic census: $censusFileP"
+        else
+            echo "✗ Parasitic census not found: $census_p_file"
+            exit 1
+        fi
+    fi
+    
+    # Skip directly to parameter collection
+    workflow_mode=2
+fi
 
 # Mode 1: Preprocessing
 if [[ "$workflow_mode" == "1" ]]; then
@@ -1210,80 +1318,60 @@ ALL_STATES=""
 
 # Load metadata if available
 has_metadata=false
-has_serotypes=false
+available_serotypes=""
+available_serogroups=""
 
 if [[ -n "${preprocessed_metadata}" && -f "${preprocessed_metadata}" ]]; then
-    echo "Using metadata file: ${preprocessed_metadata}"
     has_metadata=true
     
-    # Check if file contains serotypes
-    if grep -q "salmonella_serotypes" "${preprocessed_metadata}"; then
-        has_serotypes=true
-        echo "Metadata contains Salmonella serotype information."
-    fi
-    
-    # Extract preprocessed census file paths from metadata
-    # These are now state-level aggregated files in the same directory as preprocessed data
-    preprocessed_dir=$(dirname "${preprocessed_data}")
-    
-    # Try new metadata fields first (preprocessed census files)
-    census_bacterial_filename=$(parse_metadata_json "${preprocessed_metadata}" "census_file_bacterial_preprocessed")
-    if [[ -n "$census_bacterial_filename" ]]; then
-        census_bacterial_path="${preprocessed_dir}/${census_bacterial_filename}"
-        if [[ -f "$census_bacterial_path" ]]; then
-            echo "Found preprocessed bacterial census file: $census_bacterial_path"
-            censusFileB="$census_bacterial_path"
-            echo "Using preprocessed bacterial census file (state-level aggregated)"
+    # If not already loaded from metadata-first approach, load census files
+    if [[ "$input_method" != "1" ]]; then
+        echo ""
+        echo "======== Loading from Metadata ========"
+        preprocessed_dir=$(dirname "${preprocessed_data}")
+        
+        # Load census files from metadata
+        census_bacterial_filename=$(parse_metadata_json "${preprocessed_metadata}" "census_file_bacterial_preprocessed")
+        if [[ -n "$census_bacterial_filename" ]]; then
+            census_bacterial_path="${preprocessed_dir}/${census_bacterial_filename}"
+            if [[ -f "$census_bacterial_path" ]]; then
+                censusFileB="$census_bacterial_path"
+                echo "✓ Bacterial census loaded from metadata"
+            fi
+        fi
+        
+        census_parasitic_filename=$(parse_metadata_json "${preprocessed_metadata}" "census_file_parasitic_preprocessed")
+        if [[ -n "$census_parasitic_filename" ]]; then
+            census_parasitic_path="${preprocessed_dir}/${census_parasitic_filename}"
+            if [[ -f "$census_parasitic_path" ]]; then
+                censusFileP="$census_parasitic_path"
+                echo "✓ Parasitic census loaded from metadata"
+            fi
         fi
     fi
     
-    # If not found, try legacy metadata fields (raw census paths)
-    if [[ -z "${censusFileB}" || ! -f "${censusFileB}" ]]; then
-        census_bacterial_path=$(parse_metadata_json "${preprocessed_metadata}" "census_file_bacterial")
-        if [[ -n "$census_bacterial_path" && -f "$census_bacterial_path" ]]; then
-            echo "Warning: Using legacy raw census file path from metadata: $census_bacterial_path"
-            echo "Note: This may cause join issues - consider re-preprocessing"
-            censusFileB="$census_bacterial_path"
-        fi
-    fi
-    
-    # Same for parasitic census
-    census_parasitic_filename=$(parse_metadata_json "${preprocessed_metadata}" "census_file_parasitic_preprocessed")
-    if [[ -n "$census_parasitic_filename" ]]; then
-        census_parasitic_path="${preprocessed_dir}/${census_parasitic_filename}"
-        if [[ -f "$census_parasitic_path" ]]; then
-            echo "Found preprocessed parasitic census file: $census_parasitic_path"
-            censusFileP="$census_parasitic_path"
-            echo "Using preprocessed parasitic census file (state-level aggregated)"
-        fi
-    fi
-    
-    # If not found, try legacy metadata fields
-    if [[ -z "${censusFileP}" || ! -f "${censusFileP}" ]]; then
-        census_parasitic_path=$(parse_metadata_json "${preprocessed_metadata}" "census_file_parasitic")
-        if [[ -n "$census_parasitic_path" && -f "$census_parasitic_path" ]]; then
-            echo "Warning: Using legacy raw census file path from metadata: $census_parasitic_path"
-            echo "Note: This may cause join issues - consider re-preprocessing"
-            censusFileP="$census_parasitic_path"
-        fi
-    fi
-    
-    # Extract pathogens from metadata - this is the key functionality
+    # Extract available data from metadata
     metadata_pathogens=$(parse_metadata_json "${preprocessed_metadata}" "pathogens")
     if [ -n "$metadata_pathogens" ]; then
-        echo "Pathogens found in dataset: $metadata_pathogens"
         ALL_PATHOGENS="$metadata_pathogens"
     else
-        echo "Warning: Could not extract pathogens from metadata, using defaults"
+        ALL_PATHOGENS="SALMONELLA,CAMPYLOBACTER,SHIGA,STEC,CYCLOSPORA,LISTERIA,VIBRIO,YERSINIA"
     fi
     
-    # Extract states from metadata
     metadata_states=$(parse_metadata_json "${preprocessed_metadata}" "states")
     if [ -n "$metadata_states" ]; then
-        echo "States found in dataset: $metadata_states"
         ALL_STATES="$metadata_states"
-    else
-        echo "Warning: Could not extract states from metadata, using defaults"
+    fi
+    
+    # Load serotypes/serogroups from metadata
+    available_serotypes=$(parse_metadata_json "${preprocessed_metadata}" "salmonella_serotypes")
+    available_serogroups=$(parse_metadata_json "${preprocessed_metadata}" "stec_serogroups")
+    
+    if [[ -n "$available_serotypes" ]]; then
+        echo "✓ Salmonella serotypes available in metadata"
+    fi
+    if [[ -n "$available_serogroups" ]]; then
+        echo "✓ STEC serogroups available in metadata"
     fi
 fi
 
@@ -1508,19 +1596,19 @@ if [[ "$pathogens" == *"SALMONELLA"* ]]; then
     echo ""
     echo "--- Salmonella Serotype Selection ---"
     
-    # Discover available Salmonella serotypes from data
-    echo "Discovering Salmonella serotypes in your data..."
-    salmonella_serotype_list=$(discover_pathogen_subtypes "SALMONELLA" "$mmwrFile" "$preprocessed_metadata" "serotype")
-    if [[ -n "$salmonella_serotype_list" ]]; then
-        IFS=',' read -ra SALMONELLA_SEROTYPES_ARRAY <<< "$salmonella_serotype_list"
-        echo "Detected Salmonella serotypes in data:"
+    # Use metadata serotypes if available, otherwise discover from data
+    if [[ -n "$available_serotypes" ]]; then
+        IFS=',' read -ra SALMONELLA_SEROTYPES_ARRAY <<< "$available_serotypes"
+        echo "Available Salmonella serotypes (from metadata):"
         for i in "${!SALMONELLA_SEROTYPES_ARRAY[@]}"; do
             printf "%2d) %s\n" $((i+1)) "${SALMONELLA_SEROTYPES_ARRAY[$i]}"
         done
         echo "$(( ${#SALMONELLA_SEROTYPES_ARRAY[@]} + 1 ))) Enter a custom list manually"
         echo "$(( ${#SALMONELLA_SEROTYPES_ARRAY[@]} + 2 ))) Use all serotypes (no filtering)"
-        read -p "Select Salmonella serotypes (comma-separated indices, or $(( ${#SALMONELLA_SEROTYPES_ARRAY[@]} + 2 )) for all): " sal_sero_choice
-        if [[ -z "$sal_sero_choice" || "$sal_sero_choice" -eq $(( ${#SALMONELLA_SEROTYPES_ARRAY[@]} + 2 )) ]]; then
+        read -p "Select Salmonella serotypes (comma-separated indices, or $(( ${#SALMONELLA_SEROTYPES_ARRAY[@]} + 2 )) for all) [$(( ${#SALMONELLA_SEROTYPES_ARRAY[@]} + 2 ))]: " sal_sero_choice
+        sal_sero_choice=${sal_sero_choice:-$(( ${#SALMONELLA_SEROTYPES_ARRAY[@]} + 2 ))}
+        
+        if [[ "$sal_sero_choice" -eq $(( ${#SALMONELLA_SEROTYPES_ARRAY[@]} + 2 )) ]]; then
             salmonella_serotypes="ALL"
         elif [[ "$sal_sero_choice" -eq $(( ${#SALMONELLA_SEROTYPES_ARRAY[@]} + 1 )) ]]; then
             read -p "Enter Salmonella serotypes (comma-separated): " salmonella_serotypes
@@ -1538,15 +1626,34 @@ if [[ "$pathogens" == *"SALMONELLA"* ]]; then
             salmonella_serotypes=$(echo "$salmonella_serotypes" | sed 's/,*$//')
         fi
     else
-        echo "No Salmonella serotype list detected."
-        echo "1) Use all serotypes (no filtering)"
-        echo "2) Enter custom serotype list"
-        read -p "Selection [1]: " sal_sero_fallback
-        sal_sero_fallback=${sal_sero_fallback:-1}
-        if [[ "$sal_sero_fallback" == "2" ]]; then
-            read -p "Salmonella serotypes to include: " salmonella_serotypes
-            salmonella_serotypes=${salmonella_serotypes:-"ALL"}
+        # Fallback to data discovery if no metadata
+        salmonella_serotype_list=$(discover_pathogen_subtypes "SALMONELLA" "$mmwrFile" "$preprocessed_metadata" "serotype")
+        if [[ -n "$salmonella_serotype_list" ]]; then
+            IFS=',' read -ra SALMONELLA_SEROTYPES_ARRAY <<< "$salmonella_serotype_list"
+            echo "Detected Salmonella serotypes in data:"
+            for i in "${!SALMONELLA_SEROTYPES_ARRAY[@]}"; do
+                printf "%2d) %s\n" $((i+1)) "${SALMONELLA_SEROTYPES_ARRAY[$i]}"
+            done
+            echo "$(( ${#SALMONELLA_SEROTYPES_ARRAY[@]} + 1 ))) Use all serotypes (no filtering)"
+            read -p "Select serotypes or $(( ${#SALMONELLA_SEROTYPES_ARRAY[@]} + 1 )) for all [$(( ${#SALMONELLA_SEROTYPES_ARRAY[@]} + 1 ))]: " sal_sero_choice
+            sal_sero_choice=${sal_sero_choice:-$(( ${#SALMONELLA_SEROTYPES_ARRAY[@]} + 1 ))}
+            
+            if [[ "$sal_sero_choice" -eq $(( ${#SALMONELLA_SEROTYPES_ARRAY[@]} + 1 )) ]]; then
+                salmonella_serotypes="ALL"
+            else
+                # Convert indices to serotype names
+                salmonella_serotypes=""
+                IFS=',' read -ra IDX <<< "$sal_sero_choice"
+                for idx in "${IDX[@]}"; do
+                    idx=$((idx-1))
+                    if [[ $idx -ge 0 && $idx -lt ${#SALMONELLA_SEROTYPES_ARRAY[@]} ]]; then
+                        salmonella_serotypes+="${SALMONELLA_SEROTYPES_ARRAY[$idx]},"
+                    fi
+                done
+                salmonella_serotypes=$(echo "$salmonella_serotypes" | sed 's/,*$//')
+            fi
         else
+            echo "No serotype information available."
             salmonella_serotypes="ALL"
         fi
     fi
@@ -1818,17 +1925,17 @@ echo "======== Dashboard Generation ========"
 echo "An interactive HTML dashboard will be automatically generated with run details included."
 
 # Automatically generate dashboard title with timestamp for identification
-dashboard_title="FoodNetTrends Analysis - Run ${timestamp}"
+dashboard_title="FoodNetTrends Analysis - Run ${projID}"
 dashboard_params="--enable_dashboard true --dashboard_title \"$dashboard_title\""
 
 # Tell the user what's happening
 echo "Dashboard will be created with title: \"$dashboard_title\""
-echo "Project ID: ${timestamp} (use this if you need to regenerate the dashboard later)"
+echo "Project ID: ${projID} (use this if you need to regenerate the dashboard later)"
 
 # Provide instructions for fallback dashboard generation if needed
 echo ""
 echo "NOTE: If dashboard generation fails, you can regenerate it after completion with:"
-echo "  ./dashboard.sh ${timestamp}"
+echo "  ./dashboard.sh ${projID}"
 
 # Add warning about resource usage for heavy analyses
 if [[ $pathogen_count -gt 4 || $chains -gt 8 || $iterations -gt 3000 ]]; then
@@ -1854,6 +1961,15 @@ if [[ $pathogen_count -gt 4 || $chains -gt 8 || $iterations -gt 3000 ]]; then
             echo "Running in background mode enabled."
         fi
     fi
+fi
+
+# Generate unique project identifier for output organization
+# Users can override this by setting projID before running the script
+if [[ -z "$projID" ]]; then
+    projID="$timestamp"
+    echo "Using auto-generated project ID: $projID"
+else
+    echo "Using user-specified project ID: $projID"
 fi
 
 # Build the command
@@ -1886,6 +2002,7 @@ cmd="$cmd --max_treedepth ${max_treedepth}"
 cmd="$cmd --cores ${cores}"
 cmd="$cmd --seed 123"
 cmd="$cmd --outdir \"${outDir}\""
+cmd="$cmd --projID \"${projID}\""
 cmd="$cmd --pathogen \"${pathogens}\""
 cmd="$cmd --states \"${states}\""
 
@@ -2068,6 +2185,11 @@ if [[ "$execute" =~ ^[Yy]$ ]]; then
     echo "Output directory structure:"
     ls -la "$outDir" 2>/dev/null || echo "Output directory does not exist: $outDir"
     
+    # Construct full output path using project ID subdirectory
+    outDir="$outDir/$projID"
+    echo "Validating outputs in: $outDir"
+    ls -la "$outDir" 2>/dev/null || echo "Output directory does not exist: $outDir"
+    
     # Parse pathogens to validate each one
     IFS=',' read -ra PATHOGEN_LIST <<< "$pathogens"
     validation_passed=true
@@ -2080,7 +2202,7 @@ if [[ "$execute" =~ ^[Yy]$ ]]; then
             validation_passed=false
         fi
         
-        # Check specifically for spline trends (main fix)
+        # Verify spline trend visualizations were generated
         verify_spline_trends "$pathogen_name" "$outDir"
     done
     
@@ -2093,6 +2215,13 @@ if [[ "$execute" =~ ^[Yy]$ ]]; then
         echo "⚠ Analysis completed but some outputs may be missing or incomplete."
         echo "Check the validation messages above for details."
     fi
+    
+    # Apply standard file permissions for HPC compatibility
+    # All pipeline outputs must have 755 permissions per infrastructure requirements
+    echo ""
+    echo "Setting file permissions to 755 for HPC compatibility..."
+    find "$outDir" -type f -exec chmod 755 {} + 2>/dev/null
+    echo "✓ File permissions updated"
 else
     echo "Execution canceled."
     echo "$(date): User canceled execution" >> "$error_log"

@@ -909,28 +909,29 @@ linpred_draw <- function(data, model) {
     data$year <- as.numeric(as.character(data$year))
   }
   
-  # Handle population explicitly and carefully
-  if ("Population" %in% names(data)) {
-    data$Population <- as.numeric(as.character(data$Population))
-    cat("Using 'Population' column with type:", class(data$Population), "\n")
-    cat("First few values:", head(data$Population), "\n")
-  } else if ("population" %in% names(data)) {
-    # Create a Population column to ensure consistent capitalization
-    data$Population <- as.numeric(as.character(data$population))
-    cat("Using 'population' column with type:", class(data$Population), "\n")
-    cat("First few values:", head(data$Population), "\n")
+  # Standardize population column to lowercase for model consistency
+  # The Bayesian model uses offset(log(population)) with lowercase column name
+  if ("population" %in% names(data)) {
+    data$population <- as.numeric(as.character(data$population))
+    cat("Using 'population' column with type:", class(data$population), "\n")
+    cat("First few values:", head(data$population), "\n")
+  } else if ("Population" %in% names(data)) {
+    # Convert uppercase variant to standard lowercase format
+    data$population <- as.numeric(as.character(data$Population))
+    data$Population <- NULL  # Remove uppercase to prevent confusion
+    cat("Standardizing 'Population' to 'population' column with type:", class(data$population), "\n")
+    cat("First few values:", head(data$population), "\n")
   } else {
-    stop("No population column found")
+    stop("No population column found in data")
   }
 
-  # Ensure population is numeric - allow NA values but warn about them
-  if (!is.numeric(data$Population)) {
+  # Validate population data type and content
+  if (!is.numeric(data$population)) {
     stop("Population column is not numeric after conversion")
   }
   
-  if (any(is.na(data$Population))) {
-    warning("Population column contains ", sum(is.na(data$Population)), " NA values which will be handled in processing")
-    # Don't stop execution, just warn and continue
+  if (any(is.na(data$population))) {
+    warning("Population column contains ", sum(is.na(data$population)), " NA values which will be handled in processing")
   }
 
   # Handle fallback model (without splines)
@@ -948,19 +949,20 @@ linpred_draw <- function(data, model) {
     # Get posterior predictive draws
     epred <- epred_draws(model, newdata = data) %>% ungroup()
     
-    # Remove any Population column in the posterior draws to avoid conflict
-    epred <- epred %>% select(-one_of("Population"))
+    # Remove population column from posterior draws to avoid duplication during join
+    epred <- epred %>% select(-one_of("population", "Population"))
     
-    # Join the Population values back by the unique row identifier
-    pop_df <- data %>% select(.row, Population) %>% ungroup()
+    # Rejoin population values using row identifier to maintain data integrity
+    pop_df <- data %>% select(.row, population) %>% ungroup()
     draws <- left_join(epred, pop_df, by = ".row") %>% ungroup()
     
-    if (!is.numeric(draws$Population) || any(is.na(draws$Population))) {
+    if (!is.numeric(draws$population) || any(is.na(draws$population))) {
       stop("Population column is not numeric in the joined data")
     }
     
-    # Compute predicted incidence (per 100,000)
-    draws <- draws %>% mutate(pred_incidence = (.epred / Population) * 100000)
+    # Calculate incidence rate per 100,000 population
+    # Model predictions (.epred) are counts; divide by population for rate
+    draws <- draws %>% mutate(pred_incidence = (.epred / population) * 100000)
     
     return(draws)
   }, error = function(e) {

@@ -31,7 +31,7 @@ process TRENDY {
     
     container 'foodnet.sif'
     
-    publishDir "${params.outdir}", 
+    publishDir "${params.outdir}/${params.projID}", 
         mode: params.publish_dir_mode,
         enabled: true
     
