@@ -157,6 +157,8 @@ parser$add_argument("--stec_serogroups", type="character", default="ALL",
                     help="STEC serogroups to analyze ('O157', 'NON-O157', or 'ALL')")
 parser$add_argument("--salmonella_serotypes", type="character", default="ALL",
                     help="Salmonella serotypes to analyze (comma-separated or 'ALL')")
+parser$add_argument("--states", type="character", default="ALL",
+                    help="Comma-separated list of states to analyze (default: ALL)")
 
 # Parse arguments
 args <- parser$parse_args()
@@ -940,7 +942,7 @@ data_quality <- validate_data_quality(analysis_data, pathogen)
 # Fit model with error handling
 model_fit <- tryCatch({
   # Set up model formula
-  formula <- count ~ s(year) + (1 | state) + offset(log(population))
+  formula <- count ~ s(year, by = state) + state + offset(log(population))
   
   # Set up MCMC callback for progress tracking
   if (exists("has_progress_tracking") && has_progress_tracking) {
@@ -1009,7 +1011,7 @@ model_fit <- tryCatch({
   log_message("FALLBACK", "Creating fallback model object for graceful degradation")
   dummy <- list(
     family = list(family = "negbinomial"),
-    formula = count ~ s(year) + (1 | state) + offset(log(population)),
+    formula = count ~ s(year, by = state) + state + offset(log(population)),
     data = analysis_data,
     is_dummy = TRUE,
     creation_time = Sys.time(),
