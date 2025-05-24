@@ -946,7 +946,7 @@ test_trend_significance <- function(model_fit) {
   if (!isTRUE(model_fit$is_dummy)) {
     tryCatch({
       # Extract posterior samples for the smooth term
-      posterior_samples <- posterior_samples(model_fit)
+      posterior_samples <- as_draws_df(model_fit)
       
       # Check if smooth term coefficients are significantly different from zero
       smooth_cols <- grep("^s_", names(posterior_samples), value = TRUE)

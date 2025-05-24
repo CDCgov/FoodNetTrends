@@ -296,6 +296,7 @@ process TRENDY {
         --projID="${params.projID ?: 'foodnet'}" \\
         --travel="${params.travel}" \\
         --cidt="${params.cidt}" \\
+        --states="${params.states}" \\
         --outDir="./" \\
         --cores=${params.cores} \\
         --chains=${params.chains} \\
