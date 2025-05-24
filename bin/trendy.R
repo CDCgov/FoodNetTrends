@@ -1106,8 +1106,36 @@ ir_data <- tryCatch({
     # Create a dense prediction grid for spline curves
     years <- sort(unique(analysis_data$year))
     year_range <- range(years)
-    # Create dense sequence (quarterly intervals) for spline interpolation
-    dense_years <- seq(year_range[1], year_range[2], by = 0.25)
+    
+    # Original code - can extrapolate wildly beyond data range
+    # dense_years <- seq(year_range[1], year_range[2], by = 0.25)
+    
+    # Enhanced prediction range logic - constrain extrapolation based on data availability
+    actual_years <- sort(unique(analysis_data$year))
+    data_span <- diff(range(actual_years))
+    
+    # Determine appropriate prediction range based on available data
+    if (data_span < 3) {
+      # Limited temporal data - restrict to observed years only
+      log_message("INFO", paste("Limited temporal data (", data_span, "years) - restricting to observed years"))
+      dense_years <- actual_years
+    } else if (data_span < 10) {
+      # Moderate data availability - allow limited extrapolation (20% beyond data range)
+      buffer <- data_span * 0.2
+      safe_min <- min(actual_years) - buffer
+      safe_max <- max(actual_years) + buffer
+      
+      # Generate quarterly predictions within safe bounds
+      dense_years <- seq(max(safe_min, min(actual_years)), 
+                         min(safe_max, max(actual_years)), 
+                         by = 0.25)
+      log_message("INFO", paste("Moderate extrapolation: predicting", 
+                               min(dense_years), "to", max(dense_years),
+                               "from data spanning", min(actual_years), "to", max(actual_years)))
+    } else {
+      # Rich data - standard quarterly predictions across full range
+      dense_years <- seq(year_range[1], year_range[2], by = 0.25)
+    }
     
     states <- unique(analysis_data$state)
     
