@@ -957,6 +957,9 @@ model_fit <- tryCatch({
   formula <- as.formula(sprintf("count ~ s(year, by = state, k = %d) + state + offset(log(population))", k_value))
   
   log_message("INFO", paste("Using adaptive spline basis dimension k =", k_value, "based on data availability"))
+  log_message("INFO", paste("Model formula:", deparse(formula)))
+  log_message("INFO", "CONFIGURATION: State-specific splines enabled (by = state)")
+  log_message("INFO", paste("CONFIGURATION: Adaptive k =", k_value, "(based on", min(years_per_state), "min years per state)"))
   
   # Set up MCMC callback for progress tracking
   if (exists("has_progress_tracking") && has_progress_tracking) {
@@ -984,6 +987,11 @@ model_fit <- tryCatch({
       prior(normal(0, 2), class = b)
     )
     
+    log_message("INFO", "CONFIGURATION: Using informative priors:")
+    log_message("INFO", "  - student_t(3, 0, 5) for spline smoothness (sds)")
+    log_message("INFO", "  - normal(0, 5) for intercept")
+    log_message("INFO", "  - normal(0, 2) for fixed effects")
+    
     # Fit model with progress callback using command-line parameters
     brm(
       formula = formula,
@@ -1009,6 +1017,11 @@ model_fit <- tryCatch({
       prior(normal(0, 5), class = Intercept),
       prior(normal(0, 2), class = b)
     )
+    
+    log_message("INFO", "CONFIGURATION: Using informative priors:")
+    log_message("INFO", "  - student_t(3, 0, 5) for spline smoothness (sds)")
+    log_message("INFO", "  - normal(0, 5) for intercept")
+    log_message("INFO", "  - normal(0, 2) for fixed effects")
     
     # Fit model without progress tracking using command-line parameters
     brm(
