@@ -326,7 +326,7 @@ generate_metadata <- function(data, source_file, census_file_b = NULL, census_fi
   
   # Add inferred field information if available
   if ("region" %in% names(data)) {
-    metadata$regions = sort(unique(data$region[data$region != "Unknown"]))
+    metadata$regions = sort(unique(data[region != "Unknown", region]))
   }
   
   if ("age_category" %in% names(data)) {
@@ -362,9 +362,9 @@ generate_metadata <- function(data, source_file, census_file_b = NULL, census_fi
   # Process Salmonella serotypes if available
   if (any(data$pathogen == "SALMONELLA") && "serotypesummary" %in% names(data)) {
     cat("Processing Salmonella serotype information...\n")
-    sal_data <- data[data$pathogen == "SALMONELLA", ]
+    sal_data <- data[pathogen == "SALMONELLA"]
     serotype_counts <- as.data.frame(table(sal_data$serotypesummary))
-    serotype_counts <- serotype_counts[order(serotype_counts$Freq, decreasing=TRUE),]
+    serotype_counts <- serotype_counts[order(serotype_counts$Freq, decreasing=TRUE), ]
     
     # Store in metadata
     metadata$salmonella_serotypes <- as.list(serotype_counts$Freq)
@@ -587,10 +587,10 @@ main <- function() {
   
   # Combine for validation checks (using state-level data now)
   census <- dplyr::bind_rows(census_b_state, census_p_state)
-  census_pairs <- unique(census[, c("state", "year")])
+  census_pairs <- unique(census[, .(state, year)])
   cleaned_data$state <- toupper(as.character(cleaned_data$state))
   cleaned_data$year <- as.numeric(as.character(cleaned_data$year))
-  mmwr_pairs <- unique(cleaned_data[, c("state", "year")])
+  mmwr_pairs <- unique(cleaned_data[, .(state, year)])
 
   # Find (state, year) pairs in MMWR but not in census
   mmwr_not_in_census <- anti_join(mmwr_pairs, census_pairs, by = c("state", "year"))
@@ -625,12 +625,12 @@ main <- function() {
   pop_comparison$pct_diff <- round(100 * pop_comparison$pop_diff / pmax(pop_comparison$pop_bacterial, pop_comparison$pop_parasitic), 2)
   
   # Flag significant discrepancies (>1% difference)
-  discrepancies <- pop_comparison[pop_comparison$pct_diff > 1, ]
+  discrepancies <- pop_comparison[pct_diff > 1]
   
   if (nrow(discrepancies) > 0) {
     cat('  WARNING: Population inconsistencies found between bacterial and parasitic census data!\n')
     cat('  State-year combinations with >1% population difference:\n')
-    print(discrepancies[order(-discrepancies$pct_diff), c("state", "year", "pop_bacterial", "pop_parasitic", "pct_diff")])
+    print(discrepancies[order(-pct_diff), .(state, year, pop_bacterial, pop_parasitic, pct_diff)])
     cat('\n  This indicates potential data quality issues. Population should be consistent for the same state-year.\n')
     cat('  Consider reviewing the source census files for accuracy.\n')
   } else {
@@ -675,7 +675,7 @@ main <- function() {
   if (exists("discrepancies") && nrow(discrepancies) > 0) {
     cat("WARNING: Inconsistent population values found between bacterial and parasitic census data\n")
     cat("The following state-year combinations show >1% difference:\n\n")
-    print(discrepancies[order(-discrepancies$pct_diff), ])
+    print(discrepancies[order(-pct_diff)])
     cat("\nRecommendation: Review source census files for data quality issues\n")
   } else {
     cat("✓ All population values are consistent between bacterial and parasitic census data\n")

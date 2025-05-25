@@ -518,7 +518,7 @@ if (pathogen == "CYCLOSPORA") {
   # Fall back to standard implementation if specialized function fails
   if (!has_cyclospora_fn) {
     # Filter for Cyclospora cases
-    pathogen_data <- mmwrdata[toupper(mmwrdata$pathogen) == "CYCLOSPORA", ]
+    pathogen_data <- mmwrdata[toupper(pathogen) == "CYCLOSPORA"]
     
     # Apply states filtering if specified
     if (!is.null(args$states) && args$states != "ALL") {
@@ -529,7 +529,7 @@ if (pathogen == "CYCLOSPORA") {
       # Check if state column exists
       if ("state" %in% names(pathogen_data)) {
         initial_count <- nrow(pathogen_data)
-        pathogen_data <- pathogen_data[toupper(pathogen_data$state) %in% toupper(target_states), ]
+        pathogen_data <- pathogen_data[toupper(state) %in% toupper(target_states)]
         final_count <- nrow(pathogen_data)
         log_message("INFO", paste("States filtering reduced data from", initial_count, "to", final_count, "cases"))
       } else {
@@ -588,7 +588,7 @@ if (pathogen == "CYCLOSPORA") {
     missing_pop_count <- sum(is.na(analysis_data$population))
     if (missing_pop_count > 0) {
       log_message("WARNING", paste(missing_pop_count, "records have missing population values and will be excluded"))
-      excluded_data <- analysis_data[is.na(analysis_data$population), c("state", "year")]
+      excluded_data <- analysis_data[is.na(population), .(state, year)]
       if (nrow(excluded_data) > 0) {
         excluded_summary <- excluded_data %>%
           group_by(state) %>%
@@ -598,7 +598,7 @@ if (pathogen == "CYCLOSPORA") {
         }
       }
       # Remove incomplete records
-      analysis_data <- analysis_data[!is.na(analysis_data$population), ]
+      analysis_data <- analysis_data[!is.na(population)]
       log_message("INFO", paste("Proceeding with", nrow(analysis_data), "complete records"))
     }
     
@@ -643,7 +643,7 @@ if (pathogen == "CYCLOSPORA") {
     log_message("WARNING", "Specialized Salmonella function not available, using standard approach")
     
     # Filter for Salmonella cases
-    pathogen_data <- mmwrdata[toupper(mmwrdata$pathogen) == "SALMONELLA", ]
+    pathogen_data <- mmwrdata[toupper(pathogen) == "SALMONELLA"]
     
     # Apply serotype filtering for Salmonella if specified
     if (!is.null(args$salmonella_serotypes) && args$salmonella_serotypes != "ALL") {
@@ -654,7 +654,7 @@ if (pathogen == "CYCLOSPORA") {
       # Check if serotype column exists
       if ("serotype" %in% names(pathogen_data)) {
         initial_count <- nrow(pathogen_data)
-        pathogen_data <- pathogen_data[toupper(pathogen_data$serotype) %in% toupper(target_serotypes), ]
+        pathogen_data <- pathogen_data[toupper(serotype) %in% toupper(target_serotypes)]
         final_count <- nrow(pathogen_data)
         log_message("INFO", paste("Serotype filtering reduced data from", initial_count, "to", final_count, "cases"))
       } else {
@@ -671,7 +671,7 @@ if (pathogen == "CYCLOSPORA") {
       # Check if state column exists
       if ("state" %in% names(pathogen_data)) {
         initial_count <- nrow(pathogen_data)
-        pathogen_data <- pathogen_data[toupper(pathogen_data$state) %in% toupper(target_states), ]
+        pathogen_data <- pathogen_data[toupper(state) %in% toupper(target_states)]
         final_count <- nrow(pathogen_data)
         log_message("INFO", paste("States filtering reduced data from", initial_count, "to", final_count, "cases"))
       } else {
@@ -727,7 +727,7 @@ if (pathogen == "CYCLOSPORA") {
   missing_pop_count <- sum(is.na(analysis_data$population))
   if (missing_pop_count > 0) {
     log_message("WARNING", paste(missing_pop_count, "records have missing population values and will be excluded"))
-    excluded_data <- analysis_data[is.na(analysis_data$population), c("state", "year")]
+    excluded_data <- analysis_data[is.na(population), .(state, year)]
     if (nrow(excluded_data) > 0) {
       excluded_summary <- excluded_data %>%
         group_by(state) %>%
@@ -737,7 +737,7 @@ if (pathogen == "CYCLOSPORA") {
       }
     }
     # Remove incomplete records
-    analysis_data <- analysis_data[!is.na(analysis_data$population), ]
+    analysis_data <- analysis_data[!is.na(population)]
     log_message("INFO", paste("Proceeding with", nrow(analysis_data), "complete records"))
   }
   
@@ -754,7 +754,7 @@ if (pathogen == "CYCLOSPORA") {
   log_message("MODEL", paste("Using standard model approach for", pathogen))
   
   # Filter for the specific pathogen
-  pathogen_data <- mmwrdata[toupper(mmwrdata$pathogen) == pathogen, ]
+  pathogen_data <- mmwrdata[toupper(pathogen) == pathogen]
   
   # Apply STEC serogroup filtering if this is STEC
   if (pathogen == "STEC") {
@@ -766,9 +766,9 @@ if (pathogen == "CYCLOSPORA") {
       if ("serogroup" %in% names(pathogen_data)) {
         initial_count <- nrow(pathogen_data)
         if (args$stec_serogroups == "O157") {
-          pathogen_data <- pathogen_data[toupper(pathogen_data$serogroup) == "O157", ]
+          pathogen_data <- pathogen_data[toupper(serogroup) == "O157"]
         } else if (args$stec_serogroups == "NON-O157") {
-          pathogen_data <- pathogen_data[toupper(pathogen_data$serogroup) != "O157", ]
+          pathogen_data <- pathogen_data[toupper(serogroup) != "O157"]
         }
         final_count <- nrow(pathogen_data)
         log_message("INFO", paste("Serogroup filtering reduced data from", initial_count, "to", final_count, "cases"))
@@ -787,7 +787,7 @@ if (pathogen == "CYCLOSPORA") {
     # Check if state column exists
     if ("state" %in% names(pathogen_data)) {
       initial_count <- nrow(pathogen_data)
-      pathogen_data <- pathogen_data[toupper(pathogen_data$state) %in% toupper(target_states), ]
+      pathogen_data <- pathogen_data[toupper(state) %in% toupper(target_states)]
       final_count <- nrow(pathogen_data)
       log_message("INFO", paste("States filtering reduced data from", initial_count, "to", final_count, "cases"))
     } else {
@@ -843,7 +843,7 @@ if (pathogen == "CYCLOSPORA") {
   if (missing_pop_count > 0) {
     log_message("ERROR", paste(missing_pop_count, "missing population values found"))
     # Exclude rows with missing population data
-    analysis_data <- analysis_data[!is.na(analysis_data$population), ]
+    analysis_data <- analysis_data[!is.na(population)]
     log_message("INFO", paste("Excluded", missing_pop_count, "rows with missing population data"))
     
     # Check if we still have data after exclusion

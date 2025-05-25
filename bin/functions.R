@@ -310,7 +310,7 @@ path_analysis <- function(mmwrdata, census) {
   if (na_population_count > 0) {
     warning(paste(na_population_count, "rows have missing population values after join. These will be excluded."))
     # Exclude rows with missing population
-    selectDf <- selectDf[!is.na(selectDf$population), ]
+    selectDf <- selectDf[!is.na(population)]
     if (nrow(selectDf) == 0) {
       stop("CRITICAL ERROR: No complete data (with population) available after join.")
     }
@@ -539,7 +539,7 @@ cyclospora_analysis <- function(mmwrdata, census) {
   # Handle missing population values - exclude incomplete data rather than fabricate
   na_population_count <- sum(is.na(cyclo$population))
   if (na_population_count > 0) {
-    excluded_data <- cyclo[is.na(cyclo$population), c("state", "year")]
+    excluded_data <- cyclo[is.na(population), .(state, year)]
     warning(paste("EXCLUDING", na_population_count, "rows due to missing population data:"))
     if (nrow(excluded_data) > 0) {
       excluded_summary <- excluded_data %>%
@@ -550,7 +550,7 @@ cyclospora_analysis <- function(mmwrdata, census) {
       }
     }
     # Remove incomplete records
-    cyclo <- cyclo[!is.na(cyclo$population), ]
+    cyclo <- cyclo[!is.na(population)]
     message(paste("Analysis will proceed with", nrow(cyclo), "complete records"))
   }
   
@@ -743,7 +743,7 @@ salmonella_analysis <- function(mmwrdata, census) {
   if (na_population_count > 0) {
     warning(paste(na_population_count, "rows have missing population values after join. These will be excluded."))
     # Exclude rows with missing population
-    sal <- sal[!is.na(sal$population), ]
+    sal <- sal[!is.na(population)]
     if (nrow(sal) == 0) {
       stop("CRITICAL ERROR: No complete data (with population) available after join.")
     }
