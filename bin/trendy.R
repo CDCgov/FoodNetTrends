@@ -314,14 +314,42 @@ tryCatch({
     # Determine file type from extension
     if (grepl("\\.csv$", args$mmwrFile, ignore.case = TRUE)) {
       log_message("IMPORT", paste("Reading CSV file:", args$mmwrFile))
-      mmwrdata <- fread(args$mmwrFile, stringsAsFactors = FALSE, fill = TRUE)
+      # Try fread first, but handle cases where it stops early
+      mmwrdata <- tryCatch({
+        dt <- fread(args$mmwrFile, stringsAsFactors = FALSE, fill = TRUE, showProgress = FALSE)
+        log_message("INFO", paste("fread loaded", nrow(dt), "rows"))
+        dt
+      }, warning = function(w) {
+        if (grepl("Stopped early", w$message)) {
+          log_message("WARNING", "fread stopped early due to irregular fields, using read.csv instead")
+          df <- read.csv(args$mmwrFile, stringsAsFactors = FALSE)
+          log_message("INFO", paste("read.csv loaded", nrow(df), "rows"))
+          df
+        } else {
+          suppressWarnings(fread(args$mmwrFile, stringsAsFactors = FALSE, fill = TRUE, showProgress = FALSE))
+        }
+      })
     } else if (grepl("\\.sas7bdat$", args$mmwrFile, ignore.case = TRUE)) {
       log_message("IMPORT", paste("Reading SAS file:", args$mmwrFile))
       mmwrdata <- read_sas(args$mmwrFile)
     } else {
       # Try CSV by default
       log_message("IMPORT", paste("Attempting to read as CSV:", args$mmwrFile))
-      mmwrdata <- fread(args$mmwrFile, stringsAsFactors = FALSE, fill = TRUE)
+      # Try fread first, but handle cases where it stops early
+      mmwrdata <- tryCatch({
+        dt <- fread(args$mmwrFile, stringsAsFactors = FALSE, fill = TRUE, showProgress = FALSE)
+        log_message("INFO", paste("fread loaded", nrow(dt), "rows"))
+        dt
+      }, warning = function(w) {
+        if (grepl("Stopped early", w$message)) {
+          log_message("WARNING", "fread stopped early due to irregular fields, using read.csv instead")
+          df <- read.csv(args$mmwrFile, stringsAsFactors = FALSE)
+          log_message("INFO", paste("read.csv loaded", nrow(df), "rows"))
+          df
+        } else {
+          suppressWarnings(fread(args$mmwrFile, stringsAsFactors = FALSE, fill = TRUE, showProgress = FALSE))
+        }
+      })
     }
   }
 }, error = function(e) {
@@ -333,6 +361,18 @@ tryCatch({
 if (is.null(mmwrdata) || nrow(mmwrdata) == 0) {
   log_message("ERROR", "No data loaded from MMWR file")
   stop("MMWR data could not be loaded or is empty.")
+}
+
+# Log data loading success
+log_message("INFO", paste("Successfully loaded MMWR data:", nrow(mmwrdata), "rows,", ncol(mmwrdata), "columns"))
+
+# Check if pathogen column exists and show summary
+if ("pathogen" %in% names(mmwrdata)) {
+  pathogen_counts <- table(mmwrdata$pathogen)
+  log_message("INFO", paste("Found", length(pathogen_counts), "pathogen types"))
+  for (p in names(sort(pathogen_counts, decreasing = TRUE)[1:min(5, length(pathogen_counts))])) {
+    log_message("INFO", paste("  -", p, ":", pathogen_counts[p], "records"))
+  }
 }
 
 # Import and standardize census bacterial data
@@ -517,8 +557,12 @@ if (pathogen == "CYCLOSPORA") {
   
   # Fall back to standard implementation if specialized function fails
   if (!has_cyclospora_fn) {
-    # Filter for Cyclospora cases
-    pathogen_data <- mmwrdata[toupper(pathogen) == "CYCLOSPORA"]
+    # Filter for Cyclospora cases (handle both data.table and data.frame)
+    if (inherits(mmwrdata, "data.table")) {
+      pathogen_data <- mmwrdata[toupper(pathogen) == "CYCLOSPORA"]
+    } else {
+      pathogen_data <- mmwrdata[toupper(mmwrdata$pathogen) == "CYCLOSPORA", ]
+    }
     
     # Apply states filtering if specified
     if (!is.null(args$states) && args$states != "ALL") {
@@ -633,17 +677,23 @@ if (pathogen == "CYCLOSPORA") {
     }, error = function(e) {
       log_message("ERROR", paste("Error in specialized salmonella_analysis function:", e$message))
       log_message("ERROR", "Falling back to standard implementation")
+      # Set analysis_data to NULL to ensure we use standard approach
+      analysis_data <- NULL
       # Continue to standard implementation below
       has_salmonella_fn <- FALSE
     })
   }
   
-  # Fall back to standard implementation if specialized function fails
-  if (!has_salmonella_fn) {
+  # Fall back to standard implementation if specialized function fails or didn't produce data
+  if (!has_salmonella_fn || !exists("analysis_data") || is.null(analysis_data)) {
     log_message("WARNING", "Specialized Salmonella function not available, using standard approach")
     
-    # Filter for Salmonella cases
-    pathogen_data <- mmwrdata[toupper(pathogen) == "SALMONELLA"]
+    # Filter for Salmonella cases (handle both data.table and data.frame)
+    if (inherits(mmwrdata, "data.table")) {
+      pathogen_data <- mmwrdata[toupper(pathogen) == "SALMONELLA"]
+    } else {
+      pathogen_data <- mmwrdata[toupper(mmwrdata$pathogen) == "SALMONELLA", ]
+    }
     
     # Apply serotype filtering for Salmonella if specified
     if (!is.null(args$salmonella_serotypes) && args$salmonella_serotypes != "ALL") {
@@ -753,8 +803,12 @@ if (pathogen == "CYCLOSPORA") {
   # For other pathogens (standard approach)
   log_message("MODEL", paste("Using standard model approach for", pathogen))
   
-  # Filter for the specific pathogen
-  pathogen_data <- mmwrdata[toupper(pathogen) == pathogen]
+  # Filter for the specific pathogen (handle both data.table and data.frame)
+  if (inherits(mmwrdata, "data.table")) {
+    pathogen_data <- mmwrdata[toupper(pathogen) == pathogen]
+  } else {
+    pathogen_data <- mmwrdata[toupper(mmwrdata$pathogen) == pathogen, ]
+  }
   
   # Apply STEC serogroup filtering if this is STEC
   if (pathogen == "STEC") {
