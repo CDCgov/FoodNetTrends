@@ -314,42 +314,32 @@ tryCatch({
     # Determine file type from extension
     if (grepl("\\.csv$", args$mmwrFile, ignore.case = TRUE)) {
       log_message("IMPORT", paste("Reading CSV file:", args$mmwrFile))
-      # Try fread first, but handle cases where it stops early
-      mmwrdata <- tryCatch({
-        dt <- fread(args$mmwrFile, stringsAsFactors = FALSE, fill = TRUE, showProgress = FALSE)
-        log_message("INFO", paste("fread loaded", nrow(dt), "rows"))
-        dt
-      }, warning = function(w) {
-        if (grepl("Stopped early", w$message)) {
-          log_message("WARNING", "fread stopped early due to irregular fields, using read.csv instead")
-          df <- read.csv(args$mmwrFile, stringsAsFactors = FALSE)
-          log_message("INFO", paste("read.csv loaded", nrow(df), "rows"))
-          df
-        } else {
-          suppressWarnings(fread(args$mmwrFile, stringsAsFactors = FALSE, fill = TRUE, showProgress = FALSE))
-        }
-      })
+      # For preprocessed files, use read.csv to handle irregular field counts
+      if (args$preprocessed) {
+        log_message("INFO", "Using read.csv for preprocessed file to handle irregular fields")
+        mmwrdata <- read.csv(args$mmwrFile, stringsAsFactors = FALSE)
+        log_message("INFO", paste("read.csv loaded", nrow(mmwrdata), "rows"))
+      } else {
+        # For non-preprocessed files, use fread
+        mmwrdata <- fread(args$mmwrFile, stringsAsFactors = FALSE, fill = TRUE, showProgress = FALSE)
+        log_message("INFO", paste("fread loaded", nrow(mmwrdata), "rows"))
+      }
     } else if (grepl("\\.sas7bdat$", args$mmwrFile, ignore.case = TRUE)) {
       log_message("IMPORT", paste("Reading SAS file:", args$mmwrFile))
       mmwrdata <- read_sas(args$mmwrFile)
     } else {
       # Try CSV by default
       log_message("IMPORT", paste("Attempting to read as CSV:", args$mmwrFile))
-      # Try fread first, but handle cases where it stops early
-      mmwrdata <- tryCatch({
-        dt <- fread(args$mmwrFile, stringsAsFactors = FALSE, fill = TRUE, showProgress = FALSE)
-        log_message("INFO", paste("fread loaded", nrow(dt), "rows"))
-        dt
-      }, warning = function(w) {
-        if (grepl("Stopped early", w$message)) {
-          log_message("WARNING", "fread stopped early due to irregular fields, using read.csv instead")
-          df <- read.csv(args$mmwrFile, stringsAsFactors = FALSE)
-          log_message("INFO", paste("read.csv loaded", nrow(df), "rows"))
-          df
-        } else {
-          suppressWarnings(fread(args$mmwrFile, stringsAsFactors = FALSE, fill = TRUE, showProgress = FALSE))
-        }
-      })
+      # For preprocessed files, use read.csv to handle irregular field counts
+      if (args$preprocessed) {
+        log_message("INFO", "Using read.csv for preprocessed file to handle irregular fields")
+        mmwrdata <- read.csv(args$mmwrFile, stringsAsFactors = FALSE)
+        log_message("INFO", paste("read.csv loaded", nrow(mmwrdata), "rows"))
+      } else {
+        # For non-preprocessed files, use fread
+        mmwrdata <- fread(args$mmwrFile, stringsAsFactors = FALSE, fill = TRUE, showProgress = FALSE)
+        log_message("INFO", paste("fread loaded", nrow(mmwrdata), "rows"))
+      }
     }
   }
 }, error = function(e) {
