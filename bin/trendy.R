@@ -62,6 +62,7 @@ suppressPackageStartupMessages({
   library(readr)
   library(HDInterval)
   library(gridExtra)
+  library(data.table)
 })
 
 options(warn = 1)  # Show warnings as they occur
@@ -304,7 +305,7 @@ tryCatch({
   if (preprocessed && !is.null(args$cleanFile)) {
     # Load preprocessed CSV file
     log_message("IMPORT", paste("Reading preprocessed CSV file:", args$cleanFile))
-    mmwrdata <- read.csv(args$cleanFile, stringsAsFactors = FALSE)
+    mmwrdata <- fread(args$cleanFile, stringsAsFactors = FALSE)
   } else if (!preprocessed && !is.null(args$rawFile)) {
     # Load raw SAS file
     log_message("IMPORT", paste("Reading raw SAS file:", args$rawFile))
@@ -313,14 +314,14 @@ tryCatch({
     # Determine file type from extension
     if (grepl("\\.csv$", args$mmwrFile, ignore.case = TRUE)) {
       log_message("IMPORT", paste("Reading CSV file:", args$mmwrFile))
-      mmwrdata <- read.csv(args$mmwrFile, stringsAsFactors = FALSE)
+      mmwrdata <- fread(args$mmwrFile, stringsAsFactors = FALSE)
     } else if (grepl("\\.sas7bdat$", args$mmwrFile, ignore.case = TRUE)) {
       log_message("IMPORT", paste("Reading SAS file:", args$mmwrFile))
       mmwrdata <- read_sas(args$mmwrFile)
     } else {
       # Try CSV by default
       log_message("IMPORT", paste("Attempting to read as CSV:", args$mmwrFile))
-      mmwrdata <- read.csv(args$mmwrFile, stringsAsFactors = FALSE)
+      mmwrdata <- fread(args$mmwrFile, stringsAsFactors = FALSE)
     }
   }
 }, error = function(e) {
@@ -340,7 +341,7 @@ if (!is.null(args$censusFileB) && file.exists(args$censusFileB)) {
   tryCatch({
     log_message("IMPORT", paste("Reading bacterial census file:", args$censusFileB))
     if (grepl("\\.csv$", args$censusFileB, ignore.case = TRUE)) {
-      censusBdata <- read.csv(args$censusFileB, stringsAsFactors = FALSE)
+      censusBdata <- fread(args$censusFileB, stringsAsFactors = FALSE)
     } else if (grepl("\\.sas7bdat$", args$censusFileB, ignore.case = TRUE)) {
       censusBdata <- read_sas(args$censusFileB)
     }
@@ -402,7 +403,7 @@ if (!is.null(args$censusFileP) && file.exists(args$censusFileP)) {
   tryCatch({
     log_message("IMPORT", paste("Reading parasitic census file:", args$censusFileP))
     if (grepl("\\.csv$", args$censusFileP, ignore.case = TRUE)) {
-      censusPdata <- read.csv(args$censusFileP, stringsAsFactors = FALSE)
+      censusPdata <- fread(args$censusFileP, stringsAsFactors = FALSE)
     } else if (grepl("\\.sas7bdat$", args$censusFileP, ignore.case = TRUE)) {
       censusPdata <- read_sas(args$censusFileP)
     }
@@ -1456,7 +1457,7 @@ ir_data <- tryCatch({
 
 # Save IR results
 ir_file <- paste0(pathogen, "_IRCatch.csv")
-write.csv(ir_data, file = ir_file, row.names = FALSE)
+fwrite(ir_data, file = ir_file)
 if (exists("has_progress_tracking") && has_progress_tracking) {
   log_progress("OUTPUT", paste("Saved IR data to", ir_file))
 } else {
@@ -1532,7 +1533,7 @@ for (period in periods) {
     
     # Save IRR results
     irr_file <- paste0(pathogen, "_EstIRRCatch_", period, ".csv")
-    write.csv(irr_results, file = irr_file, row.names = FALSE)
+    fwrite(irr_results, file = irr_file)
     log_message("OUTPUT", paste("Saved IRR data to", irr_file))
     
   }, error = function(e) {
@@ -1551,7 +1552,7 @@ for (period in periods) {
     )
     
     irr_file <- paste0(pathogen, "_EstIRRError_", period, ".csv")
-    write.csv(error_irr, file = irr_file, row.names = FALSE)
+    fwrite(error_irr, file = irr_file)
     log_message("OUTPUT", paste("Saved error-state IRR data to", irr_file))
   })
 }

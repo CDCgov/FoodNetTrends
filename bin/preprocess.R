@@ -59,6 +59,7 @@ suppressPackageStartupMessages({
   library("dplyr")
   library("haven")
   library("jsonlite")
+  library("data.table")
 })
 
 # Setup argument parser
@@ -103,11 +104,11 @@ if(!exists("safe_write")) {
       # Write data based on file extension
       if (endsWith(file_path, ".csv")) {
         if (file.exists(file_path)) {
-          write.table(data, file = file_path, append = TRUE, quote = TRUE, sep = ",",
-                      col.names = FALSE, row.names = FALSE)
+          # For append mode, use fwrite with append=TRUE
+          fwrite(data, file = file_path, append = TRUE, quote = TRUE)
         } else {
-          write.table(data, file = file_path, append = FALSE, quote = TRUE, sep = ",",
-                      col.names = TRUE, row.names = FALSE)
+          # For new files, use fwrite (much faster than write.table)
+          fwrite(data, file = file_path, quote = TRUE)
         }
       } else if (endsWith(file_path, ".Rds")) {
         saveRDS(data, file = file_path)
@@ -517,20 +518,20 @@ main <- function() {
   census_b_filename <- paste0(output_base, "_census_bacterial.csv")
   census_b_path <- file.path(output_dir, census_b_filename)
   cat("Saving preprocessed bacterial census to:", census_b_path, "\n")
-  write.csv(census_b_state, census_b_path, row.names = FALSE)
+  fwrite(census_b_state, census_b_path)
   
   # Save parasitic census
   census_p_filename <- paste0(output_base, "_census_parasitic.csv")
   census_p_path <- file.path(output_dir, census_p_filename)
   cat("Saving preprocessed parasitic census to:", census_p_path, "\n")
-  write.csv(census_p_state, census_p_path, row.names = FALSE)
+  fwrite(census_p_state, census_p_path)
   
   # VALIDATION: Verify census aggregation worked correctly
   cat("\n=== Census Preprocessing Validation ===\n")
   
   # Check bacterial census
   if (file.exists(census_b_path)) {
-    saved_census_b <- read.csv(census_b_path)
+    saved_census_b <- fread(census_b_path)
     cat("✓ Bacterial census file created:\n")
     cat("  - Records:", nrow(saved_census_b), "(from", nrow(census_b), "county records)\n")
     cat("  - States:", length(unique(saved_census_b$state)), "\n")
@@ -548,7 +549,7 @@ main <- function() {
   
   # Check parasitic census  
   if (file.exists(census_p_path)) {
-    saved_census_p <- read.csv(census_p_path)
+    saved_census_p <- fread(census_p_path)
     cat("\n✓ Parasitic census file created:\n")
     cat("  - Records:", nrow(saved_census_p), "(from", nrow(census_p), "county records)\n")
     cat("  - States:", length(unique(saved_census_p$state)), "\n")

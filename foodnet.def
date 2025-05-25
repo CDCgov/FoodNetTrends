@@ -52,7 +52,8 @@ From: rocker/r-ver:4.4
         r-plotly \
         r-dt \
         r-htmltools \
-        r-base64enc
+        r-base64enc \
+        r-data.table
     
     # Create directory for pipeline-specific files
     mkdir -p /opt/foodnet
