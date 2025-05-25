@@ -341,7 +341,7 @@ if (!is.null(args$censusFileB) && file.exists(args$censusFileB)) {
   tryCatch({
     log_message("IMPORT", paste("Reading bacterial census file:", args$censusFileB))
     if (grepl("\\.csv$", args$censusFileB, ignore.case = TRUE)) {
-      censusBdata <- fread(args$censusFileB, stringsAsFactors = FALSE)
+      censusBdata <- fread(args$censusFileB, stringsAsFactors = FALSE, fill = TRUE)
     } else if (grepl("\\.sas7bdat$", args$censusFileB, ignore.case = TRUE)) {
       censusBdata <- read_sas(args$censusFileB)
     }
@@ -403,7 +403,7 @@ if (!is.null(args$censusFileP) && file.exists(args$censusFileP)) {
   tryCatch({
     log_message("IMPORT", paste("Reading parasitic census file:", args$censusFileP))
     if (grepl("\\.csv$", args$censusFileP, ignore.case = TRUE)) {
-      censusPdata <- fread(args$censusFileP, stringsAsFactors = FALSE)
+      censusPdata <- fread(args$censusFileP, stringsAsFactors = FALSE, fill = TRUE)
     } else if (grepl("\\.sas7bdat$", args$censusFileP, ignore.case = TRUE)) {
       censusPdata <- read_sas(args$censusFileP)
     }
