@@ -305,7 +305,7 @@ tryCatch({
   if (preprocessed && !is.null(args$cleanFile)) {
     # Load preprocessed CSV file
     log_message("IMPORT", paste("Reading preprocessed CSV file:", args$cleanFile))
-    mmwrdata <- fread(args$cleanFile, stringsAsFactors = FALSE)
+    mmwrdata <- fread(args$cleanFile, stringsAsFactors = FALSE, fill = TRUE)
   } else if (!preprocessed && !is.null(args$rawFile)) {
     # Load raw SAS file
     log_message("IMPORT", paste("Reading raw SAS file:", args$rawFile))
@@ -314,14 +314,14 @@ tryCatch({
     # Determine file type from extension
     if (grepl("\\.csv$", args$mmwrFile, ignore.case = TRUE)) {
       log_message("IMPORT", paste("Reading CSV file:", args$mmwrFile))
-      mmwrdata <- fread(args$mmwrFile, stringsAsFactors = FALSE)
+      mmwrdata <- fread(args$mmwrFile, stringsAsFactors = FALSE, fill = TRUE)
     } else if (grepl("\\.sas7bdat$", args$mmwrFile, ignore.case = TRUE)) {
       log_message("IMPORT", paste("Reading SAS file:", args$mmwrFile))
       mmwrdata <- read_sas(args$mmwrFile)
     } else {
       # Try CSV by default
       log_message("IMPORT", paste("Attempting to read as CSV:", args$mmwrFile))
-      mmwrdata <- fread(args$mmwrFile, stringsAsFactors = FALSE)
+      mmwrdata <- fread(args$mmwrFile, stringsAsFactors = FALSE, fill = TRUE)
     }
   }
 }, error = function(e) {
