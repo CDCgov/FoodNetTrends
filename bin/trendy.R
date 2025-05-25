@@ -588,7 +588,7 @@ if (pathogen == "CYCLOSPORA") {
     missing_pop_count <- sum(is.na(analysis_data$population))
     if (missing_pop_count > 0) {
       log_message("WARNING", paste(missing_pop_count, "records have missing population values and will be excluded"))
-      excluded_data <- analysis_data[is.na(population), .(state, year)]
+      excluded_data <- analysis_data[is.na(analysis_data$population), c("state", "year")]
       if (nrow(excluded_data) > 0) {
         excluded_summary <- excluded_data %>%
           group_by(state) %>%
@@ -598,7 +598,7 @@ if (pathogen == "CYCLOSPORA") {
         }
       }
       # Remove incomplete records
-      analysis_data <- analysis_data[!is.na(population)]
+      analysis_data <- analysis_data[!is.na(analysis_data$population), ]
       log_message("INFO", paste("Proceeding with", nrow(analysis_data), "complete records"))
     }
     
@@ -727,7 +727,7 @@ if (pathogen == "CYCLOSPORA") {
   missing_pop_count <- sum(is.na(analysis_data$population))
   if (missing_pop_count > 0) {
     log_message("WARNING", paste(missing_pop_count, "records have missing population values and will be excluded"))
-    excluded_data <- analysis_data[is.na(population), .(state, year)]
+    excluded_data <- analysis_data[is.na(analysis_data$population), c("state", "year")]
     if (nrow(excluded_data) > 0) {
       excluded_summary <- excluded_data %>%
         group_by(state) %>%
@@ -737,7 +737,7 @@ if (pathogen == "CYCLOSPORA") {
       }
     }
     # Remove incomplete records
-    analysis_data <- analysis_data[!is.na(population)]
+    analysis_data <- analysis_data[!is.na(analysis_data$population), ]
     log_message("INFO", paste("Proceeding with", nrow(analysis_data), "complete records"))
   }
   
@@ -843,7 +843,7 @@ if (pathogen == "CYCLOSPORA") {
   if (missing_pop_count > 0) {
     log_message("ERROR", paste(missing_pop_count, "missing population values found"))
     # Exclude rows with missing population data
-    analysis_data <- analysis_data[!is.na(population)]
+    analysis_data <- analysis_data[!is.na(analysis_data$population), ]
     log_message("INFO", paste("Excluded", missing_pop_count, "rows with missing population data"))
     
     # Check if we still have data after exclusion
