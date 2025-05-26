@@ -568,7 +568,7 @@ main <- function() {
   if (file.exists(census_b_path)) {
     saved_census_b <- fread(census_b_path)
     cat("✓ Bacterial census file created:\n")
-    cat("  - Records:", nrow(saved_census_b), "(from", nrow(census_b), "county records)\n")
+    cat("  - Records:", nrow(saved_census_b), "(from", census_b_rows, "county records)\n")
     cat("  - States:", length(unique(saved_census_b$state)), "\n")
     cat("  - Years:", paste(range(saved_census_b$year), collapse="-"), "\n")
     cat("  - Has n_counties column:", "n_counties" %in% names(saved_census_b), "\n")
@@ -586,7 +586,7 @@ main <- function() {
   if (file.exists(census_p_path)) {
     saved_census_p <- fread(census_p_path)
     cat("\n✓ Parasitic census file created:\n")
-    cat("  - Records:", nrow(saved_census_p), "(from", nrow(census_p), "county records)\n")
+    cat("  - Records:", nrow(saved_census_p), "(from", census_p_rows, "county records)\n")
     cat("  - States:", length(unique(saved_census_p$state)), "\n")
     cat("  - Years:", paste(range(saved_census_p$year), collapse="-"), "\n")
     cat("  - Has n_counties column:", "n_counties" %in% names(saved_census_p), "\n")
