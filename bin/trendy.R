@@ -305,7 +305,8 @@ tryCatch({
   if (preprocessed && !is.null(args$cleanFile)) {
     # Load preprocessed CSV file
     log_message("IMPORT", paste("Reading preprocessed CSV file:", args$cleanFile))
-    mmwrdata <- fread(args$cleanFile, stringsAsFactors = FALSE, fill = TRUE)
+    # Use fill=Inf to handle irregular field counts in preprocessed files
+    mmwrdata <- fread(args$cleanFile, stringsAsFactors = FALSE, fill = Inf)
   } else if (!preprocessed && !is.null(args$rawFile)) {
     # Load raw SAS file
     log_message("IMPORT", paste("Reading raw SAS file:", args$rawFile))
@@ -316,12 +317,12 @@ tryCatch({
       log_message("IMPORT", paste("Reading CSV file:", args$mmwrFile))
       # For preprocessed files, use read.csv to handle irregular field counts
       if (args$preprocessed) {
-        log_message("INFO", "Using read.csv for preprocessed file to handle irregular fields")
-        mmwrdata <- read.csv(args$mmwrFile, stringsAsFactors = FALSE)
-        log_message("INFO", paste("read.csv loaded", nrow(mmwrdata), "rows"))
+        log_message("INFO", "Using fread with fill=Inf for preprocessed file to handle irregular fields")
+        mmwrdata <- fread(args$mmwrFile, stringsAsFactors = FALSE, fill = Inf, showProgress = FALSE)
+        log_message("INFO", paste("fread loaded", nrow(mmwrdata), "rows"))
       } else {
         # For non-preprocessed files, use fread
-        mmwrdata <- fread(args$mmwrFile, stringsAsFactors = FALSE, fill = TRUE, showProgress = FALSE)
+        mmwrdata <- fread(args$mmwrFile, stringsAsFactors = FALSE, fill = Inf, showProgress = FALSE)
         log_message("INFO", paste("fread loaded", nrow(mmwrdata), "rows"))
       }
     } else if (grepl("\\.sas7bdat$", args$mmwrFile, ignore.case = TRUE)) {
@@ -332,12 +333,12 @@ tryCatch({
       log_message("IMPORT", paste("Attempting to read as CSV:", args$mmwrFile))
       # For preprocessed files, use read.csv to handle irregular field counts
       if (args$preprocessed) {
-        log_message("INFO", "Using read.csv for preprocessed file to handle irregular fields")
-        mmwrdata <- read.csv(args$mmwrFile, stringsAsFactors = FALSE)
-        log_message("INFO", paste("read.csv loaded", nrow(mmwrdata), "rows"))
+        log_message("INFO", "Using fread with fill=Inf for preprocessed file to handle irregular fields")
+        mmwrdata <- fread(args$mmwrFile, stringsAsFactors = FALSE, fill = Inf, showProgress = FALSE)
+        log_message("INFO", paste("fread loaded", nrow(mmwrdata), "rows"))
       } else {
         # For non-preprocessed files, use fread
-        mmwrdata <- fread(args$mmwrFile, stringsAsFactors = FALSE, fill = TRUE, showProgress = FALSE)
+        mmwrdata <- fread(args$mmwrFile, stringsAsFactors = FALSE, fill = Inf, showProgress = FALSE)
         log_message("INFO", paste("fread loaded", nrow(mmwrdata), "rows"))
       }
     }

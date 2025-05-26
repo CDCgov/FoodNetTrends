@@ -199,7 +199,7 @@ process TRENDY {
     fi
     
     # Add preprocessed flag based on file type
-    if [ "${mmwrIsPreprocessed}" = "true" ]; then
+    if [ "${mmwrIsPreprocessed}" = true ]; then
         PREPROC_ARG="--preprocessed=TRUE --cleanFile=./${localMmwrFile}"
         echo "Using preprocessed mode for CSV file" >> ${pathogen}_trendy.log
     else
