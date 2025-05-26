@@ -305,8 +305,8 @@ tryCatch({
   if (preprocessed && !is.null(args$cleanFile)) {
     # Load preprocessed CSV file
     log_message("IMPORT", paste("Reading preprocessed CSV file:", args$cleanFile))
-    # Use fill=Inf to handle irregular field counts in preprocessed files
-    mmwrdata <- fread(args$cleanFile, stringsAsFactors = FALSE, fill = Inf)
+    # Use fill=TRUE to handle irregular field counts in preprocessed files
+    mmwrdata <- fread(args$cleanFile, stringsAsFactors = FALSE, fill = TRUE)
   } else if (!preprocessed && !is.null(args$rawFile)) {
     # Load raw SAS file
     log_message("IMPORT", paste("Reading raw SAS file:", args$rawFile))
@@ -317,12 +317,12 @@ tryCatch({
       log_message("IMPORT", paste("Reading CSV file:", args$mmwrFile))
       # For preprocessed files, use read.csv to handle irregular field counts
       if (args$preprocessed) {
-        log_message("INFO", "Using fread with fill=Inf for preprocessed file to handle irregular fields")
-        mmwrdata <- fread(args$mmwrFile, stringsAsFactors = FALSE, fill = Inf, showProgress = FALSE)
+        log_message("INFO", "Using fread with fill=TRUE for preprocessed file to handle irregular fields")
+        mmwrdata <- fread(args$mmwrFile, stringsAsFactors = FALSE, fill = TRUE, showProgress = FALSE)
         log_message("INFO", paste("fread loaded", nrow(mmwrdata), "rows"))
       } else {
         # For non-preprocessed files, use fread
-        mmwrdata <- fread(args$mmwrFile, stringsAsFactors = FALSE, fill = Inf, showProgress = FALSE)
+        mmwrdata <- fread(args$mmwrFile, stringsAsFactors = FALSE, fill = TRUE, showProgress = FALSE)
         log_message("INFO", paste("fread loaded", nrow(mmwrdata), "rows"))
       }
     } else if (grepl("\\.sas7bdat$", args$mmwrFile, ignore.case = TRUE)) {
@@ -333,12 +333,12 @@ tryCatch({
       log_message("IMPORT", paste("Attempting to read as CSV:", args$mmwrFile))
       # For preprocessed files, use read.csv to handle irregular field counts
       if (args$preprocessed) {
-        log_message("INFO", "Using fread with fill=Inf for preprocessed file to handle irregular fields")
-        mmwrdata <- fread(args$mmwrFile, stringsAsFactors = FALSE, fill = Inf, showProgress = FALSE)
+        log_message("INFO", "Using fread with fill=TRUE for preprocessed file to handle irregular fields")
+        mmwrdata <- fread(args$mmwrFile, stringsAsFactors = FALSE, fill = TRUE, showProgress = FALSE)
         log_message("INFO", paste("fread loaded", nrow(mmwrdata), "rows"))
       } else {
         # For non-preprocessed files, use fread
-        mmwrdata <- fread(args$mmwrFile, stringsAsFactors = FALSE, fill = Inf, showProgress = FALSE)
+        mmwrdata <- fread(args$mmwrFile, stringsAsFactors = FALSE, fill = TRUE, showProgress = FALSE)
         log_message("INFO", paste("fread loaded", nrow(mmwrdata), "rows"))
       }
     }
@@ -550,9 +550,9 @@ if (pathogen == "CYCLOSPORA") {
   if (!has_cyclospora_fn) {
     # Filter for Cyclospora cases (handle both data.table and data.frame)
     if (inherits(mmwrdata, "data.table")) {
-      pathogen_data <- mmwrdata[toupper(pathogen) == "CYCLOSPORA"]
+      pathogen_data <- mmwrdata[toupper(pathogentype) == "CYCLOSPORA"]
     } else {
-      pathogen_data <- mmwrdata[toupper(mmwrdata$pathogen) == "CYCLOSPORA", ]
+      pathogen_data <- mmwrdata[toupper(mmwrdata$pathogentype) == "CYCLOSPORA", ]
     }
     
     # Apply states filtering if specified
@@ -681,9 +681,9 @@ if (pathogen == "CYCLOSPORA") {
     
     # Filter for Salmonella cases (handle both data.table and data.frame)
     if (inherits(mmwrdata, "data.table")) {
-      pathogen_data <- mmwrdata[toupper(pathogen) == "SALMONELLA"]
+      pathogen_data <- mmwrdata[toupper(pathogentype) == "SALMONELLA"]
     } else {
-      pathogen_data <- mmwrdata[toupper(mmwrdata$pathogen) == "SALMONELLA", ]
+      pathogen_data <- mmwrdata[toupper(mmwrdata$pathogentype) == "SALMONELLA", ]
     }
     
     # Apply serotype filtering for Salmonella if specified
@@ -796,9 +796,9 @@ if (pathogen == "CYCLOSPORA") {
   
   # Filter for the specific pathogen (handle both data.table and data.frame)
   if (inherits(mmwrdata, "data.table")) {
-    pathogen_data <- mmwrdata[toupper(pathogen) == pathogen]
+    pathogen_data <- mmwrdata[toupper(pathogentype) == pathogen]
   } else {
-    pathogen_data <- mmwrdata[toupper(mmwrdata$pathogen) == pathogen, ]
+    pathogen_data <- mmwrdata[toupper(mmwrdata$pathogentype) == pathogen, ]
   }
   
   # Apply STEC serogroup filtering if this is STEC

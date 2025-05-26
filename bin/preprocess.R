@@ -105,10 +105,12 @@ if(!exists("safe_write")) {
       if (endsWith(file_path, ".csv")) {
         if (file.exists(file_path)) {
           # For append mode, use fwrite with append=TRUE
-          fwrite(data, file = file_path, append = TRUE, quote = TRUE)
+          # Use quote="auto" for better compatibility with fread
+          fwrite(data, file = file_path, append = TRUE, quote = "auto")
         } else {
           # For new files, use fwrite (much faster than write.table)
-          fwrite(data, file = file_path, quote = TRUE)
+          # Use quote="auto" for better compatibility with fread
+          fwrite(data, file = file_path, quote = "auto")
         }
       } else if (endsWith(file_path, ".Rds")) {
         saveRDS(data, file = file_path)
@@ -518,13 +520,13 @@ main <- function() {
   census_b_filename <- paste0(output_base, "_census_bacterial.csv")
   census_b_path <- file.path(output_dir, census_b_filename)
   cat("Saving preprocessed bacterial census to:", census_b_path, "\n")
-  fwrite(census_b_state, census_b_path)
+  fwrite(census_b_state, census_b_path, quote = "auto")
   
   # Save parasitic census
   census_p_filename <- paste0(output_base, "_census_parasitic.csv")
   census_p_path <- file.path(output_dir, census_p_filename)
   cat("Saving preprocessed parasitic census to:", census_p_path, "\n")
-  fwrite(census_p_state, census_p_path)
+  fwrite(census_p_state, census_p_path, quote = "auto")
   
   # VALIDATION: Verify census aggregation worked correctly
   cat("\n=== Census Preprocessing Validation ===\n")
