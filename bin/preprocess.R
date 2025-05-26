@@ -521,13 +521,17 @@ main <- function() {
     setDT(census_p)
   }
   
+  # Save row counts for validation before aggregation
+  census_b_rows <- nrow(census_b)
+  census_p_rows <- nrow(census_p)
+  
   # Aggregate bacterial census to state-year level using data.table
   census_b_state <- census_b[, .(
     population = sum(population, na.rm = TRUE),
     n_counties = .N  # Track aggregation for validation
   ), by = .(state, year, pathogentype)]
   
-  cat(paste("Bacterial census: aggregated", nrow(census_b), "county records to", nrow(census_b_state), "state records\n"))
+  cat(paste("Bacterial census: aggregated", census_b_rows, "county records to", nrow(census_b_state), "state records\n"))
   
   # Clean up original census_b to free memory
   rm(census_b)
@@ -539,7 +543,7 @@ main <- function() {
     n_counties = .N  # Track aggregation for validation
   ), by = .(state, year, pathogentype)]
   
-  cat(paste("Parasitic census: aggregated", nrow(census_p), "county records to", nrow(census_p_state), "state records\n"))
+  cat(paste("Parasitic census: aggregated", census_p_rows, "county records to", nrow(census_p_state), "state records\n"))
   
   # Clean up original census_p to free memory
   rm(census_p)
@@ -596,17 +600,17 @@ main <- function() {
     cat("✗ ERROR: Parasitic census file not created!\n")
   }
   
-  # Validate aggregation ratios
-  if (nrow(census_b) > 0 && nrow(census_b_state) > 0) {
-    aggregation_ratio_b <- round(nrow(census_b) / nrow(census_b_state), 1)
+  # Validate aggregation ratios using saved row counts
+  if (census_b_rows > 0 && nrow(census_b_state) > 0) {
+    aggregation_ratio_b <- round(census_b_rows / nrow(census_b_state), 1)
     cat("\n✓ Bacterial aggregation ratio:", aggregation_ratio_b, "counties per state-year\n")
     if (aggregation_ratio_b < 1.5) {
       cat("  ⚠ WARNING: Low aggregation ratio - data may already be state-level\n")
     }
   }
   
-  if (nrow(census_p) > 0 && nrow(census_p_state) > 0) {
-    aggregation_ratio_p <- round(nrow(census_p) / nrow(census_p_state), 1)
+  if (census_p_rows > 0 && nrow(census_p_state) > 0) {
+    aggregation_ratio_p <- round(census_p_rows / nrow(census_p_state), 1)
     cat("✓ Parasitic aggregation ratio:", aggregation_ratio_p, "counties per state-year\n")
     if (aggregation_ratio_p < 1.5) {
       cat("  ⚠ WARNING: Low aggregation ratio - data may already be state-level\n")
