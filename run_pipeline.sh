@@ -787,14 +787,56 @@ echo "         v1.0.0-rc.1                    "
 echo "========================================="
 echo ""
 
-# Enhanced workflow selection with metadata-first approach
-echo "Select data input method:"
-echo "1) Load from metadata JSON (recommended - auto-loads all files)"
-echo "2) Manual file selection (raw data → preprocessing → analysis)"
-echo "3) Use existing preprocessed data (manual selection)"
-echo "4) Load saved configuration"
-read -p "Enter selection [1]: " input_method
-input_method=${input_method:-1}
+# Search for available metadata files first
+echo "Searching for preprocessed data metadata files..."
+mapfile -t found_json < <(find . -type f -name "*_metadata.json" 2>/dev/null | grep -E "(preprocessed|output)" | sort -r)
+
+if [[ ${#found_json[@]} -gt 0 ]]; then
+    echo ""
+    echo "Found ${#found_json[@]} preprocessed dataset(s):"
+    echo ""
+    for i in "${!found_json[@]}"; do
+        # Extract key info from metadata
+        json_file="${found_json[$i]}"
+        mod_time=$(stat -c "%y" "$json_file" 2>/dev/null | cut -d' ' -f1,2 | cut -d'.' -f1)
+        pathogen_info=$(parse_metadata_json "$json_file" "pathogens" | tr ',' ' ' | wc -w)
+        state_info=$(parse_metadata_json "$json_file" "states" | tr ',' ' ' | wc -w)
+        year_info=$(parse_metadata_json "$json_file" "years")
+        
+        printf "%2d) %s\n" $((i+1)) "$json_file"
+        printf "    Modified: %s | %s pathogens | %s states | Years: %s\n" \
+               "$mod_time" "$pathogen_info" "$state_info" "$year_info"
+        echo ""
+    done
+    echo " 0) Run new preprocessing (start from raw data)"
+    echo ""
+    read -p "Select dataset to use [1]: " metadata_choice
+    metadata_choice=${metadata_choice:-1}
+    
+    if [[ "$metadata_choice" == "0" ]]; then
+        input_method=2  # Manual preprocessing
+    elif [[ "$metadata_choice" -ge 1 && "$metadata_choice" -le ${#found_json[@]} ]]; then
+        input_method=1  # Use metadata
+        selected_metadata="${found_json[$((metadata_choice-1))]}"
+    else
+        echo "Invalid selection. Starting manual preprocessing."
+        input_method=2
+    fi
+else
+    echo "No preprocessed data found."
+    echo ""
+    echo "Select data input method:"
+    echo "1) Manual file selection (raw data → preprocessing → analysis)"
+    echo "2) Load saved configuration"
+    read -p "Enter selection [1]: " input_method
+    
+    # Remap choices since we don't have metadata option
+    if [[ "$input_method" == "2" ]]; then
+        input_method=4  # Configuration
+    else
+        input_method=2  # Manual
+    fi
+fi
 
 # Map input method to workflow mode
 if [[ "$input_method" == "1" || "$input_method" == "3" ]]; then
@@ -836,37 +878,8 @@ censusFileP=""
 
 # Handle metadata-first approach
 if [[ "$input_method" == "1" ]]; then
-    echo ""
-    echo "======== Metadata JSON Loading ========"
-    
-    # Find available metadata files
-    echo "Searching for metadata JSON files..."
-    mapfile -t found_json < <(find . -type f -name "*_metadata.json" 2>/dev/null | grep -E "(preprocessed|output)" | sort -r)
-    
-    if [[ ${#found_json[@]} -gt 0 ]]; then
-        echo "Found metadata files:"
-        for i in "${!found_json[@]}"; do
-            # Show file with modification time for context
-            mod_time=$(stat -c "%y" "${found_json[$i]}" 2>/dev/null | cut -d' ' -f1,2 | cut -d'.' -f1)
-            printf "%2d) %s (modified: %s)\n" $((i+1)) "${found_json[$i]}" "$mod_time"
-        done
-        echo ""
-        read -p "Select metadata file [1]: " json_choice
-        json_choice=${json_choice:-1}
-        
-        if [[ "$json_choice" -ge 1 && "$json_choice" -le ${#found_json[@]} ]]; then
-            preprocessed_metadata="${found_json[$((json_choice-1))]}"
-        else
-            echo "Invalid selection. Exiting."
-            exit 1
-        fi
-    else
-        read -p "Enter path to metadata JSON file: " preprocessed_metadata
-        if [[ ! -f "$preprocessed_metadata" ]]; then
-            echo "Metadata file not found. Exiting."
-            exit 1
-        fi
-    fi
+    # Use the selected metadata file
+    preprocessed_metadata="$selected_metadata"
     
     echo ""
     echo "Loading data from metadata: $preprocessed_metadata"
@@ -892,26 +905,76 @@ if [[ "$input_method" == "1" ]]; then
         fi
     fi
     
-    # Load census files
-    census_b_file=$(parse_metadata_json "$preprocessed_metadata" "census_file_bacterial_preprocessed")
-    if [[ -n "$census_b_file" ]]; then
-        censusFileB="${metadata_dir}/${census_b_file}"
+    # Load original source file paths from metadata
+    original_mmwr=$(parse_metadata_json "$preprocessed_metadata" "source_file")
+    if [[ -n "$original_mmwr" ]]; then
+        echo "✓ Original MMWR source: $original_mmwr"
+    fi
+    
+    # Load original census files (these will be used by the pipeline)
+    original_census_b=$(parse_metadata_json "$preprocessed_metadata" "census_file_bacterial_original")
+    if [[ -n "$original_census_b" ]]; then
+        censusFileB="$original_census_b"
         if [[ -f "$censusFileB" ]]; then
-            echo "✓ Bacterial census: $censusFileB"
+            echo "✓ Original bacterial census: $censusFileB"
         else
-            echo "✗ Bacterial census not found: $census_b_file"
-            exit 1
+            echo "⚠️  Warning: Original bacterial census not found at: $censusFileB"
+            # Fall back to preprocessed census if original not found
+            census_b_file=$(parse_metadata_json "$preprocessed_metadata" "census_file_bacterial_preprocessed")
+            if [[ -n "$census_b_file" ]]; then
+                censusFileB="${metadata_dir}/${census_b_file}"
+                if [[ -f "$censusFileB" ]]; then
+                    echo "   Using preprocessed census instead: $censusFileB"
+                else
+                    echo "✗ Neither original nor preprocessed bacterial census found"
+                    exit 1
+                fi
+            fi
+        fi
+    else
+        # For older metadata files without original paths, use preprocessed
+        census_b_file=$(parse_metadata_json "$preprocessed_metadata" "census_file_bacterial_preprocessed")
+        if [[ -n "$census_b_file" ]]; then
+            censusFileB="${metadata_dir}/${census_b_file}"
+            if [[ -f "$censusFileB" ]]; then
+                echo "✓ Bacterial census (preprocessed): $censusFileB"
+            else
+                echo "✗ Bacterial census not found: $census_b_file"
+                exit 1
+            fi
         fi
     fi
     
-    census_p_file=$(parse_metadata_json "$preprocessed_metadata" "census_file_parasitic_preprocessed")
-    if [[ -n "$census_p_file" ]]; then
-        censusFileP="${metadata_dir}/${census_p_file}"
+    original_census_p=$(parse_metadata_json "$preprocessed_metadata" "census_file_parasitic_original")
+    if [[ -n "$original_census_p" ]]; then
+        censusFileP="$original_census_p"
         if [[ -f "$censusFileP" ]]; then
-            echo "✓ Parasitic census: $censusFileP"
+            echo "✓ Original parasitic census: $censusFileP"
         else
-            echo "✗ Parasitic census not found: $census_p_file"
-            exit 1
+            echo "⚠️  Warning: Original parasitic census not found at: $censusFileP"
+            # Fall back to preprocessed census if original not found
+            census_p_file=$(parse_metadata_json "$preprocessed_metadata" "census_file_parasitic_preprocessed")
+            if [[ -n "$census_p_file" ]]; then
+                censusFileP="${metadata_dir}/${census_p_file}"
+                if [[ -f "$censusFileP" ]]; then
+                    echo "   Using preprocessed census instead: $censusFileP"
+                else
+                    echo "✗ Neither original nor preprocessed parasitic census found"
+                    exit 1
+                fi
+            fi
+        fi
+    else
+        # For older metadata files without original paths, use preprocessed
+        census_p_file=$(parse_metadata_json "$preprocessed_metadata" "census_file_parasitic_preprocessed")
+        if [[ -n "$census_p_file" ]]; then
+            censusFileP="${metadata_dir}/${census_p_file}"
+            if [[ -f "$censusFileP" ]]; then
+                echo "✓ Parasitic census (preprocessed): $censusFileP"
+            else
+                echo "✗ Parasitic census not found: $census_p_file"
+                exit 1
+            fi
         fi
     fi
     
@@ -1820,22 +1883,31 @@ case $performance_profile in
         
         # Get MCMC parameters
         echo "Recommended settings based on pathogen count ($pathogen_count pathogens):"
+        echo ""
+        echo "IMPORTANT: Each pathogen gets the FULL number of chains you specify!"
+        echo "Total chains = pathogens × chains per pathogen"
+        echo ""
         
-        # Base recommendations on pathogen count
+        # Base recommendations on pathogen count - INVERSE relationship
         if [[ $pathogen_count -le 1 ]]; then
-            echo "Recommended: 4-8 chains, 2000 iterations, 16 cores"
-            default_chains=4
-            default_iterations=2000
+            echo "Single pathogen: Can use more chains for better convergence"
+            echo "Recommended: 8-16 chains, 5000 iterations, 16 cores"
+            default_chains=8
+            default_iterations=5000
             default_cores=16
         elif [[ $pathogen_count -le 3 ]]; then
-            echo "Recommended: 8-12 chains, 3000 iterations, 24 cores"
-            default_chains=8
+            echo "Multiple pathogens: Moderate chains to balance quality and resources"
+            echo "Recommended: 4-8 chains, 3000 iterations, 24 cores"
+            echo "Total chains will be: $pathogen_count pathogens × chains = $(($pathogen_count * 4))-$(($pathogen_count * 8)) chains"
+            default_chains=4
             default_iterations=3000
             default_cores=24
         else
-            echo "Recommended: 16 chains, 5000 iterations, 32 cores"
-            default_chains=16
-            default_iterations=5000
+            echo "Many pathogens: Reduce chains per pathogen to avoid resource exhaustion"
+            echo "Recommended: 2-4 chains, 2000 iterations, 32 cores"
+            echo "Total chains will be: $pathogen_count pathogens × chains = $(($pathogen_count * 2))-$(($pathogen_count * 4)) chains"
+            default_chains=2
+            default_iterations=2000
             default_cores=32
         fi
         
@@ -1857,8 +1929,16 @@ case $performance_profile in
         # Calculate optimal memory based on cores, chains, and iterations
         optimal_memory=$((cores * 2))
         chains_memory=$((chains * 1))
-        iterations_factor=$(echo "scale=2; ${iterations}/1000" | bc 2>/dev/null || echo "1")
-        iterations_memory=$(echo "scale=0; ${iterations_factor} * 4" | bc 2>/dev/null || echo "4")
+        # Use bc if available, otherwise use shell arithmetic
+        if command -v bc >/dev/null 2>&1; then
+            iterations_factor=$(echo "scale=2; ${iterations}/1000" | bc 2>/dev/null || echo "1")
+            iterations_memory=$(echo "scale=0; ${iterations_factor} * 4" | bc 2>/dev/null || echo "4")
+        else
+            # Fallback to shell arithmetic (less precise but works everywhere)
+            iterations_factor=$((iterations / 1000))
+            iterations_factor=${iterations_factor:-1}
+            iterations_memory=$((iterations_factor * 4))
+        fi
         
         # Ensure iterations_memory is a number even if bc fails
         if ! [[ "$iterations_memory" =~ ^[0-9]+$ ]]; then
@@ -2150,23 +2230,49 @@ if [[ "$execute" =~ ^[Yy]$ ]]; then
     fi
     
     # Check for optimal memory-to-core ratio on HPC
-    mem_per_core=$(echo "scale=2; ${memory_gb}/${cores}" | bc 2>/dev/null || echo "0")
-    if (( $(echo "$mem_per_core < 1.5" | bc -l 2>/dev/null) )); then
-        echo "WARNING: Memory-to-core ratio may be low (${mem_per_core}GB per core)."
-        echo "HPC environments typically perform best with 2-4GB per core."
-        suggested_memory=$((cores * 2))
-        echo "Suggested memory: ${suggested_memory}GB"
-        
-        read -p "Adjust memory to ${suggested_memory}GB? (y/n) [y]: " adjust_memory
-        adjust_memory=${adjust_memory:-y}
-        if [[ "$adjust_memory" =~ ^[Yy]$ ]]; then
-            memory_gb=$suggested_memory
-            memory="${memory_gb}.GB"
-            cmd=$(echo "$cmd" | sed "s/-process.memory [0-9]*\.[G|M]B/-process.memory $memory/")
-            echo "Adjusted memory to $memory"
+    # Use bc if available, otherwise use shell arithmetic
+    if command -v bc >/dev/null 2>&1; then
+        mem_per_core=$(echo "scale=2; ${memory_gb}/${cores}" | bc 2>/dev/null || echo "0")
+        low_memory=$(echo "$mem_per_core < 1.5" | bc -l 2>/dev/null || echo "0")
+        if [[ "$low_memory" == "1" ]]; then
+            echo "⚠️  WARNING: Low memory per core ratio ($mem_per_core GB/core)"
+            echo "   This may cause Stan initialization failures or slow performance"
+            echo "   HPC environments typically perform best with 2-4GB per core"
+            suggested_memory=$((cores * 2))
+            echo "   Suggested memory: ${suggested_memory}GB"
+            
+            read -p "Adjust memory to ${suggested_memory}GB? (y/n) [y]: " adjust_memory
+            adjust_memory=${adjust_memory:-y}
+            if [[ "$adjust_memory" =~ ^[Yy]$ ]]; then
+                memory_gb=$suggested_memory
+                memory="${memory_gb}.GB"
+                cmd=$(echo "$cmd" | sed "s/-process.memory [0-9]*\.[G|M]B/-process.memory $memory/")
+                echo "Adjusted memory to $memory"
+            fi
+        else
+            echo "OPTIMAL: Memory-to-core ratio is good (${mem_per_core}GB per core)."
         fi
     else
-        echo "OPTIMAL: Memory-to-core ratio is good (${mem_per_core}GB per core)."
+        # Fallback for systems without bc
+        mem_per_core_x10=$((memory_gb * 10 / cores))
+        if (( mem_per_core_x10 < 15 )); then
+            echo "⚠️  WARNING: Low memory per core ratio"
+            echo "   This may cause Stan initialization failures or slow performance"
+            echo "   HPC environments typically perform best with 2-4GB per core"
+            suggested_memory=$((cores * 2))
+            echo "   Suggested memory: ${suggested_memory}GB"
+            
+            read -p "Adjust memory to ${suggested_memory}GB? (y/n) [y]: " adjust_memory
+            adjust_memory=${adjust_memory:-y}
+            if [[ "$adjust_memory" =~ ^[Yy]$ ]]; then
+                memory_gb=$suggested_memory
+                memory="${memory_gb}.GB"
+                cmd=$(echo "$cmd" | sed "s/-process.memory [0-9]*\.[G|M]B/-process.memory $memory/")
+                echo "Adjusted memory to $memory"
+            fi
+        else
+            echo "OPTIMAL: Memory-to-core ratio is good."
+        fi
     fi
     
     echo "Starting analysis..."

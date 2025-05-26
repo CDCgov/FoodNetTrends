@@ -28,6 +28,7 @@ suppressPackageStartupMessages({
   library(tibble)
   library(readr)  
   library(HDInterval)
+  library(data.table)
   library(gridExtra)
 })
 
@@ -436,37 +437,43 @@ cyclospora_analysis <- function(mmwrdata, census) {
     stop("CRITICAL ERROR: No Parasitic pathogentype found in census data. Cannot proceed without census data.")
   }
   
+  # Convert to data.table for efficient operations
+  if (!inherits(mmwrdata, "data.table")) {
+    setDT(mmwrdata)
+  }
+  if (!inherits(census, "data.table")) {
+    setDT(census)
+  }
+  
   # Filter for Cyclospora
   message("Filtering for CYCLOSPORA records")
-  cyclospora_data <- mmwrdata %>%
-    filter(toupper(pathogen) == "CYCLOSPORA")
+  cyclospora_data <- mmwrdata[toupper(pathogen) == "CYCLOSPORA"]
   
   if (nrow(cyclospora_data) == 0) {
     stop("CRITICAL ERROR: No CYCLOSPORA data found in MMWR data. Cannot proceed with analysis.")
   }
   
   message("Aggregating Cyclospora counts by year and state")
-  cyclo_counts <- cyclospora_data %>%
-    group_by(year, state) %>%
-    summarise(count = n(), .groups = "drop")
+  cyclo_counts <- cyclospora_data[, .(count = .N), by = .(year, state)]
   
   message("Number of Cyclospora count rows: ", nrow(cyclo_counts))
   
   # Complete the dataset with all state/year combinations
   message("Completing dataset with all combinations")
-  cyclo_counts_complete <- cyclo_counts %>%
-    complete(
-      year = unique(cyclo_counts$year), 
-      state = unique(cyclo_counts$state),
-      fill = list(count = 0)
-    )
+  # Get all unique years and states
+  all_years <- cyclo_counts[, unique(year)]
+  all_states <- cyclo_counts[, unique(state)]
+  # Create complete grid
+  complete_grid <- CJ(year = all_years, state = all_states)
+  # Merge with actual counts, filling missing with 0
+  cyclo_counts_complete <- cyclo_counts[complete_grid, on = .(year, state)]
+  cyclo_counts_complete[is.na(count), count := 0]
   
   message("Number of rows after completion: ", nrow(cyclo_counts_complete))
   
   # Filter census for parasitic entries
   message("Filtering census data for parasitic records")
-  census_parasitic <- census %>% 
-    filter(toupper(pathogentype) == "PARASITIC")
+  census_parasitic <- census[toupper(pathogentype) == "PARASITIC"]
   
   message("Number of parasitic census records: ", nrow(census_parasitic))
   
@@ -493,14 +500,11 @@ cyclospora_analysis <- function(mmwrdata, census) {
     message("Aggregating census data to state-year level")
     pre_agg_rows <- nrow(census_parasitic)
     
-    census_parasitic <- census_parasitic %>%
-      group_by(state, year) %>%
-      summarise(
+    census_parasitic <- census_parasitic[, .(
         population = sum(population, na.rm = TRUE),
         pathogentype = first(pathogentype),
-        n_counties = n(),  # Track aggregation
-        .groups = "drop"
-      )
+        n_counties = .N  # Track aggregation
+      ), by = .(state, year)]
     message("Census records: aggregated ", pre_agg_rows, " county records to ", nrow(census_parasitic), " state records")
   } else {
     message("Census data is already at state level, no aggregation needed")
@@ -508,10 +512,10 @@ cyclospora_analysis <- function(mmwrdata, census) {
   
   if (nrow(census_parasitic) == 0) {
     warning("No parasitic census records found after filtering. Using all census records.")
-    census_parasitic <- census
+    census_parasitic <- copy(census)  # Use copy to avoid modifying original
   }
   
-  # Join with census data carefully
+  # Join with census data using data.table syntax
   message("Joining Cyclospora counts with census data")
   pre_join_rows <- nrow(cyclo_counts_complete)
   
@@ -527,12 +531,12 @@ cyclospora_analysis <- function(mmwrdata, census) {
     stop("CRITICAL ERROR: Essential join columns (state, year) missing from data. Check data structure and preprocessing.")
   }
   
-  # Perform the join
-  cyclo <- left_join(
-    cyclo_counts_complete,
-    census_parasitic,
-    by = join_cols
-  )
+  # Perform the join using data.table syntax
+  cyclo <- census_parasitic[cyclo_counts_complete, on = .(year, state)]
+  
+  # Clean up intermediate objects
+  rm(cyclospora_data, cyclo_counts, cyclo_counts_complete, complete_grid)
+  gc()
   
   post_join_rows <- nrow(cyclo)
   message("Rows before join: ", pre_join_rows, ", after join: ", post_join_rows)
@@ -544,25 +548,23 @@ cyclospora_analysis <- function(mmwrdata, census) {
   # Handle missing population values - exclude incomplete data rather than fabricate
   na_population_count <- sum(is.na(cyclo$population))
   if (na_population_count > 0) {
-    excluded_data <- cyclo[is.na(cyclo$population), c("state", "year")]
+    excluded_data <- cyclo[is.na(population), .(state, year)]
     warning(paste("EXCLUDING", na_population_count, "rows due to missing population data:"))
     if (nrow(excluded_data) > 0) {
-      excluded_summary <- excluded_data %>%
-        group_by(state) %>%
-        summarise(missing_years = paste(sort(unique(year)), collapse=", "), .groups = "drop")
+      excluded_summary <- excluded_data[, .(missing_years = paste(sort(unique(year)), collapse=", ")), by = .(state)]
       for(i in 1:nrow(excluded_summary)) {
         warning(paste("  State", excluded_summary$state[i], "missing years:", excluded_summary$missing_years[i]))
       }
     }
-    # Remove incomplete records
-    cyclo <- cyclo[!is.na(cyclo$population), ]
+    # Remove incomplete records using data.table syntax
+    cyclo <- cyclo[!is.na(population)]
     message(paste("Analysis will proceed with", nrow(cyclo), "complete records"))
   }
   
   # Add pathogentype if missing
   if (!"pathogentype" %in% names(cyclo) || all(is.na(cyclo$pathogentype))) {
     warning("Missing pathogentype column after join, adding default")
-    cyclo$pathogentype <- "Parasitic"
+    cyclo[, pathogentype := "Parasitic"]
   }
   
   message("Final Cyclospora dataset has", nrow(cyclo), "rows")
@@ -674,46 +676,52 @@ salmonella_analysis <- function(mmwrdata, census) {
     stop("CRITICAL ERROR: No Bacterial pathogentype found in census data. Cannot proceed without census data.")
   }
   
+  # Convert to data.table for efficient operations
+  if (!inherits(mmwrdata, "data.table")) {
+    setDT(mmwrdata)
+  }
+  if (!inherits(census, "data.table")) {
+    setDT(census)
+  }
+  
   # Filter for Salmonella
   message("Filtering for SALMONELLA records")
-  salmonella_data <- mmwrdata %>%
-    filter(toupper(pathogen) == "SALMONELLA")
+  salmonella_data <- mmwrdata[toupper(pathogen) == "SALMONELLA"]
   
   if (nrow(salmonella_data) == 0) {
     stop("CRITICAL ERROR: No SALMONELLA data found in MMWR data. Cannot proceed with analysis.")
   }
   
   message("Aggregating Salmonella counts by year and state")
-  sal_counts <- salmonella_data %>%
-    group_by(year, state) %>%
-    summarise(count = n(), .groups = "drop")
+  sal_counts <- salmonella_data[, .(count = .N), by = .(year, state)]
   
   message("Number of Salmonella count rows: ", nrow(sal_counts))
   
   # Complete the dataset with all state/year combinations
   message("Completing dataset with all combinations")
-  sal_counts_complete <- sal_counts %>%
-    complete(
-      year = unique(sal_counts$year), 
-      state = unique(sal_counts$state),
-      fill = list(count = 0)
-    )
+  # Get all unique years and states
+  all_years <- sal_counts[, unique(year)]
+  all_states <- sal_counts[, unique(state)]
+  # Create complete grid
+  complete_grid <- CJ(year = all_years, state = all_states)
+  # Merge with actual counts, filling missing with 0
+  sal_counts_complete <- sal_counts[complete_grid, on = .(year, state)]
+  sal_counts_complete[is.na(count), count := 0]
   
   message("Number of rows after completion: ", nrow(sal_counts_complete))
   
   # Filter census for bacterial entries
   message("Filtering census data for bacterial records")
-  census_bacterial <- census %>% 
-    filter(toupper(pathogentype) == "BACTERIAL")
+  census_bacterial <- census[toupper(pathogentype) == "BACTERIAL"]
   
   message("Number of bacterial census records: ", nrow(census_bacterial))
   
   if (nrow(census_bacterial) == 0) {
     warning("No bacterial census records found after filtering. Using all census records.")
-    census_bacterial <- census
+    census_bacterial <- copy(census)  # Use copy to avoid modifying original
   }
   
-  # Join with census data carefully
+  # Join with census data using data.table syntax
   message("Joining Salmonella counts with census data")
   pre_join_rows <- nrow(sal_counts_complete)
   
@@ -729,15 +737,15 @@ salmonella_analysis <- function(mmwrdata, census) {
     stop("CRITICAL ERROR: Essential join columns (state, year) missing from data. Check data structure and preprocessing.")
   }
   
-  # Perform the join
-  sal <- left_join(
-    sal_counts_complete,
-    census_bacterial,
-    by = join_cols
-  )
+  # Perform the join using data.table syntax
+  sal <- census_bacterial[sal_counts_complete, on = .(year, state)]
   
   post_join_rows <- nrow(sal)
   message("Rows before join: ", pre_join_rows, ", after join: ", post_join_rows)
+  
+  # Clean up intermediate objects
+  rm(salmonella_data, sal_counts, sal_counts_complete, complete_grid)
+  gc()
   
   if (post_join_rows != pre_join_rows) {
     warning(paste("Join changed row count from", pre_join_rows, "to", post_join_rows))
@@ -747,8 +755,8 @@ salmonella_analysis <- function(mmwrdata, census) {
   na_population_count <- sum(is.na(sal$population))
   if (na_population_count > 0) {
     warning(paste(na_population_count, "rows have missing population values after join. These will be excluded."))
-    # Exclude rows with missing population
-    sal <- sal[!is.na(sal$population), ]
+    # Exclude rows with missing population using data.table syntax
+    sal <- sal[!is.na(population)]
     if (nrow(sal) == 0) {
       stop("CRITICAL ERROR: No complete data (with population) available after join.")
     }
@@ -757,7 +765,7 @@ salmonella_analysis <- function(mmwrdata, census) {
   # Add pathogentype if missing
   if (!"pathogentype" %in% names(sal) || all(is.na(sal$pathogentype))) {
     warning("Missing pathogentype column after join, adding default")
-    sal$pathogentype <- "Bacterial"
+    sal[, pathogentype := "Bacterial"]
   }
   
   message("Final Salmonella dataset has", nrow(sal), "rows")

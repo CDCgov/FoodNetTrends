@@ -579,6 +579,15 @@ if (pathogen == "CYCLOSPORA") {
       # Call specialized function
       analysis_data <- cyclospora_analysis(mmwr_copy, census_copy)
       
+      # Apply states filtering if specified
+      if (!is.null(args$states) && args$states != "ALL") {
+        target_states <- trimws(unlist(strsplit(args$states, ",")))
+        initial_count <- nrow(analysis_data)
+        analysis_data <- analysis_data[toupper(analysis_data$state) %in% toupper(target_states), ]
+        final_count <- nrow(analysis_data)
+        log_message("INFO", paste("States filtering reduced analysis data from", initial_count, "to", final_count, "rows"))
+      }
+      
       log_message("INFO", paste("Generated analysis data using specialized function:", 
                                nrow(analysis_data), "rows"))
     }, error = function(e) {
@@ -704,6 +713,15 @@ if (pathogen == "CYCLOSPORA") {
       # Call specialized function
       analysis_data <- salmonella_analysis(mmwr_copy, census_copy)
       
+      # Apply states filtering if specified
+      if (!is.null(args$states) && args$states != "ALL") {
+        target_states <- trimws(unlist(strsplit(args$states, ",")))
+        initial_count <- nrow(analysis_data)
+        analysis_data <- analysis_data[toupper(analysis_data$state) %in% toupper(target_states), ]
+        final_count <- nrow(analysis_data)
+        log_message("INFO", paste("States filtering reduced analysis data from", initial_count, "to", final_count, "rows"))
+      }
+      
       log_message("INFO", paste("Generated analysis data using specialized function:", 
                                nrow(analysis_data), "rows"))
     }, error = function(e) {
@@ -798,10 +816,16 @@ if (pathogen == "CYCLOSPORA") {
     log_message("DEBUG", paste("Pathogen counts year class:", class(pathogen_counts$year)))
     log_message("DEBUG", paste("Census data year class:", class(censusBdata$year)))
     
-    # Join with census data
+    # Join with census data using data.table syntax for efficiency
     log_message("MODEL", "Joining pathogen counts with census data")
-    analysis_data <- left_join(pathogen_counts, censusBdata, by = c("state", "year"))
-    # Force garbage collection after join
+    # Convert to data.table if needed
+    if (!inherits(censusBdata, "data.table")) {
+      setDT(censusBdata)
+    }
+    # Use data.table merge syntax - more memory efficient than dplyr::left_join
+    analysis_data <- censusBdata[pathogen_counts, on = .(state, year)]
+    # Clean up and force garbage collection after join
+    rm(pathogen_counts)
     gc()
   }
   
@@ -917,10 +941,16 @@ if (pathogen == "CYCLOSPORA") {
   log_message("DEBUG", paste("Pathogen counts year class:", class(pathogen_counts$year)))
   log_message("DEBUG", paste("Census data year class:", class(censusBdata$year)))
   
-  # Join with census data
+  # Join with census data using data.table syntax for efficiency
   log_message("MODEL", "Joining pathogen counts with census data")
-  analysis_data <- left_join(pathogen_counts, censusBdata, by = c("state", "year"))
-  # Force garbage collection after join
+  # Convert to data.table if needed
+  if (!inherits(censusBdata, "data.table")) {
+    setDT(censusBdata)
+  }
+  # Use data.table merge syntax - more memory efficient than dplyr::left_join
+  analysis_data <- censusBdata[pathogen_counts, on = .(state, year)]
+  # Clean up and force garbage collection after join
+  rm(pathogen_counts)
   gc()
   
   # Handle missing population values
@@ -1326,9 +1356,17 @@ ir_data <- tryCatch({
       stringsAsFactors = FALSE
     )
     
-    # Add average population for each state from original data
-    state_pops <- aggregate(population ~ state, data = analysis_data, FUN = mean)
-    pred_grid <- merge(pred_grid, state_pops, by = "state")
+    # Add average population for each state from original data using data.table
+    if (!inherits(analysis_data, "data.table")) {
+      setDT(analysis_data)
+    }
+    state_pops <- analysis_data[, .(population = mean(population, na.rm = TRUE)), by = .(state)]
+    
+    # Convert pred_grid to data.table and merge
+    if (!inherits(pred_grid, "data.table")) {
+      setDT(pred_grid)
+    }
+    pred_grid <- state_pops[pred_grid, on = .(state)]
     
     # CRITICAL FIX: Use posterior_epred to get predictions on response scale
     # This avoids the astronomical values caused by exponentiating log-scale predictions
@@ -1443,15 +1481,21 @@ ir_data <- tryCatch({
       observed_data$ir_upper <- observed_data$ir
       observed_data$type <- "observed"
       
-      # Combine spline predictions and observed data
-      ir_results <- rbind(
-        data.frame(state = pred_grid$state, year = pred_grid$year,
-                  ir = pred_grid$ir, ir_lower = pred_grid$ir_lower, ir_upper = pred_grid$ir_upper,
-                  type = pred_grid$type, stringsAsFactors = FALSE),
-        data.frame(state = observed_data$state, year = observed_data$year,
-                  ir = observed_data$ir, ir_lower = observed_data$ir_lower, ir_upper = observed_data$ir_upper,
-                  type = observed_data$type, stringsAsFactors = FALSE)
-      )
+      # Combine spline predictions and observed data using data.table for efficiency
+      # Convert to data.table if needed
+      if (!inherits(pred_grid, "data.table")) {
+        setDT(pred_grid)
+      }
+      if (!inherits(observed_data, "data.table")) {
+        setDT(observed_data)
+      }
+      
+      # Select only needed columns
+      pred_subset <- pred_grid[, .(state, year, ir, ir_lower, ir_upper, type)]
+      obs_subset <- observed_data[, .(state, year, ir, ir_lower, ir_upper, type)]
+      
+      # Efficiently combine using data.table
+      ir_results <- rbindlist(list(pred_subset, obs_subset), use.names = TRUE)
       
       log_message("INFO", paste("Generated", nrow(pred_grid), "spline trend points and", 
                                nrow(observed_data), "observed data points"))
@@ -1479,7 +1523,10 @@ ir_data <- tryCatch({
       years <- sort(unique(analysis_data$year))
       states <- unique(analysis_data$state)
       
-      ir_results <- data.frame()
+      # Pre-allocate list for efficiency
+      results_list <- list()
+      idx <- 1
+      
       for (s in states) {
         for (y in years) {
           state_data <- subset(analysis_data, state == s & year == y)
@@ -1490,13 +1537,17 @@ ir_data <- tryCatch({
             ir_lower <- max(0, ir - 0.3 * ir)
             ir_upper <- ir + 0.3 * ir
             
-            ir_results <- rbind(ir_results, data.frame(
+            results_list[[idx]] <- data.table(
               state = s, year = y, ir = ir, ir_lower = ir_lower, ir_upper = ir_upper,
-              type = "observed", stringsAsFactors = FALSE
-            ))
+              type = "observed"
+            )
+            idx <- idx + 1
           }
         }
       }
+      
+      # Combine all results at once
+      ir_results <- rbindlist(results_list, use.names = TRUE)
     }
   } else {
     # Dummy model fallback
@@ -1504,7 +1555,10 @@ ir_data <- tryCatch({
     years <- sort(unique(analysis_data$year))
     states <- unique(analysis_data$state)
     
-    ir_results <- data.frame()
+    # Pre-allocate list for efficiency
+    results_list <- list()
+    idx <- 1
+    
     for (s in states) {
       for (y in years) {
         state_data <- subset(analysis_data, state == s & year == y)
@@ -1515,13 +1569,17 @@ ir_data <- tryCatch({
           ir_lower <- max(0, ir - 0.5 * ir)
           ir_upper <- ir + 0.5 * ir
           
-          ir_results <- rbind(ir_results, data.frame(
+          results_list[[idx]] <- data.table(
             state = s, year = y, ir = ir, ir_lower = ir_lower, ir_upper = ir_upper,
-            type = "observed", stringsAsFactors = FALSE
-          ))
+            type = "observed"
+          )
+          idx <- idx + 1
         }
       }
     }
+    
+    # Combine all results at once
+    ir_results <- rbindlist(results_list, use.names = TRUE)
   }
   
   ir_results
@@ -1666,9 +1724,15 @@ tryCatch({
   
   # Overall spline trend plot
   if (nrow(spline_data) > 0) {
-    # Calculate overall trend (average across states)
-    overall_spline <- aggregate(cbind(ir, ir_lower, ir_upper) ~ year, 
-                               data = spline_data, FUN = mean, na.rm = TRUE)
+    # Calculate overall trend (average across states) using data.table
+    if (!inherits(spline_data, "data.table")) {
+      setDT(spline_data)
+    }
+    overall_spline <- spline_data[, .(
+      ir = mean(ir, na.rm = TRUE),
+      ir_lower = mean(ir_lower, na.rm = TRUE),
+      ir_upper = mean(ir_upper, na.rm = TRUE)
+    ), by = .(year)]
     
     p1 <- ggplot() +
       # Spline trend line with confidence interval
@@ -1677,7 +1741,10 @@ tryCatch({
       geom_line(data = overall_spline, aes(x = year, y = ir), 
                 color = "blue", linewidth = 1.2) +
       # Observed data points
-      geom_point(data = aggregate(ir ~ year, data = observed_data, FUN = mean, na.rm = TRUE),
+      geom_point(data = {
+                  if (!inherits(observed_data, "data.table")) setDT(observed_data)
+                  observed_data[, .(ir = mean(ir, na.rm = TRUE)), by = .(year)]
+                },
                 aes(x = year, y = ir), color = "darkblue", size = 2.5, alpha = 0.7) +
       labs(
         title = paste(pathogen, "Spline Incidence Rate Trend"),
@@ -1745,9 +1812,15 @@ tryCatch({
   
   # Comparison plot: Spline vs Observed
   if (nrow(spline_data) > 0 && nrow(observed_data) > 0) {
-    # Average trends for comparison
-    overall_spline <- aggregate(ir ~ year, data = spline_data, FUN = mean, na.rm = TRUE)
-    overall_observed <- aggregate(ir ~ year, data = observed_data, FUN = mean, na.rm = TRUE)
+    # Average trends for comparison using data.table
+    if (!inherits(spline_data, "data.table")) {
+      setDT(spline_data)
+    }
+    if (!inherits(observed_data, "data.table")) {
+      setDT(observed_data)
+    }
+    overall_spline <- spline_data[, .(ir = mean(ir, na.rm = TRUE)), by = .(year)]
+    overall_observed <- observed_data[, .(ir = mean(ir, na.rm = TRUE)), by = .(year)]
     
     p3 <- ggplot() +
       geom_line(data = overall_spline, aes(x = year, y = ir), 
@@ -1847,7 +1920,10 @@ cat("\n--- INCIDENCE RATE SUMMARY ---\n")
 if ("type" %in% names(ir_data)) {
   observed_ir <- subset(ir_data, type == "observed")
   if (nrow(observed_ir) > 0) {
-    state_summary <- aggregate(ir ~ state, data = observed_ir, FUN = function(x) round(mean(x, na.rm=TRUE), 2))
+    if (!inherits(observed_ir, "data.table")) {
+      setDT(observed_ir)
+    }
+    state_summary <- observed_ir[, .(ir = round(mean(ir, na.rm=TRUE), 2)), by = .(state)]
     overall_mean <- round(mean(observed_ir$ir, na.rm=TRUE), 2)
     overall_range <- round(range(observed_ir$ir, na.rm=TRUE), 2)
     
@@ -1860,7 +1936,10 @@ if ("type" %in% names(ir_data)) {
   }
 } else {
   # Fallback for older format
-  state_summary <- aggregate(ir ~ state, data = ir_data, FUN = function(x) round(mean(x, na.rm=TRUE), 2))
+  if (!inherits(ir_data, "data.table")) {
+    setDT(ir_data)
+  }
+  state_summary <- ir_data[, .(ir = round(mean(ir, na.rm=TRUE), 2)), by = .(state)]
   cat("State Averages:\n")
   for (i in 1:nrow(state_summary)) {
     cat(paste("  ", state_summary$state[i], ": ", state_summary$ir[i], " per 100,000\n"))

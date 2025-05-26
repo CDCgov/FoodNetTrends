@@ -133,7 +133,8 @@ load_mmwr_data <- function(file_path) {
   
   tryCatch({
     cat("Loading raw MMWR data from:", file_path, "\n")
-    data <- haven::read_sas(file_path) %>% as.data.frame()
+    # Read directly as data.table for efficiency
+    data <- as.data.table(haven::read_sas(file_path))
     cat("Successfully loaded data with", nrow(data), "records and", ncol(data), "columns\n")
     return(data)
   }, error = function(e) {
@@ -146,44 +147,46 @@ load_mmwr_data <- function(file_path) {
 #' @param raw_data Data frame with raw MMWR data
 #' @return Cleaned data frame
 clean_mmwr_data <- function(raw_data) {
+  # Ensure we're working with data.table
+  if (!inherits(raw_data, "data.table")) {
+    setDT(raw_data)
+  }
+  
   # Convert all column names to lowercase for consistency
   cat("Standardizing column names to lowercase...\n")
-  data <- raw_data %>% rename_all(tolower)
+  setnames(raw_data, tolower(names(raw_data)))
+  data <- raw_data
   
-  # Recode serotype values
+  # Recode serotype values using data.table syntax
   cat("Recoding serotype values...\n")
   seroList <- c("NOT SPECIATED", "UNKNOWN", "PARTIAL SERO", "NOT SERO", "")
-  data$sero2 <- ifelse(data$sero1 %in% seroList, "Missing", data$sero1)
-  data$sero2 <- ifelse(grepl("UNDET", data$sero2), "Missing", data$sero2)
-  data$serotypesummary <- data$sero2
+  data[, sero2 := ifelse(sero1 %in% seroList, "Missing", sero1)]
+  data[grepl("UNDET", sero2), sero2 := "Missing"]
+  data[, serotypesummary := sero2]
   
-  # Standardize county names
+  # Standardize county names using data.table syntax
   cat("Standardizing county names...\n")
-  data <- data %>%
-    mutate(
-      county = if_else(county %in% c("ST. MARYS'S", "ST. MARYS"), "ST. MARY'S", county),
-      county = if_else(county == "PRINCE GEORGES", "PRINCE GEORGE'S", county),
-      county = if_else(county == "QUEEN ANNES", "QUEEN ANNE'S", county),
-      county = if_else(county == "DE BACA", "DEBACA", county)
-    )
+  data[county %in% c("ST. MARYS'S", "ST. MARYS"), county := "ST. MARY'S"]
+  data[county == "PRINCE GEORGES", county := "PRINCE GEORGE'S"]
+  data[county == "QUEEN ANNES", county := "QUEEN ANNE'S"]
+  data[county == "DE BACA", county := "DEBACA"]
   
   # Ensure pathogen column is uppercase for consistency
-  data$pathogen <- toupper(data$pathogen)
+  data[, pathogen := toupper(pathogen)]
   
   # Create pathogentype column if not present
   if(!"pathogentype" %in% names(data)) {
     cat("Creating derived pathogentype column...\n")
-    data <- data %>%
-      mutate(pathogentype = ifelse(pathogen %in% c("CRYPTOSPORIDIUM", "CYCLOSPORA"), 
-                                  "Parasitic", "Bacterial"))
+    data[, pathogentype := ifelse(pathogen %in% c("CRYPTOSPORIDIUM", "CYCLOSPORA"), 
+                                  "Parasitic", "Bacterial")]
   }
   
   # Ensure state and year columns are standardized
   cat("Standardizing state and year columns...\n")
   # Ensure state column is uppercase character
-  data$state <- toupper(as.character(data$state))
+  data[, state := toupper(as.character(state))]
   # Ensure year column is numeric
-  data$year <- as.numeric(as.character(data$year))
+  data[, year := as.numeric(as.character(year))]
   
   return(data)
 }
@@ -323,7 +326,8 @@ generate_metadata <- function(data, source_file, census_file_b = NULL, census_fi
     counties = sort(unique(data$county)),
     generated_timestamp = as.character(Sys.time()),
     source_file = source_file,
-    record_count = nrow(data)
+    record_count = nrow(data),
+    output_file = basename(source_file)  # Will be updated with actual output filename
   )
   
   # Add inferred field information if available
@@ -364,16 +368,21 @@ generate_metadata <- function(data, source_file, census_file_b = NULL, census_fi
   # Process Salmonella serotypes if available
   if (any(data$pathogen == "SALMONELLA") && "serotypesummary" %in% names(data)) {
     cat("Processing Salmonella serotype information...\n")
-    sal_data <- data[data$pathogen == "SALMONELLA", ]
-    serotype_counts <- as.data.frame(table(sal_data$serotypesummary))
-    serotype_counts <- serotype_counts[order(serotype_counts$Freq, decreasing=TRUE), ]
+    # Ensure we're working with data.table
+    if (!inherits(data, "data.table")) {
+      setDT(data)
+    }
+    
+    # Use data.table to get serotype counts efficiently
+    sal_data <- data[pathogen == "SALMONELLA"]
+    serotype_counts <- sal_data[, .N, by = serotypesummary][order(-N)]
     
     # Store in metadata
-    metadata$salmonella_serotypes <- as.list(serotype_counts$Freq)
-    names(metadata$salmonella_serotypes) <- serotype_counts$Var1
+    metadata$salmonella_serotypes <- as.list(serotype_counts$N)
+    names(metadata$salmonella_serotypes) <- serotype_counts$serotypesummary
     
     # Also store a flat list of names
-    metadata$salmonella_serotype_names <- as.character(serotype_counts$Var1)
+    metadata$salmonella_serotype_names <- serotype_counts$serotypesummary
     
     cat("Found", length(metadata$salmonella_serotype_names), "Salmonella serotypes\n")
   } else {
@@ -404,14 +413,16 @@ main <- function() {
     # Determine file type and read appropriately
     if (grepl("\\.csv$", file_path, ignore.case = TRUE)) {
       census_data <- tryCatch({
-        read.csv(file_path, stringsAsFactors = FALSE)
+        # Use fread for faster CSV reading
+        fread(file_path, stringsAsFactors = FALSE)
       }, error = function(e) {
         cat(paste("Error reading CSV:", e$message, "\n"))
         return(NULL)
       })
     } else if (grepl("\\.sas7bdat$", file_path, ignore.case = TRUE)) {
       census_data <- tryCatch({
-        haven::read_sas(file_path)
+        # Convert to data.table after reading
+        as.data.table(haven::read_sas(file_path))
       }, error = function(e) {
         cat(paste("Error reading SAS:", e$message, "\n"))
         return(NULL)
@@ -419,7 +430,8 @@ main <- function() {
     } else {
       cat("Unknown file format, attempting to read as SAS\n")
       census_data <- tryCatch({
-        haven::read_sas(file_path)
+        # Convert to data.table after reading
+        as.data.table(haven::read_sas(file_path))
       }, error = function(e) {
         cat(paste("Error reading file:", e$message, "\n"))
         return(NULL)
@@ -443,9 +455,14 @@ main <- function() {
     
     cat(paste("Found", pathogen_type, "columns - State:", state_col, "Year:", year_col, "Population:", pop_col, "\n"))
     
-    # Standardize column names and types
+    # Ensure we're working with data.table
+    if (!inherits(census_data, "data.table")) {
+      setDT(census_data)
+    }
+    
+    # Standardize column names and types using data.table syntax
     if (!is.na(state_col)) {
-      census_data$state <- toupper(as.character(census_data[[state_col]]))
+      census_data[, state := toupper(as.character(get(state_col)))]
     } else {
       cat(paste("WARNING: Could not find state column in", pathogen_type, "census file\n"))
       # Error: state column is required
@@ -453,7 +470,7 @@ main <- function() {
     }
     
     if (!is.na(year_col)) {
-      census_data$year <- as.numeric(as.character(census_data[[year_col]]))
+      census_data[, year := as.numeric(as.character(get(year_col)))]
     } else {
       cat(paste("WARNING: Could not find year column in", pathogen_type, "census file\n"))
       # Error: year column is required
@@ -461,7 +478,7 @@ main <- function() {
     }
     
     if (!is.na(pop_col)) {
-      census_data$population <- as.numeric(as.character(census_data[[pop_col]]))
+      census_data[, population := as.numeric(as.character(get(pop_col)))]
     } else {
       cat(paste("WARNING: Could not find population column in", pathogen_type, "census file\n"))
       # Error: population column is required
@@ -469,7 +486,7 @@ main <- function() {
     }
     
     # Add pathogentype
-    census_data$pathogentype <- pathogen_type
+    census_data[, pathogentype := pathogen_type]
     
     # Final check that all required columns exist and have proper types
     if (all(c("state", "year", "population", "pathogentype") %in% names(census_data))) {
@@ -496,25 +513,37 @@ main <- function() {
   # This aggregation ensures proper data structure for statistical modeling processes
   cat("\nAggregating census data from county to state level...\n")
   
-  # Aggregate bacterial census to state-year level
-  census_b_state <- census_b %>%
-    dplyr::group_by(state, year, pathogentype) %>%
-    dplyr::summarise(
-      population = sum(population, na.rm = TRUE),
-      n_counties = dplyr::n(),  # Track aggregation for validation
-      .groups = "drop"
-    )
+  # Convert to data.table for efficient aggregation
+  if (!inherits(census_b, "data.table")) {
+    setDT(census_b)
+  }
+  if (!inherits(census_p, "data.table")) {
+    setDT(census_p)
+  }
+  
+  # Aggregate bacterial census to state-year level using data.table
+  census_b_state <- census_b[, .(
+    population = sum(population, na.rm = TRUE),
+    n_counties = .N  # Track aggregation for validation
+  ), by = .(state, year, pathogentype)]
+  
   cat(paste("Bacterial census: aggregated", nrow(census_b), "county records to", nrow(census_b_state), "state records\n"))
   
-  # Aggregate parasitic census to state-year level  
-  census_p_state <- census_p %>%
-    dplyr::group_by(state, year, pathogentype) %>%
-    dplyr::summarise(
-      population = sum(population, na.rm = TRUE),
-      n_counties = dplyr::n(),  # Track aggregation for validation
-      .groups = "drop"
-    )
+  # Clean up original census_b to free memory
+  rm(census_b)
+  gc()
+  
+  # Aggregate parasitic census to state-year level using data.table
+  census_p_state <- census_p[, .(
+    population = sum(population, na.rm = TRUE),
+    n_counties = .N  # Track aggregation for validation
+  ), by = .(state, year, pathogentype)]
+  
   cat(paste("Parasitic census: aggregated", nrow(census_p), "county records to", nrow(census_p_state), "state records\n"))
+  
+  # Clean up original census_p to free memory
+  rm(census_p)
+  gc()
   
   # Save preprocessed census files for downstream analysis
   census_b_filename <- paste0(output_base, "_census_bacterial.csv")
@@ -588,16 +617,27 @@ main <- function() {
   cat("=====================================\n")
   
   # Combine for validation checks (using state-level data now)
-  census <- dplyr::bind_rows(census_b_state, census_p_state)
-  census_pairs <- unique(census[, c("state", "year")])
-  cleaned_data$state <- toupper(as.character(cleaned_data$state))
-  cleaned_data$year <- as.numeric(as.character(cleaned_data$year))
-  mmwr_pairs <- unique(cleaned_data[, c("state", "year")])
+  # Use rbindlist for efficient combination
+  census <- rbindlist(list(census_b_state, census_p_state), use.names = TRUE)
+  
+  # Ensure cleaned_data is data.table
+  if (!inherits(cleaned_data, "data.table")) {
+    setDT(cleaned_data)
+  }
+  
+  # Get unique pairs efficiently
+  census_pairs <- unique(census[, .(state, year)])
+  cleaned_data[, `:=`(state = toupper(as.character(state)), 
+                      year = as.numeric(as.character(year)))]
+  mmwr_pairs <- unique(cleaned_data[, .(state, year)])
 
-  # Find (state, year) pairs in MMWR but not in census
-  mmwr_not_in_census <- anti_join(mmwr_pairs, census_pairs, by = c("state", "year"))
+  # Find (state, year) pairs in MMWR but not in census using data.table anti-join
+  setkey(mmwr_pairs, state, year)
+  setkey(census_pairs, state, year)
+  mmwr_not_in_census <- mmwr_pairs[!census_pairs]
+  
   # Find (state, year) pairs in census but not in MMWR
-  census_not_in_mmwr <- anti_join(census_pairs, mmwr_pairs, by = c("state", "year"))
+  census_not_in_mmwr <- census_pairs[!mmwr_pairs]
 
   # Print summary to console
   cat('PREPROCESS CHECK: (state, year) pairs in MMWR but missing in census:', nrow(mmwr_not_in_census), '\n')
@@ -615,24 +655,29 @@ main <- function() {
   # Check for population consistency across pathogen types
   cat('\nPREPROCESS CHECK: Verifying population consistency across pathogen types...\n')
   
-  # Compare bacterial and parasitic census for same state-year combinations
-  pop_comparison <- inner_join(
-    census_b_state %>% select(state, year, pop_bacterial = population),
-    census_p_state %>% select(state, year, pop_parasitic = population),
-    by = c("state", "year")
-  )
+  # Compare bacterial and parasitic census for same state-year combinations using data.table
+  # Rename columns for clarity
+  census_b_compare <- census_b_state[, .(state, year, pop_bacterial = population)]
+  census_p_compare <- census_p_state[, .(state, year, pop_parasitic = population)]
   
-  # Find discrepancies
-  pop_comparison$pop_diff <- abs(pop_comparison$pop_bacterial - pop_comparison$pop_parasitic)
-  pop_comparison$pct_diff <- round(100 * pop_comparison$pop_diff / pmax(pop_comparison$pop_bacterial, pop_comparison$pop_parasitic), 2)
+  # Inner join using data.table
+  setkey(census_b_compare, state, year)
+  setkey(census_p_compare, state, year)
+  pop_comparison <- census_b_compare[census_p_compare, nomatch = 0]
+  
+  # Find discrepancies using data.table syntax
+  pop_comparison[, `:=`(
+    pop_diff = abs(pop_bacterial - pop_parasitic),
+    pct_diff = round(100 * abs(pop_bacterial - pop_parasitic) / pmax(pop_bacterial, pop_parasitic), 2)
+  )]
   
   # Flag significant discrepancies (>1% difference)
-  discrepancies <- pop_comparison[pop_comparison$pct_diff > 1, ]
+  discrepancies <- pop_comparison[pct_diff > 1]
   
   if (nrow(discrepancies) > 0) {
     cat('  WARNING: Population inconsistencies found between bacterial and parasitic census data!\n')
     cat('  State-year combinations with >1% population difference:\n')
-    print(discrepancies[order(-discrepancies$pct_diff), c("state", "year", "pop_bacterial", "pop_parasitic", "pct_diff")])
+    print(discrepancies[order(-pct_diff), .(state, year, pop_bacterial, pop_parasitic, pct_diff)])
     cat('\n  This indicates potential data quality issues. Population should be consistent for the same state-year.\n')
     cat('  Consider reviewing the source census files for accuracy.\n')
   } else {
@@ -706,6 +751,13 @@ main <- function() {
       census_p_path   # Pass preprocessed parasitic census file path
     )
     
+    # Add original census file paths to metadata for full traceability
+    metadata$census_file_bacterial_original <- args$censusFileB
+    metadata$census_file_parasitic_original <- args$censusFileP
+    
+    # Update output file name to actual output file
+    metadata$output_file <- basename(args$outputFile)
+    
     # Write metadata JSON
     cat("Writing metadata to:", metadata_file, "\n")
     write_json(metadata, metadata_file, pretty = TRUE)
@@ -746,6 +798,10 @@ main <- function() {
   
   cat("\n✓ All files ready for analysis pipeline\n")
   cat("==========================================\n")
+  
+  # Clean up memory before exiting
+  rm(cleaned_data, census_b_state, census_p_state, census, mmwrdata)
+  gc()
 }
 
 # Run the main function
