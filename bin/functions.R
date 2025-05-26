@@ -102,12 +102,17 @@ safe_write <- function(data, file_path) {
     
     # Write data based on file extension
     if (endsWith(file_path, ".csv")) {
+      # Load data.table if not already loaded
+      if (!requireNamespace("data.table", quietly = TRUE)) {
+        stop("data.table package required for safe_write")
+      }
+      
       if (file.exists(file_path)) {
-        write.table(data, file = file_path, append = TRUE, quote = TRUE, sep = ",",
-                    col.names = FALSE, row.names = FALSE)
+        # For append mode, use fwrite with append=TRUE and quote="auto"
+        data.table::fwrite(data, file = file_path, append = TRUE, quote = "auto")
       } else {
-        write.table(data, file = file_path, append = FALSE, quote = TRUE, sep = ",",
-                    col.names = TRUE, row.names = FALSE)
+        # For new files, use fwrite with quote="auto" for consistency
+        data.table::fwrite(data, file = file_path, quote = "auto")
       }
     } else if (endsWith(file_path, ".Rds")) {
       saveRDS(data, file = file_path)

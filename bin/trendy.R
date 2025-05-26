@@ -67,6 +67,34 @@ suppressPackageStartupMessages({
 
 options(warn = 1)  # Show warnings as they occur
 
+# Memory profiling function for optimization tracking
+profile_memory <- function(label, expr) {
+  gc(reset = TRUE)
+  start_time <- Sys.time()
+  
+  result <- force(expr)
+  
+  end_time <- Sys.time()
+  mem <- gc()
+  cat(sprintf("MEMORY [%s]: %.1f MB | Time: %.1f sec\n", 
+              label, sum(mem[,2]), 
+              as.numeric(end_time - start_time)))
+  
+  return(result)
+}
+
+# Optimize data types by reference for memory efficiency
+optimize_data_types <- function(dt) {
+  if (inherits(dt, "data.table")) {
+    # Convert columns by reference (no copying)
+    if ("state" %in% names(dt)) dt[, state := toupper(as.character(state))]
+    if ("year" %in% names(dt)) dt[, year := as.integer(year)]
+    if ("pathogentype" %in% names(dt)) dt[, pathogentype := toupper(as.character(pathogentype))]
+    if ("pathogen" %in% names(dt)) dt[, pathogen := toupper(as.character(pathogen))]
+  }
+  return(dt)
+}
+
 # Source helper functions - robust path handling
 tryCatch({
   script_path <- commandArgs(trailingOnly = FALSE)
@@ -305,19 +333,17 @@ tryCatch({
   if (preprocessed && !is.null(args$cleanFile)) {
     # Load preprocessed CSV file
     log_message("IMPORT", paste("Reading preprocessed CSV file:", args$cleanFile))
-    # Use fill=TRUE and capture the result even if there's a warning
-    mmwrdata <- suppressWarnings(fread(args$cleanFile, stringsAsFactors = FALSE, fill = TRUE))
-    # Log what we actually loaded
-    log_message("INFO", paste("fread loaded", nrow(mmwrdata), "rows,", ncol(mmwrdata), "columns"))
+    # Load with fill=TRUE to handle varying column counts
+    mmwrdata <- fread(args$cleanFile, stringsAsFactors = FALSE, fill = TRUE)
+    log_message("INFO", paste("Loaded", nrow(mmwrdata), "rows,", ncol(mmwrdata), "columns"))
     
-    # If we got very few rows, there might be a serious issue
-    if (nrow(mmwrdata) < 100) {
-      log_message("WARNING", "fread loaded fewer than 100 rows, attempting alternative read method")
-      # Fall back to read.csv and convert to data.table
-      mmwrdata <- read.csv(args$cleanFile, stringsAsFactors = FALSE)
-      setDT(mmwrdata)
-      log_message("INFO", paste("read.csv loaded", nrow(mmwrdata), "rows as data.table"))
+    # Only validate actual data presence
+    if (nrow(mmwrdata) == 0) {
+      stop("No data loaded from preprocessed file")
     }
+    
+    # Force garbage collection after large data load
+    gc()
   } else if (!preprocessed && !is.null(args$rawFile)) {
     # Load raw SAS file
     log_message("IMPORT", paste("Reading raw SAS file:", args$rawFile))
@@ -326,64 +352,34 @@ tryCatch({
     # Determine file type from extension
     if (grepl("\\.csv$", args$mmwrFile, ignore.case = TRUE)) {
       log_message("IMPORT", paste("Reading CSV file:", args$mmwrFile))
-      # For preprocessed files, use read.csv to handle irregular field counts
-      if (args$preprocessed) {
-        log_message("INFO", "Using fread with fill=TRUE for preprocessed file to handle irregular fields")
-        mmwrdata <- suppressWarnings(fread(args$mmwrFile, stringsAsFactors = FALSE, fill = TRUE, showProgress = FALSE))
-        log_message("INFO", paste("fread loaded", nrow(mmwrdata), "rows,", ncol(mmwrdata), "columns"))
-        
-        # Check if we got very few rows
-        if (nrow(mmwrdata) < 100) {
-          log_message("WARNING", "fread loaded fewer than 100 rows, using read.csv fallback")
-          mmwrdata <- read.csv(args$mmwrFile, stringsAsFactors = FALSE)
-          setDT(mmwrdata)
-          log_message("INFO", paste("read.csv loaded", nrow(mmwrdata), "rows as data.table"))
-        }
-      } else {
-        # For non-preprocessed files, use fread
-        mmwrdata <- suppressWarnings(fread(args$mmwrFile, stringsAsFactors = FALSE, fill = TRUE, showProgress = FALSE))
-        log_message("INFO", paste("fread loaded", nrow(mmwrdata), "rows,", ncol(mmwrdata), "columns"))
-        
-        # Check if we got very few rows
-        if (nrow(mmwrdata) < 100) {
-          log_message("WARNING", "fread loaded fewer than 100 rows, using read.csv fallback")
-          mmwrdata <- read.csv(args$mmwrFile, stringsAsFactors = FALSE)
-          setDT(mmwrdata)
-          log_message("INFO", paste("read.csv loaded", nrow(mmwrdata), "rows as data.table"))
-        }
+      # Load CSV file with fill=TRUE to handle varying column counts
+      mmwrdata <- fread(args$mmwrFile, stringsAsFactors = FALSE, fill = TRUE, showProgress = FALSE)
+      log_message("INFO", paste("Loaded", nrow(mmwrdata), "rows,", ncol(mmwrdata), "columns"))
+      
+      # Only validate actual data presence
+      if (nrow(mmwrdata) == 0) {
+        stop("No data loaded from CSV file")
       }
+      
+      # Force garbage collection after large data load
+      gc()
     } else if (grepl("\\.sas7bdat$", args$mmwrFile, ignore.case = TRUE)) {
       log_message("IMPORT", paste("Reading SAS file:", args$mmwrFile))
       mmwrdata <- read_sas(args$mmwrFile)
     } else {
       # Try CSV by default
       log_message("IMPORT", paste("Attempting to read as CSV:", args$mmwrFile))
-      # For preprocessed files, use read.csv to handle irregular field counts
-      if (args$preprocessed) {
-        log_message("INFO", "Using fread with fill=TRUE for preprocessed file to handle irregular fields")
-        mmwrdata <- suppressWarnings(fread(args$mmwrFile, stringsAsFactors = FALSE, fill = TRUE, showProgress = FALSE))
-        log_message("INFO", paste("fread loaded", nrow(mmwrdata), "rows,", ncol(mmwrdata), "columns"))
-        
-        # Check if we got very few rows
-        if (nrow(mmwrdata) < 100) {
-          log_message("WARNING", "fread loaded fewer than 100 rows, using read.csv fallback")
-          mmwrdata <- read.csv(args$mmwrFile, stringsAsFactors = FALSE)
-          setDT(mmwrdata)
-          log_message("INFO", paste("read.csv loaded", nrow(mmwrdata), "rows as data.table"))
-        }
-      } else {
-        # For non-preprocessed files, use fread
-        mmwrdata <- suppressWarnings(fread(args$mmwrFile, stringsAsFactors = FALSE, fill = TRUE, showProgress = FALSE))
-        log_message("INFO", paste("fread loaded", nrow(mmwrdata), "rows,", ncol(mmwrdata), "columns"))
-        
-        # Check if we got very few rows
-        if (nrow(mmwrdata) < 100) {
-          log_message("WARNING", "fread loaded fewer than 100 rows, using read.csv fallback")
-          mmwrdata <- read.csv(args$mmwrFile, stringsAsFactors = FALSE)
-          setDT(mmwrdata)
-          log_message("INFO", paste("read.csv loaded", nrow(mmwrdata), "rows as data.table"))
-        }
+      # Load CSV file with fill=TRUE to handle varying column counts
+      mmwrdata <- fread(args$mmwrFile, stringsAsFactors = FALSE, fill = TRUE, showProgress = FALSE)
+      log_message("INFO", paste("Loaded", nrow(mmwrdata), "rows,", ncol(mmwrdata), "columns"))
+      
+      # Only validate actual data presence
+      if (nrow(mmwrdata) == 0) {
+        stop("No data loaded from CSV file")
       }
+      
+      # Force garbage collection after large data load
+      gc()
     }
   }
 }, error = function(e) {
@@ -419,6 +415,8 @@ if (!is.null(args$censusFileB) && file.exists(args$censusFileB)) {
     } else if (grepl("\\.sas7bdat$", args$censusFileB, ignore.case = TRUE)) {
       censusBdata <- read_sas(args$censusFileB)
     }
+    # Force garbage collection after census load
+    gc()
     
     # Standardize column names by looking for variations 
     log_message("IMPORT", "Standardizing bacterial census column names")
@@ -481,6 +479,8 @@ if (!is.null(args$censusFileP) && file.exists(args$censusFileP)) {
     } else if (grepl("\\.sas7bdat$", args$censusFileP, ignore.case = TRUE)) {
       censusPdata <- read_sas(args$censusFileP)
     }
+    # Force garbage collection after census load
+    gc()
     
     # Standardize column names by looking for variations 
     log_message("IMPORT", "Standardizing parasitic census column names")
@@ -621,13 +621,11 @@ if (pathogen == "CYCLOSPORA") {
       stop(paste("Analysis terminated: No data available for", pathogen))
     }
     
-    # Aggregate data
-    pathogen_counts <- pathogen_data %>%
-      group_by(state, year) %>%
-      summarize(count = n(), .groups = "drop")
+    # Aggregate data using data.table for efficiency
+    pathogen_counts <- pathogen_data[, .(count = .N), by = .(state, year)]
       
     # Ensure year is numeric before joining with census data
-    pathogen_counts$year <- as.numeric(as.character(pathogen_counts$year))
+    pathogen_counts[, year := as.numeric(as.character(year))]
     
     # Verify census data before joining
     if (is.null(censusPdata)) {
@@ -661,6 +659,8 @@ if (pathogen == "CYCLOSPORA") {
       log_message("MODEL", "Joining pathogen counts with census data")
     }
     analysis_data <- left_join(pathogen_counts, censusPdata, by = c("state", "year"))
+    # Force garbage collection after join
+    gc()
     
     # Handle missing population values - exclude incomplete records
     missing_pop_count <- sum(is.na(analysis_data$population))
@@ -668,9 +668,7 @@ if (pathogen == "CYCLOSPORA") {
       log_message("WARNING", paste(missing_pop_count, "records have missing population values and will be excluded"))
       excluded_data <- analysis_data[is.na(analysis_data$population), c("state", "year")]
       if (nrow(excluded_data) > 0) {
-        excluded_summary <- excluded_data %>%
-          group_by(state) %>%
-          summarise(years = paste(sort(unique(year)), collapse=", "), .groups = "drop")
+        excluded_summary <- excluded_data[, .(years = paste(sort(unique(year)), collapse=", ")), by = .(state)]
         for(i in 1:nrow(excluded_summary)) {
           log_message("WARNING", paste("  Excluding", excluded_summary$state[i], "years:", excluded_summary$years[i]))
         }
@@ -769,13 +767,11 @@ if (pathogen == "CYCLOSPORA") {
       stop(paste("Analysis terminated: No data available for", pathogen))
     }
     
-    # Aggregate data
-    pathogen_counts <- pathogen_data %>%
-      group_by(state, year) %>%
-      summarize(count = n(), .groups = "drop")
+    # Aggregate data using data.table for efficiency
+    pathogen_counts <- pathogen_data[, .(count = .N), by = .(state, year)]
       
     # Ensure year is numeric before joining with census data
-    pathogen_counts$year <- as.numeric(as.character(pathogen_counts$year))
+    pathogen_counts[, year := as.numeric(as.character(year))]
     
     # Verify census data before joining
     if (is.null(censusBdata)) {
@@ -805,6 +801,8 @@ if (pathogen == "CYCLOSPORA") {
     # Join with census data
     log_message("MODEL", "Joining pathogen counts with census data")
     analysis_data <- left_join(pathogen_counts, censusBdata, by = c("state", "year"))
+    # Force garbage collection after join
+    gc()
   }
   
   # Handle missing population values - exclude incomplete records
@@ -813,9 +811,7 @@ if (pathogen == "CYCLOSPORA") {
     log_message("WARNING", paste(missing_pop_count, "records have missing population values and will be excluded"))
     excluded_data <- analysis_data[is.na(analysis_data$population), c("state", "year")]
     if (nrow(excluded_data) > 0) {
-      excluded_summary <- excluded_data %>%
-        group_by(state) %>%
-        summarise(years = paste(sort(unique(year)), collapse=", "), .groups = "drop")
+      excluded_summary <- excluded_data[, .(years = paste(sort(unique(year)), collapse=", ")), by = .(state)]
       for(i in 1:nrow(excluded_summary)) {
         log_message("WARNING", paste("  Excluding", excluded_summary$state[i], "years:", excluded_summary$years[i]))
       }
@@ -890,12 +886,11 @@ if (pathogen == "CYCLOSPORA") {
   }
   
   # Aggregate data
-  pathogen_counts <- pathogen_data %>%
-    group_by(state, year) %>%
-    summarize(count = n(), .groups = "drop")
+  # Aggregate data using data.table for efficiency
+  pathogen_counts <- pathogen_data[, .(count = .N), by = .(state, year)]
     
   # Ensure year is numeric before joining with census data
-  pathogen_counts$year <- as.numeric(as.character(pathogen_counts$year))
+  pathogen_counts[, year := as.numeric(as.character(year))]
   
   # Verify census data before joining
   if (is.null(censusBdata)) {
@@ -925,6 +920,8 @@ if (pathogen == "CYCLOSPORA") {
   # Join with census data
   log_message("MODEL", "Joining pathogen counts with census data")
   analysis_data <- left_join(pathogen_counts, censusBdata, by = c("state", "year"))
+  # Force garbage collection after join
+  gc()
   
   # Handle missing population values
   missing_pop_count <- sum(is.na(analysis_data$population))
