@@ -70,10 +70,14 @@ process PREPROCESS {
     # Create warnings log
     touch ${outputBase}_warnings.log
     
-    # Validate MMWR file
+    # Validate MMWR file and get absolute path
     if [ ! -f "${mmwrFile}" ]; then
         echo "ERROR: Input file does not exist: ${mmwrFile}" > ${outputBase}_error.log
         exit 1
+    else
+        MMWR_ABS=\$(readlink -f "${mmwrFile}")
+        echo "Using MMWR file: ${mmwrFile}" >> ${outputBase}_process.log
+        echo "Absolute path to MMWR: \$MMWR_ABS" >> ${outputBase}_process.log
     fi
     
     # Handle census bacterial file - get absolute path
@@ -104,14 +108,14 @@ process PREPROCESS {
     
     # Execute the R preprocessing script with absolute paths
     echo "Running preprocessing script with:" >> ${outputBase}_process.log
-    echo "  MMWR file: ${mmwrFile}" >> ${outputBase}_process.log
+    echo "  MMWR file: \$MMWR_ABS" >> ${outputBase}_process.log
     echo "  Census bacterial file: \$CENSUS_B_ABS" >> ${outputBase}_process.log
     echo "  Census parasitic file: \$CENSUS_P_ABS" >> ${outputBase}_process.log
     echo "  Output file: ${outputBase}.csv" >> ${outputBase}_process.log
     echo "  Generate metadata: ${generateMetadata}" >> ${outputBase}_process.log
     
     Rscript ${workflow.projectDir}/bin/preprocess.R \\
-      --mmwrFile="${mmwrFile}" \\
+      --mmwrFile="\$MMWR_ABS" \\
       --censusFileB="\$CENSUS_B_ABS" \\
       --censusFileP="\$CENSUS_P_ABS" \\
       --outputFile="${outputBase}.csv" \\
