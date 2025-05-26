@@ -305,8 +305,19 @@ tryCatch({
   if (preprocessed && !is.null(args$cleanFile)) {
     # Load preprocessed CSV file
     log_message("IMPORT", paste("Reading preprocessed CSV file:", args$cleanFile))
-    # Use fill=TRUE to handle irregular field counts in preprocessed files
-    mmwrdata <- fread(args$cleanFile, stringsAsFactors = FALSE, fill = TRUE)
+    # Use fill=TRUE and capture the result even if there's a warning
+    mmwrdata <- suppressWarnings(fread(args$cleanFile, stringsAsFactors = FALSE, fill = TRUE))
+    # Log what we actually loaded
+    log_message("INFO", paste("fread loaded", nrow(mmwrdata), "rows,", ncol(mmwrdata), "columns"))
+    
+    # If we got very few rows, there might be a serious issue
+    if (nrow(mmwrdata) < 100) {
+      log_message("WARNING", "fread loaded fewer than 100 rows, attempting alternative read method")
+      # Fall back to read.csv and convert to data.table
+      mmwrdata <- read.csv(args$cleanFile, stringsAsFactors = FALSE)
+      setDT(mmwrdata)
+      log_message("INFO", paste("read.csv loaded", nrow(mmwrdata), "rows as data.table"))
+    }
   } else if (!preprocessed && !is.null(args$rawFile)) {
     # Load raw SAS file
     log_message("IMPORT", paste("Reading raw SAS file:", args$rawFile))
@@ -318,12 +329,28 @@ tryCatch({
       # For preprocessed files, use read.csv to handle irregular field counts
       if (args$preprocessed) {
         log_message("INFO", "Using fread with fill=TRUE for preprocessed file to handle irregular fields")
-        mmwrdata <- fread(args$mmwrFile, stringsAsFactors = FALSE, fill = TRUE, showProgress = FALSE)
-        log_message("INFO", paste("fread loaded", nrow(mmwrdata), "rows"))
+        mmwrdata <- suppressWarnings(fread(args$mmwrFile, stringsAsFactors = FALSE, fill = TRUE, showProgress = FALSE))
+        log_message("INFO", paste("fread loaded", nrow(mmwrdata), "rows,", ncol(mmwrdata), "columns"))
+        
+        # Check if we got very few rows
+        if (nrow(mmwrdata) < 100) {
+          log_message("WARNING", "fread loaded fewer than 100 rows, using read.csv fallback")
+          mmwrdata <- read.csv(args$mmwrFile, stringsAsFactors = FALSE)
+          setDT(mmwrdata)
+          log_message("INFO", paste("read.csv loaded", nrow(mmwrdata), "rows as data.table"))
+        }
       } else {
         # For non-preprocessed files, use fread
-        mmwrdata <- fread(args$mmwrFile, stringsAsFactors = FALSE, fill = TRUE, showProgress = FALSE)
-        log_message("INFO", paste("fread loaded", nrow(mmwrdata), "rows"))
+        mmwrdata <- suppressWarnings(fread(args$mmwrFile, stringsAsFactors = FALSE, fill = TRUE, showProgress = FALSE))
+        log_message("INFO", paste("fread loaded", nrow(mmwrdata), "rows,", ncol(mmwrdata), "columns"))
+        
+        # Check if we got very few rows
+        if (nrow(mmwrdata) < 100) {
+          log_message("WARNING", "fread loaded fewer than 100 rows, using read.csv fallback")
+          mmwrdata <- read.csv(args$mmwrFile, stringsAsFactors = FALSE)
+          setDT(mmwrdata)
+          log_message("INFO", paste("read.csv loaded", nrow(mmwrdata), "rows as data.table"))
+        }
       }
     } else if (grepl("\\.sas7bdat$", args$mmwrFile, ignore.case = TRUE)) {
       log_message("IMPORT", paste("Reading SAS file:", args$mmwrFile))
@@ -334,12 +361,28 @@ tryCatch({
       # For preprocessed files, use read.csv to handle irregular field counts
       if (args$preprocessed) {
         log_message("INFO", "Using fread with fill=TRUE for preprocessed file to handle irregular fields")
-        mmwrdata <- fread(args$mmwrFile, stringsAsFactors = FALSE, fill = TRUE, showProgress = FALSE)
-        log_message("INFO", paste("fread loaded", nrow(mmwrdata), "rows"))
+        mmwrdata <- suppressWarnings(fread(args$mmwrFile, stringsAsFactors = FALSE, fill = TRUE, showProgress = FALSE))
+        log_message("INFO", paste("fread loaded", nrow(mmwrdata), "rows,", ncol(mmwrdata), "columns"))
+        
+        # Check if we got very few rows
+        if (nrow(mmwrdata) < 100) {
+          log_message("WARNING", "fread loaded fewer than 100 rows, using read.csv fallback")
+          mmwrdata <- read.csv(args$mmwrFile, stringsAsFactors = FALSE)
+          setDT(mmwrdata)
+          log_message("INFO", paste("read.csv loaded", nrow(mmwrdata), "rows as data.table"))
+        }
       } else {
         # For non-preprocessed files, use fread
-        mmwrdata <- fread(args$mmwrFile, stringsAsFactors = FALSE, fill = TRUE, showProgress = FALSE)
-        log_message("INFO", paste("fread loaded", nrow(mmwrdata), "rows"))
+        mmwrdata <- suppressWarnings(fread(args$mmwrFile, stringsAsFactors = FALSE, fill = TRUE, showProgress = FALSE))
+        log_message("INFO", paste("fread loaded", nrow(mmwrdata), "rows,", ncol(mmwrdata), "columns"))
+        
+        # Check if we got very few rows
+        if (nrow(mmwrdata) < 100) {
+          log_message("WARNING", "fread loaded fewer than 100 rows, using read.csv fallback")
+          mmwrdata <- read.csv(args$mmwrFile, stringsAsFactors = FALSE)
+          setDT(mmwrdata)
+          log_message("INFO", paste("read.csv loaded", nrow(mmwrdata), "rows as data.table"))
+        }
       }
     }
   }
