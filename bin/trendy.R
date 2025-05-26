@@ -83,6 +83,26 @@ profile_memory <- function(label, expr) {
   return(result)
 }
 
+# Aggressive memory cleanup function
+clean_memory <- function(keep_objects = NULL) {
+  # Get all objects in the environment
+  all_objects <- ls(envir = parent.frame())
+  
+  # Remove everything except specified objects
+  if (!is.null(keep_objects)) {
+    to_remove <- setdiff(all_objects, keep_objects)
+    if (length(to_remove) > 0) {
+      rm(list = to_remove, envir = parent.frame())
+    }
+  }
+  
+  # Force garbage collection twice for thorough cleanup
+  gc()
+  gc()
+  
+  invisible(NULL)
+}
+
 # Optimize data types by reference for memory efficiency
 optimize_data_types <- function(dt) {
   if (inherits(dt, "data.table")) {
@@ -583,7 +603,11 @@ if (pathogen == "CYCLOSPORA") {
       if (!is.null(args$states) && args$states != "ALL") {
         target_states <- trimws(unlist(strsplit(args$states, ",")))
         initial_count <- nrow(analysis_data)
-        analysis_data <- analysis_data[toupper(analysis_data$state) %in% toupper(target_states), ]
+        # Ensure data.table syntax
+        if (!inherits(analysis_data, "data.table")) {
+          setDT(analysis_data)
+        }
+        analysis_data <- analysis_data[toupper(state) %in% toupper(target_states)]
         final_count <- nrow(analysis_data)
         log_message("INFO", paste("States filtering reduced analysis data from", initial_count, "to", final_count, "rows"))
       }
@@ -667,7 +691,18 @@ if (pathogen == "CYCLOSPORA") {
     } else {
       log_message("MODEL", "Joining pathogen counts with census data")
     }
-    analysis_data <- left_join(pathogen_counts, censusPdata, by = c("state", "year"))
+    # Convert to data.table if needed
+    if (!inherits(censusPdata, "data.table")) {
+      setDT(censusPdata)
+    }
+    if (!inherits(pathogen_counts, "data.table")) {
+      setDT(pathogen_counts)
+    }
+    # Use data.table merge syntax
+    analysis_data <- censusPdata[pathogen_counts, on = .(state, year)]
+    # Clean up
+    rm(pathogen_counts)
+    gc()
     # Force garbage collection after join
     gc()
     
@@ -717,7 +752,11 @@ if (pathogen == "CYCLOSPORA") {
       if (!is.null(args$states) && args$states != "ALL") {
         target_states <- trimws(unlist(strsplit(args$states, ",")))
         initial_count <- nrow(analysis_data)
-        analysis_data <- analysis_data[toupper(analysis_data$state) %in% toupper(target_states), ]
+        # Ensure data.table syntax
+        if (!inherits(analysis_data, "data.table")) {
+          setDT(analysis_data)
+        }
+        analysis_data <- analysis_data[toupper(state) %in% toupper(target_states)]
         final_count <- nrow(analysis_data)
         log_message("INFO", paste("States filtering reduced analysis data from", initial_count, "to", final_count, "rows"))
       }
@@ -1111,10 +1150,12 @@ model_fit <- tryCatch({
   # Set up model formula
   # Use adaptive basis dimension based on data availability
   # This helps prevent overfitting in sparse data regions
-  years_per_state <- analysis_data %>%
-    group_by(state) %>%
-    summarise(n_years = n_distinct(year)) %>%
-    pull(n_years)
+  # Convert to data.table if needed
+  if (!inherits(analysis_data, "data.table")) {
+    setDT(analysis_data)
+  }
+  # Use data.table syntax for efficiency
+  years_per_state <- analysis_data[, .(n_years = uniqueN(year)), by = state][, n_years]
   
   # Set k (basis dimension) adaptively - minimum 4, maximum 10
   # Lower k for states with less data prevents wild extrapolation
@@ -1299,6 +1340,13 @@ if (exists("has_progress_tracking") && has_progress_tracking) {
   log_message("OUTPUT", paste("Saved model to", model_file))
 }
 
+# Clean up memory after model fitting
+# Keep only essential objects for downstream analysis
+clean_memory(keep_objects = c("model_fit", "analysis_data", "pathogen", "args", 
+                             "convergence_check", "trend_significance",
+                             "log_message", "log_progress", "has_progress_tracking",
+                             "clean_memory", "optimize_data_types"))
+
 # ---- Generate Results ----
 
 # Generate incidence rate estimates
@@ -1377,11 +1425,11 @@ ir_data <- tryCatch({
                                       re_formula = NA)  # Include all effects
       
       # Summarize posterior draws
-      data.frame(
+      as.matrix(data.frame(
         Estimate = apply(epred_matrix, 2, median),
         Q2.5 = apply(epred_matrix, 2, quantile, probs = 0.025),
         Q97.5 = apply(epred_matrix, 2, quantile, probs = 0.975)
-      ) %>% as.matrix()
+      ))
       
     }, error = function(e) {
       log_message("WARNING", paste("posterior_epred failed, trying predict():", e$message))
@@ -1607,6 +1655,13 @@ if (exists("has_progress_tracking") && has_progress_tracking) {
   log_message("OUTPUT", paste("Saved IR data to", ir_file))
 }
 
+# Clean up memory after IR calculation
+# Remove large intermediate objects
+if (exists("pred_grid")) rm(pred_grid)
+if (exists("fitted_summary")) rm(fitted_summary)
+if (exists("results_list")) rm(results_list)
+gc()
+
 # Generate estimated incidence rate ratio results for different periods
 if (exists("has_progress_tracking") && has_progress_tracking) {
   log_progress("RESULTS", "Generating incidence rate ratios", milestone="IRR_CALCULATION")
@@ -1759,7 +1814,11 @@ tryCatch({
     log_message("OUTPUT", paste("Saved spline trend plot to", paste0(pathogen, "_spline_trend.png")))
   } else {
     # Fallback for observed data only
-    overall_observed <- aggregate(ir ~ year, data = observed_data, FUN = mean, na.rm = TRUE)
+    # Convert to data.table if needed
+    if (!inherits(observed_data, "data.table")) {
+      setDT(observed_data)
+    }
+    overall_observed <- observed_data[, .(ir = mean(ir, na.rm = TRUE)), by = year]
     p1 <- ggplot(overall_observed, aes(x = year, y = ir)) +
       geom_line(color = "blue", linewidth = 1) +
       geom_point(color = "blue", size = 2) +

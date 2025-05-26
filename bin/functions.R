@@ -18,8 +18,8 @@
 
 # Load required libraries
 suppressPackageStartupMessages({
-  library(dplyr)
-  library(tidyr)
+  # library(dplyr)  # Commented out - using data.table instead
+  # library(tidyr)  # Commented out - using data.table instead
   library(gtools)
   library(brms)
   library(ggplot2)
