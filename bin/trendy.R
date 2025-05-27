@@ -1636,6 +1636,7 @@ ir_data <- tryCatch({
         log_message("WARNING", "This may indicate a data quality issue or modeling problem")
       } else {
         log_message("INFO", paste("Maximum incidence rate:", round(max_ir, 2), "per 100,000 (reasonable)"))
+        log_message("DEBUG", paste("target_pathogen still exists:", target_pathogen))
       }
       
       # Check for any remaining Inf values
@@ -1743,6 +1744,14 @@ if (exists("fitted_summary")) rm(fitted_summary)
 if (exists("results_list")) rm(results_list)
 gc()
 
+# Debug: Verify target_pathogen still exists
+if (!exists("target_pathogen")) {
+  log_message("ERROR", "CRITICAL: target_pathogen variable lost during cleanup!")
+  stop("target_pathogen variable is missing - cannot continue")
+} else {
+  log_message("DEBUG", paste("target_pathogen verified:", target_pathogen))
+}
+
 # Generate estimated incidence rate ratio results for different periods
 if (exists("has_progress_tracking") && has_progress_tracking) {
   log_progress("RESULTS", "Generating incidence rate ratios", milestone="IRR_CALCULATION")
@@ -1752,6 +1761,9 @@ if (exists("has_progress_tracking") && has_progress_tracking) {
 
 # Define comparison periods
 periods <- c("2016_2020", "2018_2022", "2020_2022")
+
+# Debug: Verify target_pathogen before IRR loop
+log_message("DEBUG", paste("About to start IRR calculation for:", target_pathogen))
 
 for (period in periods) {
   tryCatch({
