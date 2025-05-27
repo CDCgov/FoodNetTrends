@@ -715,11 +715,23 @@ parse_metadata_json() {
             library(jsonlite)
             data <- fromJSON('$json_file')
             if('$field' %in% names(data)) {
-                if(is.list(data[['$field']]) || is.vector(data[['$field']])) {
-                    cat(paste(data[['$field']], collapse=','))
+                field_data <- data[['$field']]
+                if(is.list(field_data) && !is.null(names(field_data))) {
+                    # Handle named list (like serotype objects with counts)
+                    cat(paste(names(field_data), collapse=','))
+                } else if(is.list(field_data) || is.vector(field_data)) {
+                    # Handle arrays or unnamed lists
+                    cat(paste(field_data, collapse=','))
                 } else {
-                    cat(data[['$field']])
+                    # Handle single values
+                    cat(field_data)
                 }
+            } else if('$field' == 'salmonella_serotypes' && 'salmonella_serotype_names' %in% names(data)) {
+                # Fallback: try alternative field name for serotypes
+                cat(paste(data[['salmonella_serotype_names']], collapse=','))
+            } else if('$field' == 'stec_serogroups' && 'stec_serogroup_names' %in% names(data)) {
+                # Fallback: try alternative field name for serogroups
+                cat(paste(data[['stec_serogroup_names']], collapse=','))
             }
         }, error = function(e) { cat('') })
         " 2>/dev/null)
@@ -740,6 +752,34 @@ parse_metadata_json() {
         
         if [[ -n "$bash_result" ]]; then
             echo "$bash_result"
+            return 0
+        fi
+    fi
+    
+    # Enhanced bash fallback for serotype/serogroup objects
+    if [[ "$field" == "salmonella_serotypes" || "$field" == "stec_serogroups" ]]; then
+        # Try to extract from object keys first
+        local bash_result=$(grep -o "\"$field\"[[:space:]]*:[[:space:]]*{[^}]*}" "$json_file" | \
+                           sed 's/.*{\(.*\)}.*/\1/' | \
+                           grep -o '"[^"]*"[[:space:]]*:' | \
+                           sed 's/"//g' | sed 's/[[:space:]]*://' | \
+                           tr '\n' ',' | sed 's/,$//')
+        
+        if [[ -n "$bash_result" ]]; then
+            echo "$bash_result"
+            return 0
+        fi
+        
+        # Try alternative field names
+        local alt_field="${field%s}_names"  # Convert "serotypes" to "serotype_names"
+        local alt_result=$(grep -o "\"$alt_field\"[[:space:]]*:[[:space:]]*\[[^]]*\]" "$json_file" | \
+                          sed 's/.*\[\(.*\)\].*/\1/' | \
+                          sed 's/"//g' | \
+                          tr -d ' ' | \
+                          sed 's/,/, /g')
+        
+        if [[ -n "$alt_result" ]]; then
+            echo "$alt_result"
             return 0
         fi
     fi
@@ -1431,10 +1471,14 @@ if [[ -n "${preprocessed_metadata}" && -f "${preprocessed_metadata}" ]]; then
     available_serogroups=$(parse_metadata_json "${preprocessed_metadata}" "stec_serogroups")
     
     if [[ -n "$available_serotypes" ]]; then
-        echo "✓ Salmonella serotypes available in metadata"
+        echo "✓ Salmonella serotypes available in metadata: $available_serotypes"
+    else
+        echo "⚠️  No Salmonella serotypes found in metadata"
     fi
     if [[ -n "$available_serogroups" ]]; then
-        echo "✓ STEC serogroups available in metadata"
+        echo "✓ STEC serogroups available in metadata: $available_serogroups"
+    else
+        echo "⚠️  No STEC serogroups found in metadata"
     fi
 fi
 
@@ -2190,7 +2234,9 @@ echo "Output directory: $outDir"
 echo "Run in background: $([ "$background" == true ] && echo "Yes" || echo "No")"
 echo ""
 echo "Command to run:"
-echo "$cmd"
+# Clean command for display (remove extra spaces and newlines)
+display_cmd=$(echo "$cmd" | tr '\n' ' ' | sed 's/  */ /g')
+echo "$display_cmd"
 echo ""
 
 # If we're just getting the command, print it and exit
@@ -2278,7 +2324,10 @@ if [[ "$execute" =~ ^[Yy]$ ]]; then
     echo "Starting analysis..."
     echo "$(date): Executing command: $cmd" >> "$error_log"
     
-    if ! eval $cmd; then
+    # Clean up command string to prevent eval issues
+    cmd=$(echo "$cmd" | tr '\n' ' ' | sed 's/  */ /g')
+    
+    if ! eval "$cmd"; then
         echo "Error running analysis command."
         echo "Check .nextflow.log for details."
         echo "$(date): Command execution failed" >> "$error_log"
