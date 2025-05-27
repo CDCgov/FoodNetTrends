@@ -1939,14 +1939,29 @@ cat(paste("MMWR File:        ", args$mmwrFile, "\n"))
 
 # Data Quality Summary
 cat("\n--- DATA QUALITY ASSESSMENT ---\n")
-cat(paste("Records Analyzed: ", nrow(analysis_data), "\n"))
-cat(paste("States Included:  ", data_quality$state_count, " (", paste(unique(analysis_data$state), collapse=", "), ")\n"))
-cat(paste("Time Period:      ", paste(data_quality$year_range, collapse=" - "), "\n"))
-cat(paste("Data Quality:     ", if(data_quality$passed) "PASSED" else "ISSUES DETECTED", "\n"))
-if (!data_quality$passed) {
-  for (issue in data_quality$issues) {
-    cat(paste("  WARNING: ", issue, "\n"))
+if (exists("analysis_data")) {
+  cat(paste("Records Analyzed: ", nrow(analysis_data), "\n"))
+} else {
+  cat("Records Analyzed:  ERROR - analysis_data not found\n")
+}
+
+# Check if data_quality exists
+if (exists("data_quality")) {
+  cat(paste("States Included:  ", data_quality$state_count, " (", paste(unique(analysis_data$state), collapse=", "), ")\n"))
+  cat(paste("Time Period:      ", paste(data_quality$year_range, collapse=" - "), "\n"))
+  cat(paste("Data Quality:     ", if(data_quality$passed) "PASSED" else "ISSUES DETECTED", "\n"))
+  if (!data_quality$passed) {
+    for (issue in data_quality$issues) {
+      cat(paste("  WARNING: ", issue, "\n"))
+    }
   }
+} else {
+  # Fallback if data_quality doesn't exist
+  if (exists("analysis_data")) {
+    cat(paste("States Included:  ", length(unique(analysis_data$state)), " (", paste(unique(analysis_data$state), collapse=", "), ")\n"))
+    cat(paste("Time Period:      ", paste(range(analysis_data$year), collapse=" - "), "\n"))
+  }
+  cat("Data Quality:     ERROR - validation object not found\n")
 }
 
 # Model Performance Summary  

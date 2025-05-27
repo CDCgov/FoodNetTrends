@@ -819,7 +819,12 @@ generate_pathogen_summaries <- function(ir_data_list, summary_data_list) {
           for (i in 1:nrow(display_data)) {
             html <- paste0(html, '<tr>')
             for (col_name in names(display_data)) {
-              value <- display_data[i, col_name]
+              # Handle both data.table and data.frame
+              if (inherits(display_data, "data.table")) {
+                value <- display_data[i, ..col_name][[1]]
+              } else {
+                value <- display_data[i, col_name]
+              }
               if (is.numeric(value)) {
                 value <- round(value, 3)
               }
