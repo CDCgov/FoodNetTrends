@@ -714,11 +714,28 @@ parse_metadata_json() {
         tryCatch({
             library(jsonlite)
             data <- fromJSON('$json_file')
-            if('$field' %in% names(data)) {
+            
+            # For serotype/serogroup fields, prioritize the _names field for better UX
+            if('$field' == 'salmonella_serotypes' && 'salmonella_serotype_names' %in% names(data)) {
+                serotype_names <- data[['salmonella_serotype_names']]
+                # Limit to first 15 serotypes to avoid overwhelming the UI
+                if(length(serotype_names) > 15) {
+                    serotype_names <- serotype_names[1:15]
+                }
+                cat(paste(as.character(serotype_names), collapse=','))
+            } else if('$field' == 'stec_serogroups' && 'stec_serogroup_names' %in% names(data)) {
+                serotype_names <- data[['stec_serogroup_names']]
+                cat(paste(as.character(serotype_names), collapse=','))
+            } else if('$field' %in% names(data)) {
                 field_data <- data[['$field']]
                 if(is.list(field_data) && !is.null(names(field_data)) && length(names(field_data)) > 0) {
                     # Handle named list (like serotype objects with counts) - extract keys
-                    cat(paste(names(field_data), collapse=','))
+                    serotype_names <- names(field_data)
+                    # Limit to first 15 for UI purposes
+                    if(length(serotype_names) > 15) {
+                        serotype_names <- serotype_names[1:15]
+                    }
+                    cat(paste(serotype_names, collapse=','))
                 } else if(is.vector(field_data) && length(field_data) > 1) {
                     # Handle arrays - convert to character and paste
                     cat(paste(as.character(field_data), collapse=','))
@@ -730,12 +747,6 @@ parse_metadata_json() {
                     # Handle single values
                     cat(as.character(field_data))
                 }
-            } else if('$field' == 'salmonella_serotypes' && 'salmonella_serotype_names' %in% names(data)) {
-                # Fallback: try alternative field name for serotypes
-                cat(paste(as.character(data[['salmonella_serotype_names']]), collapse=','))
-            } else if('$field' == 'stec_serogroups' && 'stec_serogroup_names' %in% names(data)) {
-                # Fallback: try alternative field name for serogroups
-                cat(paste(as.character(data[['stec_serogroup_names']]), collapse=','))
             }
         }, error = function(e) { cat('') })
         " 2>/dev/null)
@@ -1680,10 +1691,9 @@ if [[ "$pathogens" == *"STEC"* ]]; then
     fi
     
     echo "STEC analysis uses serogroups (epidemiological standard):"
-    echo "1) All STEC serogroups (O157 and non-O157)"
-    echo "2) O157 only"
-    echo "3) Non-O157 only"
-    echo "4) Custom serogroup selection"
+    echo "1) ALL"
+    echo "2) O157"
+    echo "3) NON-O157"
     read -p "Select STEC serogroups [1]: " stec_serogroup_choice
     stec_serogroup_choice=${stec_serogroup_choice:-1}
     
@@ -1691,11 +1701,6 @@ if [[ "$pathogens" == *"STEC"* ]]; then
         1) stec_serogroups="ALL" ;;
         2) stec_serogroups="O157" ;;
         3) stec_serogroups="NON-O157" ;;
-        4) 
-            echo "Enter specific STEC serogroups (e.g., O157,O26,O111):"
-            read -p "STEC serogroups: " stec_serogroups
-            stec_serogroups=${stec_serogroups:-"ALL"}
-            ;;
     esac
     echo "Selected STEC serogroups: $stec_serogroups"
 else
