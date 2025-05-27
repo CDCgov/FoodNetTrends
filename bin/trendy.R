@@ -817,7 +817,7 @@ if (target_pathogen == "CYCLOSPORA") {
     
     # Check if we have any data
     if (nrow(pathogen_data) == 0) {
-      log_message("ERROR", paste("No", pathogen, "data found in dataset"))
+      log_message("ERROR", paste("No", target_pathogen, "data found in dataset"))
       stop(paste("Analysis terminated: No data available for", target_pathogen))
     }
     
@@ -911,12 +911,12 @@ if (target_pathogen == "CYCLOSPORA") {
   
   if (inherits(mmwrdata, "data.table")) {
     # Use get() to reference the column dynamically
-    pathogen_data <- mmwrdata[toupper(get("pathogen")) == toupper(pathogen)]
+    pathogen_data <- mmwrdata[toupper(get("pathogen")) == toupper(target_pathogen)]
   } else {
-    pathogen_data <- mmwrdata[toupper(mmwrdata$pathogen) == toupper(pathogen), ]
+    pathogen_data <- mmwrdata[toupper(mmwrdata$pathogen) == toupper(target_pathogen), ]
   }
   
-  log_message("DEBUG", paste("Rows after filtering for", pathogen, ":", nrow(pathogen_data)))
+  log_message("DEBUG", paste("Rows after filtering for", target_pathogen, ":", nrow(pathogen_data)))
   
   # Verify filtering worked correctly
   if (nrow(pathogen_data) > 0) {
@@ -965,7 +965,7 @@ if (target_pathogen == "CYCLOSPORA") {
   
   # Check if we have data
   if (nrow(pathogen_data) == 0) {
-    log_message("ERROR", paste("No", pathogen, "data found in dataset"))
+    log_message("ERROR", paste("No", target_pathogen, "data found in dataset"))
     stop(paste("Analysis terminated: No data available for", target_pathogen))
   }
   
@@ -984,7 +984,7 @@ if (target_pathogen == "CYCLOSPORA") {
   
   # Create data signature for comparison
   data_signature <- digest::digest(pathogen_counts[order(state, year)], algo = "md5")
-  log_message("INFO", paste("Data signature for", pathogen, ":", data_signature))
+  log_message("INFO", paste("Data signature for", target_pathogen, ":", data_signature))
   
   # Show sample of aggregated data
   log_message("DEBUG", "Sample of aggregated data (first 5 rows):")
@@ -1147,7 +1147,7 @@ validate_data_quality <- function(analysis_data, target_pathogen) {
   
   # Log results
   if (length(issues) > 0) {
-    log_message("WARNING", paste("Data quality issues for", pathogen, ":"))
+    log_message("WARNING", paste("Data quality issues for", target_pathogen, ":"))
     for (issue in issues) {
       log_message("WARNING", paste("  -", issue))
     }
@@ -1291,7 +1291,7 @@ model_fit <- tryCatch({
     log_message("DEBUG", paste("Model input data rows:", nrow(analysis_data)))
     log_message("DEBUG", paste("Model input data columns:", paste(names(analysis_data), collapse=", ")))
     model_data_signature <- digest::digest(analysis_data[order(state, year)], algo = "md5")
-    log_message("INFO", paste("Model input data signature for", pathogen, ":", model_data_signature))
+    log_message("INFO", paste("Model input data signature for", target_pathogen, ":", model_data_signature))
     
     # Fit model with progress callback using command-line parameters
     brm(
@@ -1388,7 +1388,7 @@ model_fit <- tryCatch({
     data = analysis_data,
     is_dummy = TRUE,
     creation_time = Sys.time(),
-    pathogen = pathogen,
+    pathogen = target_pathogen,
     error_message = e$message
   )
   class(dummy) <- c("brmsfit", "list")
@@ -1413,7 +1413,7 @@ if (exists("has_progress_tracking") && has_progress_tracking) {
 } else {
   log_message("OUTPUT", "Saving model file")
 }
-model_file <- paste0(pathogen, "_brm.Rds")
+model_file <- paste0(target_pathogen, "_brm.Rds")
 saveRDS(model_fit, file = model_file)
 if (exists("has_progress_tracking") && has_progress_tracking) {
   log_progress("OUTPUT", paste("Saved model to", model_file))
@@ -1728,7 +1728,7 @@ ir_data <- tryCatch({
 })
 
 # Save IR results
-ir_file <- paste0(pathogen, "_IRCatch.csv")
+ir_file <- paste0(target_pathogen, "_IRCatch.csv")
 fwrite(ir_data, file = ir_file)
 if (exists("has_progress_tracking") && has_progress_tracking) {
   log_progress("OUTPUT", paste("Saved IR data to", ir_file))
@@ -1811,7 +1811,7 @@ for (period in periods) {
     }
     
     # Save IRR results
-    irr_file <- paste0(pathogen, "_EstIRRCatch_", period, ".csv")
+    irr_file <- paste0(target_pathogen, "_EstIRRCatch_", period, ".csv")
     fwrite(irr_results, file = irr_file)
     log_message("OUTPUT", paste("Saved IRR data to", irr_file))
     
@@ -1830,7 +1830,7 @@ for (period in periods) {
       stringsAsFactors = FALSE
     )
     
-    irr_file <- paste0(pathogen, "_EstIRRError_", period, ".csv")
+    irr_file <- paste0(target_pathogen, "_EstIRRError_", period, ".csv")
     fwrite(error_irr, file = irr_file)
     log_message("OUTPUT", paste("Saved error-state IRR data to", irr_file))
   })
@@ -1891,8 +1891,8 @@ tryCatch({
       theme_minimal() +
       theme(plot.title = element_text(size = 14, face = "bold"))
       
-    ggsave(paste0(pathogen, "_spline_trend.png"), p1, width = 10, height = 6, dpi = 300)
-    log_message("OUTPUT", paste("Saved spline trend plot to", paste0(pathogen, "_spline_trend.png")))
+    ggsave(paste0(target_pathogen, "_spline_trend.png"), p1, width = 10, height = 6, dpi = 300)
+    log_message("OUTPUT", paste("Saved spline trend plot to", paste0(target_pathogen, "_spline_trend.png")))
   } else {
     # Fallback for observed data only
     # Convert to data.table if needed
@@ -1909,8 +1909,8 @@ tryCatch({
       ) +
       theme_minimal()
       
-    ggsave(paste0(pathogen, "_trend_observed.png"), p1, width = 8, height = 6)
-    log_message("OUTPUT", paste("Saved observed trend plot to", paste0(pathogen, "_trend_observed.png")))
+    ggsave(paste0(target_pathogen, "_trend_observed.png"), p1, width = 8, height = 6)
+    log_message("OUTPUT", paste("Saved observed trend plot to", paste0(target_pathogen, "_trend_observed.png")))
   }
   
   # State-specific spline trends plot
@@ -1932,8 +1932,8 @@ tryCatch({
       theme_minimal() +
       theme(legend.position = "right")
     
-    ggsave(paste0(pathogen, "_state_spline_trends.png"), p2, width = 12, height = 8, dpi = 300)
-    log_message("OUTPUT", paste("Saved state spline trends plot to", paste0(pathogen, "_state_spline_trends.png")))
+    ggsave(paste0(target_pathogen, "_state_spline_trends.png"), p2, width = 12, height = 8, dpi = 300)
+    log_message("OUTPUT", paste("Saved state spline trends plot to", paste0(target_pathogen, "_state_spline_trends.png")))
   } else {
     # Fallback for observed data only
     p2 <- ggplot(observed_data, aes(x = year, y = ir, color = state, group = state)) +
@@ -1946,8 +1946,8 @@ tryCatch({
       theme_minimal() +
       theme(legend.position = "right")
       
-    ggsave(paste0(pathogen, "_state_trends_observed.png"), p2, width = 10, height = 6)
-    log_message("OUTPUT", paste("Saved state observed trends plot to", paste0(pathogen, "_state_trends_observed.png")))
+    ggsave(paste0(target_pathogen, "_state_trends_observed.png"), p2, width = 10, height = 6)
+    log_message("OUTPUT", paste("Saved state observed trends plot to", paste0(target_pathogen, "_state_trends_observed.png")))
   }
   
   # Comparison plot: Spline vs Observed
@@ -1976,25 +1976,25 @@ tryCatch({
       theme_minimal() +
       theme(plot.title = element_text(size = 16, face = "bold"))
     
-    ggsave(paste0(pathogen, "_foodnettrends_comparison.png"), p3, width = 10, height = 6, dpi = 300)
-    log_message("OUTPUT", paste("Saved FoodNetTrends comparison plot to", paste0(pathogen, "_foodnettrends_comparison.png")))
+    ggsave(paste0(target_pathogen, "_foodnettrends_comparison.png"), p3, width = 10, height = 6, dpi = 300)
+    log_message("OUTPUT", paste("Saved FoodNetTrends comparison plot to", paste0(target_pathogen, "_foodnettrends_comparison.png")))
   }
 }, error = function(e) {
   log_message("ERROR", paste("Plot generation failed:", e$message))
   
   # Create error indicator plots
-  png(paste0(pathogen, "_spline_trend_error.png"), width = 800, height = 600)
+  png(paste0(target_pathogen, "_spline_trend_error.png"), width = 800, height = 600)
   plot(1:10, 1:10, type = "n", main = paste(pathogen, "Spline Trend (ERROR)"))
   text(5, 5, "Error generating spline trend plot", col = "red", cex = 2)
   dev.off()
   
-  png(paste0(pathogen, "_state_spline_trends_error.png"), width = 800, height = 600)
+  png(paste0(target_pathogen, "_state_spline_trends_error.png"), width = 800, height = 600)
   plot(1:10, 1:10, type = "n", main = paste(pathogen, "State Spline Trends (ERROR)"))
   text(5, 5, "Error generating state trends plot", col = "red", cex = 2)
   dev.off()
   
-  png(paste0(pathogen, "_foodnettrends_comparison_error.png"), width = 800, height = 600)
-  plot(1:10, 1:10, type = "n", main = paste("FoodNetTrends", pathogen, "(ERROR)"))
+  png(paste0(target_pathogen, "_foodnettrends_comparison_error.png"), width = 800, height = 600)
+  plot(1:10, 1:10, type = "n", main = paste("FoodNetTrends", target_pathogen, "(ERROR)"))
   text(5, 5, "Error generating comparison plot", col = "red", cex = 2)
   dev.off()
   
@@ -2010,12 +2010,12 @@ if (exists("has_progress_tracking") && has_progress_tracking) {
 }
 
 # Create summary file
-summary_file <- paste0(pathogen, "_summary.txt")
+summary_file <- paste0(target_pathogen, "_summary.txt")
 sink(summary_file)
 cat("=======================================================\n")
 cat(" FoodNetTrends v1.0.0-rc.1 Analysis Summary         \n")
 cat("=======================================================\n")
-cat(paste("Pathogen:         ", pathogen, "\n"))
+cat(paste("Pathogen:         ", target_pathogen, "\n"))
 cat(paste("Analysis Date:    ", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "\n"))
 cat(paste("Pipeline Version: ", "v1.0.0-rc.1", "\n"))
 cat(paste("MMWR File:        ", args$mmwrFile, "\n"))
@@ -2103,11 +2103,11 @@ if ("type" %in% names(ir_data)) {
 
 # Output Files
 cat("\n--- OUTPUT FILES GENERATED ---\n")
-cat(paste("Model File:       ", paste0(pathogen, "_brm.Rds"), "\n"))
-cat(paste("IR Data:          ", paste0(pathogen, "_IRCatch.csv"), "\n"))
-cat(paste("Spline Trends:    ", paste0(pathogen, "_spline_trend.png"), "\n"))
-cat(paste("State Trends:     ", paste0(pathogen, "_state_spline_trends.png"), "\n"))
-cat(paste("Comparison Plot:  ", paste0(pathogen, "_foodnettrends_comparison.png"), "\n"))
+cat(paste("Model File:       ", paste0(target_pathogen, "_brm.Rds"), "\n"))
+cat(paste("IR Data:          ", paste0(target_pathogen, "_IRCatch.csv"), "\n"))
+cat(paste("Spline Trends:    ", paste0(target_pathogen, "_spline_trend.png"), "\n"))
+cat(paste("State Trends:     ", paste0(target_pathogen, "_state_spline_trends.png"), "\n"))
+cat(paste("Comparison Plot:  ", paste0(target_pathogen, "_foodnettrends_comparison.png"), "\n"))
 
 # Interpretation Guidelines
 cat("\n--- INTERPRETATION GUIDELINES ---\n")
@@ -2132,12 +2132,12 @@ if (exists("has_progress_tracking") && has_progress_tracking) {
 
 # Generate a simple summary file if it doesn't exist already
 # This helps prevent "Missing output file" errors in the pipeline
-summary_file_path <- paste0(pathogen, "_summary.txt")
+summary_file_path <- paste0(target_pathogen, "_summary.txt")
 if (!file.exists(summary_file_path)) {
   log_message("OUTPUT", paste("Creating summary file", summary_file_path))
   
   # Create a simple summary file
-  write(paste("Summary for", pathogen, "analysis completed at", format(Sys.time(), "%Y-%m-%d %H:%M:%S")), 
+  write(paste("Summary for", target_pathogen, "analysis completed at", format(Sys.time(), "%Y-%m-%d %H:%M:%S")), 
         file = summary_file_path)
   write(paste("Data characteristics:"), file = summary_file_path, append = TRUE)
   write(paste("  Total records:", nrow(pathogen_data)), file = summary_file_path, append = TRUE)
