@@ -1438,6 +1438,9 @@ if (exists("has_progress_tracking") && has_progress_tracking) {
 }
 
 ir_data <- tryCatch({
+  # Ensure target_pathogen is accessible in this scope
+  target_pathogen <- target_pathogen
+  
   # Generate spline predictions from the Bayesian hierarchical model
   if (!isTRUE(model_fit$is_dummy)) {
     log_message("INFO", "Generating spline predictions for trend visualization...")
