@@ -1757,33 +1757,124 @@ if [[ "$pathogens" == *"SALMONELLA"* ]]; then
     
     # Use metadata serotypes if available, otherwise discover from data
     if [[ -n "$available_serotypes" ]]; then
-        IFS=',' read -ra SALMONELLA_SEROTYPES_ARRAY <<< "$available_serotypes"
-        echo "Available Salmonella serotypes (from metadata):"
-        for i in "${!SALMONELLA_SEROTYPES_ARRAY[@]}"; do
-            printf "%2d) %s\n" $((i+1)) "${SALMONELLA_SEROTYPES_ARRAY[$i]}"
-        done
-        echo "$(( ${#SALMONELLA_SEROTYPES_ARRAY[@]} + 1 ))) Enter a custom list manually"
-        echo "$(( ${#SALMONELLA_SEROTYPES_ARRAY[@]} + 2 ))) Use all serotypes (no filtering)"
-        read -p "Select Salmonella serotypes (comma-separated indices, or $(( ${#SALMONELLA_SEROTYPES_ARRAY[@]} + 2 )) for all) [$(( ${#SALMONELLA_SEROTYPES_ARRAY[@]} + 2 ))]: " sal_sero_choice
-        sal_sero_choice=${sal_sero_choice:-$(( ${#SALMONELLA_SEROTYPES_ARRAY[@]} + 2 ))}
+        # Parse serotypes and filter out the "...and X others" entry if present
+        IFS=',' read -ra RAW_SEROTYPES_ARRAY <<< "$available_serotypes"
+        SALMONELLA_SEROTYPES_ARRAY=()
+        total_count=""
         
-        if [[ "$sal_sero_choice" -eq $(( ${#SALMONELLA_SEROTYPES_ARRAY[@]} + 2 )) ]]; then
-            salmonella_serotypes="ALL"
-        elif [[ "$sal_sero_choice" -eq $(( ${#SALMONELLA_SEROTYPES_ARRAY[@]} + 1 )) ]]; then
-            read -p "Enter Salmonella serotypes (comma-separated): " salmonella_serotypes
-            salmonella_serotypes=${salmonella_serotypes:-"ALL"}
-        else
-            # Convert indices to serotype names
-            salmonella_serotypes=""
-            IFS=',' read -ra IDX <<< "$sal_sero_choice"
-            for idx in "${IDX[@]}"; do
-                idx=$((idx-1))
-                if [[ $idx -ge 0 && $idx -lt ${#SALMONELLA_SEROTYPES_ARRAY[@]} ]]; then
-                    salmonella_serotypes+="${SALMONELLA_SEROTYPES_ARRAY[$idx]},"
-                fi
-            done
-            salmonella_serotypes=$(echo "$salmonella_serotypes" | sed 's/,*$//')
+        for serotype in "${RAW_SEROTYPES_ARRAY[@]}"; do
+            if [[ "$serotype" =~ ^\.\.\. ]]; then
+                # Extract total count from "...and X others"
+                total_count=$(echo "$serotype" | grep -o '[0-9]\+' | head -1)
+            else
+                SALMONELLA_SEROTYPES_ARRAY+=("$serotype")
+            fi
+        done
+        
+        total_serotypes=${#SALMONELLA_SEROTYPES_ARRAY[@]}
+        if [[ -n "$total_count" ]]; then
+            total_serotypes=$((total_serotypes + total_count))
         fi
+        
+        echo ""
+        echo "Salmonella serotypes in your data ($total_serotypes total):"
+        echo ""
+        
+        # Show hierarchical selection
+        echo "1) Top 5 most common serotypes:"
+        if [[ ${#SALMONELLA_SEROTYPES_ARRAY[@]} -ge 5 ]]; then
+            echo "   ${SALMONELLA_SEROTYPES_ARRAY[0]}, ${SALMONELLA_SEROTYPES_ARRAY[1]}, ${SALMONELLA_SEROTYPES_ARRAY[2]}, ${SALMONELLA_SEROTYPES_ARRAY[3]}, ${SALMONELLA_SEROTYPES_ARRAY[4]}"
+        else
+            echo "   $(IFS=', '; echo "${SALMONELLA_SEROTYPES_ARRAY[*]}")"
+        fi
+        echo ""
+        
+        if [[ ${#SALMONELLA_SEROTYPES_ARRAY[@]} -ge 10 ]]; then
+            echo "2) Top 10 most common serotypes:"
+            echo "   + ${SALMONELLA_SEROTYPES_ARRAY[5]}, ${SALMONELLA_SEROTYPES_ARRAY[6]}, ${SALMONELLA_SEROTYPES_ARRAY[7]}, ${SALMONELLA_SEROTYPES_ARRAY[8]}, ${SALMONELLA_SEROTYPES_ARRAY[9]}"
+            echo ""
+        fi
+        
+        if [[ ${#SALMONELLA_SEROTYPES_ARRAY[@]} -ge 15 ]]; then
+            echo "3) Top 15 most common serotypes:"
+            echo "   + ${SALMONELLA_SEROTYPES_ARRAY[10]}, ${SALMONELLA_SEROTYPES_ARRAY[11]}, ${SALMONELLA_SEROTYPES_ARRAY[12]}, ${SALMONELLA_SEROTYPES_ARRAY[13]}, ${SALMONELLA_SEROTYPES_ARRAY[14]}"
+            echo ""
+        fi
+        
+        if [[ ${#SALMONELLA_SEROTYPES_ARRAY[@]} -ge 20 ]]; then
+            echo "4) Top 20 most common serotypes:"
+            echo "   + ${SALMONELLA_SEROTYPES_ARRAY[15]}, ${SALMONELLA_SEROTYPES_ARRAY[16]}, ${SALMONELLA_SEROTYPES_ARRAY[17]}, ${SALMONELLA_SEROTYPES_ARRAY[18]}, ${SALMONELLA_SEROTYPES_ARRAY[19]}"
+            echo ""
+        fi
+        
+        # Determine next option numbers
+        local next_opt=2
+        [[ ${#SALMONELLA_SEROTYPES_ARRAY[@]} -ge 10 ]] && ((next_opt++))
+        [[ ${#SALMONELLA_SEROTYPES_ARRAY[@]} -ge 15 ]] && ((next_opt++))
+        [[ ${#SALMONELLA_SEROTYPES_ARRAY[@]} -ge 20 ]] && ((next_opt++))
+        
+        echo "$next_opt) All serotypes (no filtering) - $total_serotypes total serotypes"
+        echo "$((next_opt + 1))) Enter specific serotypes manually"
+        echo ""
+        
+        read -p "Select Salmonella serotype analysis [$next_opt]: " sal_sero_choice
+        sal_sero_choice=${sal_sero_choice:-$next_opt}
+        
+        case $sal_sero_choice in
+            1)
+                # Top 5
+                if [[ ${#SALMONELLA_SEROTYPES_ARRAY[@]} -ge 5 ]]; then
+                    salmonella_serotypes="${SALMONELLA_SEROTYPES_ARRAY[0]},${SALMONELLA_SEROTYPES_ARRAY[1]},${SALMONELLA_SEROTYPES_ARRAY[2]},${SALMONELLA_SEROTYPES_ARRAY[3]},${SALMONELLA_SEROTYPES_ARRAY[4]}"
+                else
+                    salmonella_serotypes=$(IFS=','; echo "${SALMONELLA_SEROTYPES_ARRAY[*]}")
+                fi
+                ;;
+            2)
+                # Top 10 (if available)
+                if [[ ${#SALMONELLA_SEROTYPES_ARRAY[@]} -ge 10 ]]; then
+                    salmonella_serotypes="${SALMONELLA_SEROTYPES_ARRAY[0]},${SALMONELLA_SEROTYPES_ARRAY[1]},${SALMONELLA_SEROTYPES_ARRAY[2]},${SALMONELLA_SEROTYPES_ARRAY[3]},${SALMONELLA_SEROTYPES_ARRAY[4]},${SALMONELLA_SEROTYPES_ARRAY[5]},${SALMONELLA_SEROTYPES_ARRAY[6]},${SALMONELLA_SEROTYPES_ARRAY[7]},${SALMONELLA_SEROTYPES_ARRAY[8]},${SALMONELLA_SEROTYPES_ARRAY[9]}"
+                else
+                    salmonella_serotypes="ALL"
+                fi
+                ;;
+            3)
+                # Top 15 (if available)
+                if [[ ${#SALMONELLA_SEROTYPES_ARRAY[@]} -ge 15 ]]; then
+                    salmonella_serotypes=""
+                    for i in {0..14}; do
+                        [[ $i -gt 0 ]] && salmonella_serotypes+=","
+                        salmonella_serotypes+="${SALMONELLA_SEROTYPES_ARRAY[$i]}"
+                    done
+                else
+                    salmonella_serotypes="ALL"
+                fi
+                ;;
+            4)
+                # Top 20 (if available)
+                if [[ ${#SALMONELLA_SEROTYPES_ARRAY[@]} -ge 20 ]]; then
+                    salmonella_serotypes=""
+                    for i in {0..19}; do
+                        [[ $i -gt 0 ]] && salmonella_serotypes+=","
+                        salmonella_serotypes+="${SALMONELLA_SEROTYPES_ARRAY[$i]}"
+                    done
+                else
+                    salmonella_serotypes="ALL"
+                fi
+                ;;
+            $next_opt)
+                # All serotypes
+                salmonella_serotypes="ALL"
+                ;;
+            $((next_opt + 1)))
+                # Manual entry
+                read -p "Enter Salmonella serotypes (comma-separated): " salmonella_serotypes
+                salmonella_serotypes=${salmonella_serotypes:-"ALL"}
+                ;;
+            *)
+                # Default to all
+                salmonella_serotypes="ALL"
+                ;;
+        esac
     else
         # Fallback to data discovery if no metadata
         salmonella_serotype_list=$(discover_pathogen_subtypes "SALMONELLA" "$mmwrFile" "$preprocessed_metadata" "serotype")
