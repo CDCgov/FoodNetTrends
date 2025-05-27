@@ -1441,8 +1441,10 @@ ir_data <- tryCatch({
   # Generate spline predictions from the Bayesian hierarchical model
   if (!isTRUE(model_fit$is_dummy)) {
     log_message("INFO", "Generating spline predictions for trend visualization...")
+    log_message("DEBUG", paste("Starting prediction generation, target_pathogen:", target_pathogen))
     
     # Create a dense prediction grid for spline curves
+    log_message("DEBUG", paste("Creating prediction grid, target_pathogen:", target_pathogen))
     years <- sort(unique(analysis_data$year))
     year_range <- range(years)
     
@@ -1499,6 +1501,7 @@ ir_data <- tryCatch({
     
     # CRITICAL FIX: Use posterior_epred to get predictions on response scale
     # This avoids the astronomical values caused by exponentiating log-scale predictions
+    log_message("DEBUG", paste("About to call posterior_epred, target_pathogen:", target_pathogen))
     fitted_summary <- tryCatch({
       # Use posterior_epred to get predictions on response scale (counts)
       epred_matrix <- posterior_epred(model_fit, 
