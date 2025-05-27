@@ -1423,7 +1423,7 @@ if (exists("has_progress_tracking") && has_progress_tracking) {
 
 # Clean up memory after model fitting
 # Keep only essential objects for downstream analysis
-clean_memory(keep_objects = c("model_fit", "analysis_data", "pathogen", "args", 
+clean_memory(keep_objects = c("model_fit", "analysis_data", "pathogen", "target_pathogen", "args", 
                              "convergence_check", "trend_significance", "data_quality",
                              "log_message", "log_progress", "has_progress_tracking",
                              "clean_memory", "optimize_data_types"))
