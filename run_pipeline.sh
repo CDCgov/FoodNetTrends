@@ -698,7 +698,7 @@ discover_pathogen_subtypes() {
     return 1
 }
 
-# JSON parsing function with R and bash fallbacks
+# JSON parsing function using Python
 parse_metadata_json() {
     local json_file="$1"
     local field="$2"
@@ -708,90 +708,91 @@ parse_metadata_json() {
         return 1
     fi
     
-    # Try R first (preferred method)
-    if command -v Rscript >/dev/null 2>&1; then
-        echo "DEBUG: R available, parsing field '$field' from file '$json_file'" >&2
-        local r_result=$(Rscript -e "
-        field_name <- '$field'
-        json_file <- '$json_file'
+    # Use Python for reliable JSON parsing
+    if command -v python3 >/dev/null 2>&1; then
+        echo "DEBUG: Python available, parsing field '$field' from file '$json_file'" >&2
         
-        tryCatch({
-            library(jsonlite)
-            data <- fromJSON(json_file)
-            cat('DEBUG: Parsing field:', field_name, '\n', file=stderr())
-            
-            # Handle specific serotype fields by prioritizing _names arrays
-            if(field_name == 'salmonella_serotypes') {
-                if('salmonella_serotype_names' %in% names(data)) {
-                    cat('DEBUG: Using salmonella_serotype_names field\n', file=stderr())
-                    serotype_names <- data[['salmonella_serotype_names']]
-                    # Limit to first 10 serotypes for UI
-                    if(length(serotype_names) > 10) {
-                        remaining <- length(serotype_names) - 10
-                        serotype_names <- c(serotype_names[1:10], paste('...and', remaining, 'others'))
-                    }
-                    cat(paste(serotype_names, collapse=','))
-                } else if('salmonella_serotypes' %in% names(data)) {
-                    cat('DEBUG: Using salmonella_serotypes object keys\n', file=stderr())
-                    serotype_obj <- data[['salmonella_serotypes']]
-                    if(is.list(serotype_obj) && !is.null(names(serotype_obj))) {
-                        serotype_names <- names(serotype_obj)
-                        if(length(serotype_names) > 10) {
-                            remaining <- length(serotype_names) - 10
-                            serotype_names <- c(serotype_names[1:10], paste('...and', remaining, 'others'))
-                        }
-                        cat(paste(serotype_names, collapse=','))
-                    } else {
-                        cat('')
-                    }
-                } else {
-                    cat('')
-                }
-            } else if(field_name == 'stec_serogroups') {
-                if('stec_serogroup_names' %in% names(data)) {
-                    cat('DEBUG: Using stec_serogroup_names field\n', file=stderr())
-                    serogroup_names <- data[['stec_serogroup_names']]
-                    cat(paste(serogroup_names, collapse=','))
-                } else if('stec_serogroups' %in% names(data)) {
-                    cat('DEBUG: Using stec_serogroups object keys\n', file=stderr())
-                    serogroup_obj <- data[['stec_serogroups']]
-                    if(is.list(serogroup_obj) && !is.null(names(serogroup_obj))) {
-                        serogroup_names <- names(serogroup_obj)
-                        cat(paste(serogroup_names, collapse=','))
-                    } else {
-                        cat('')
-                    }
-                } else {
-                    cat('')
-                }
-            } else if(field_name %in% names(data)) {
-                # Generic field handling for other fields
-                field_data <- data[[field_name]]
-                if(is.vector(field_data)) {
-                    cat(paste(as.character(field_data), collapse=','))
-                } else if(is.list(field_data) && !is.null(names(field_data))) {
-                    cat(paste(names(field_data), collapse=','))
-                } else {
-                    cat(as.character(field_data))
-                }
-            } else {
-                cat('')
-            }
-        }, error = function(e) { 
-            cat('DEBUG: R Error:', e\$message, '\n', file=stderr())
-            cat('')
-        })
-        ")
+        local python_result=$(python3 -c "
+import json
+import sys
+
+try:
+    with open('$json_file', 'r') as f:
+        data = json.load(f)
+    
+    field_name = '$field'
+    print(f'DEBUG: Parsing field: {field_name}', file=sys.stderr)
+    
+    # Handle specific serotype/serogroup fields
+    if field_name == 'salmonella_serotypes':
+        # Try _names field first (preferred)
+        if 'salmonella_serotype_names' in data:
+            print('DEBUG: Using salmonella_serotype_names field', file=sys.stderr)
+            serotype_names = data['salmonella_serotype_names']
+            # Limit to first 10 for UI
+            if len(serotype_names) > 10:
+                result = serotype_names[:10] + [f'...and {len(serotype_names) - 10} others']
+            else:
+                result = serotype_names
+            print(','.join(result))
+        # Fallback to object keys
+        elif 'salmonella_serotypes' in data and isinstance(data['salmonella_serotypes'], dict):
+            print('DEBUG: Using salmonella_serotypes object keys', file=sys.stderr)
+            serotype_names = list(data['salmonella_serotypes'].keys())
+            if len(serotype_names) > 10:
+                result = serotype_names[:10] + [f'...and {len(serotype_names) - 10} others']
+            else:
+                result = serotype_names
+            print(','.join(result))
+        else:
+            print('DEBUG: No salmonella serotype data found', file=sys.stderr)
+            print('')
+    
+    elif field_name == 'stec_serogroups':
+        # Try _names field first (preferred)
+        if 'stec_serogroup_names' in data:
+            print('DEBUG: Using stec_serogroup_names field', file=sys.stderr)
+            serogroup_names = data['stec_serogroup_names']
+            print(','.join(serogroup_names))
+        # Fallback to object keys
+        elif 'stec_serogroups' in data and isinstance(data['stec_serogroups'], dict):
+            print('DEBUG: Using stec_serogroups object keys', file=sys.stderr)
+            serogroup_names = list(data['stec_serogroups'].keys())
+            print(','.join(serogroup_names))
+        else:
+            print('DEBUG: No STEC serogroup data found', file=sys.stderr)
+            print('')
+    
+    # Generic field handling for other fields (pathogens, states, etc.)
+    elif field_name in data:
+        field_data = data[field_name]
+        if isinstance(field_data, list):
+            # Array field - join with commas
+            print(','.join(str(x) for x in field_data))
+        elif isinstance(field_data, dict):
+            # Object field - return keys
+            print(','.join(field_data.keys()))
+        else:
+            # Single value
+            print(str(field_data))
+    else:
+        print(f'DEBUG: Field {field_name} not found in metadata', file=sys.stderr)
+        print('')
+
+except Exception as e:
+    print(f'DEBUG: Python Error: {e}', file=sys.stderr)
+    print('')
+")
         
-        if [[ -n "$r_result" ]]; then
-            echo "DEBUG: R parsing succeeded, returning: '$r_result'" >&2
-            echo "$r_result"
+        if [[ -n "$python_result" ]]; then
+            echo "DEBUG: Python parsing succeeded, returning: '$python_result'" >&2
+            echo "$python_result"
             return 0
         else
-            echo "DEBUG: R parsing failed or returned empty" >&2
+            echo "DEBUG: Python parsing failed or returned empty" >&2
         fi
     else
-        echo "DEBUG: R not available, using bash fallback" >&2
+        echo "DEBUG: Python not available" >&2
     fi
     
     # Fallback: Simple bash parsing for basic JSON arrays
