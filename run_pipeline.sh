@@ -1497,8 +1497,13 @@ if [[ -n "${preprocessed_metadata}" && -f "${preprocessed_metadata}" ]]; then
     fi
     
     # Load serotypes/serogroups from metadata
+    echo "DEBUG: Parsing salmonella_serotypes from: ${preprocessed_metadata}" >&2
     available_serotypes=$(parse_metadata_json "${preprocessed_metadata}" "salmonella_serotypes")
+    echo "DEBUG: Raw salmonella result: '$available_serotypes' (length: ${#available_serotypes})" >&2
+    
+    echo "DEBUG: Parsing stec_serogroups" >&2
     available_serogroups=$(parse_metadata_json "${preprocessed_metadata}" "stec_serogroups")
+    echo "DEBUG: Raw stec result: '$available_serogroups' (length: ${#available_serogroups})" >&2
     
     if [[ -n "$available_serotypes" ]]; then
         echo "✓ Salmonella serotypes available in metadata: $available_serotypes"
