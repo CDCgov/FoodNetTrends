@@ -623,9 +623,9 @@ if (pathogen == "CYCLOSPORA") {
   if (!has_cyclospora_fn) {
     # Filter for Cyclospora cases (handle both data.table and data.frame)
     if (inherits(mmwrdata, "data.table")) {
-      pathogen_data <- mmwrdata[toupper(pathogentype) == "CYCLOSPORA"]
+      pathogen_data <- mmwrdata[toupper(get("pathogen")) == "CYCLOSPORA"]
     } else {
-      pathogen_data <- mmwrdata[toupper(mmwrdata$pathogentype) == "CYCLOSPORA", ]
+      pathogen_data <- mmwrdata[toupper(mmwrdata$pathogen) == "CYCLOSPORA", ]
     }
     
     # Apply states filtering if specified
@@ -776,9 +776,9 @@ if (pathogen == "CYCLOSPORA") {
     
     # Filter for Salmonella cases (handle both data.table and data.frame)
     if (inherits(mmwrdata, "data.table")) {
-      pathogen_data <- mmwrdata[toupper(pathogentype) == "SALMONELLA"]
+      pathogen_data <- mmwrdata[toupper(get("pathogen")) == "SALMONELLA"]
     } else {
-      pathogen_data <- mmwrdata[toupper(mmwrdata$pathogentype) == "SALMONELLA", ]
+      pathogen_data <- mmwrdata[toupper(mmwrdata$pathogen) == "SALMONELLA", ]
     }
     
     # Apply serotype filtering for Salmonella if specified
@@ -895,9 +895,10 @@ if (pathogen == "CYCLOSPORA") {
   
   # Filter for the specific pathogen (handle both data.table and data.frame)
   if (inherits(mmwrdata, "data.table")) {
-    pathogen_data <- mmwrdata[toupper(pathogentype) == pathogen]
+    # Use get() to reference the column dynamically
+    pathogen_data <- mmwrdata[toupper(get("pathogen")) == pathogen]
   } else {
-    pathogen_data <- mmwrdata[toupper(mmwrdata$pathogentype) == pathogen, ]
+    pathogen_data <- mmwrdata[toupper(mmwrdata$pathogen) == pathogen, ]
   }
   
   # Apply STEC serogroup filtering if this is STEC
