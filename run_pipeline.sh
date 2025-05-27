@@ -716,22 +716,22 @@ parse_metadata_json() {
             data <- fromJSON('$json_file')
             if('$field' %in% names(data)) {
                 field_data <- data[['$field']]
-                if(is.list(field_data) && !is.null(names(field_data))) {
-                    # Handle named list (like serotype objects with counts)
+                if(is.list(field_data) && !is.null(names(field_data)) && length(names(field_data)) > 0) {
+                    # Handle named list (like serotype objects with counts) - extract keys
                     cat(paste(names(field_data), collapse=','))
                 } else if(is.list(field_data) || is.vector(field_data)) {
-                    # Handle arrays or unnamed lists
-                    cat(paste(field_data, collapse=','))
+                    # Handle arrays or unnamed lists - convert to character and paste
+                    cat(paste(as.character(field_data), collapse=','))
                 } else {
                     # Handle single values
-                    cat(field_data)
+                    cat(as.character(field_data))
                 }
             } else if('$field' == 'salmonella_serotypes' && 'salmonella_serotype_names' %in% names(data)) {
                 # Fallback: try alternative field name for serotypes
-                cat(paste(data[['salmonella_serotype_names']], collapse=','))
+                cat(paste(as.character(data[['salmonella_serotype_names']]), collapse=','))
             } else if('$field' == 'stec_serogroups' && 'stec_serogroup_names' %in% names(data)) {
                 # Fallback: try alternative field name for serogroups
-                cat(paste(data[['stec_serogroup_names']], collapse=','))
+                cat(paste(as.character(data[['stec_serogroup_names']]), collapse=','))
             }
         }, error = function(e) { cat('') })
         " 2>/dev/null)
@@ -2324,10 +2324,17 @@ if [[ "$execute" =~ ^[Yy]$ ]]; then
     echo "Starting analysis..."
     echo "$(date): Executing command: $cmd" >> "$error_log"
     
+    # Debug: Show command before cleanup
+    echo "DEBUG: Raw command: $cmd"
+    
     # Clean up command string to prevent eval issues
     cmd=$(echo "$cmd" | tr '\n' ' ' | sed 's/  */ /g')
     
-    if ! eval "$cmd"; then
+    # Debug: Show command after cleanup
+    echo "DEBUG: Cleaned command: $cmd"
+    
+    # Execute command using bash -c instead of eval to handle complex parameter strings
+    if ! bash -c "$cmd"; then
         echo "Error running analysis command."
         echo "Check .nextflow.log for details."
         echo "$(date): Command execution failed" >> "$error_log"

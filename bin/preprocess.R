@@ -388,6 +388,53 @@ generate_metadata <- function(data, source_file, census_file_b = NULL, census_fi
     cat("No Salmonella serotype information available\n")
   }
   
+  # Process STEC serogroups if available
+  if (any(data$pathogen == "STEC" | data$pathogen == "SHIGA")) {
+    cat("Processing STEC serogroup information...\n")
+    # Ensure we're working with data.table
+    if (!inherits(data, "data.table")) {
+      setDT(data)
+    }
+    
+    # Get STEC data (check both STEC and SHIGA pathogen names)
+    stec_data <- data[pathogen == "STEC" | pathogen == "SHIGA"]
+    
+    # Look for serogroup information in various possible columns
+    serogroup_cols <- c("serogroup", "serotype", "serotypesummary", "serovar", "serogroup_summary")
+    serogroup_col <- NULL
+    
+    for (col in serogroup_cols) {
+      if (col %in% names(stec_data)) {
+        serogroup_col <- col
+        break
+      }
+    }
+    
+    if (!is.null(serogroup_col)) {
+      # Get serogroup counts efficiently
+      serogroup_counts <- stec_data[, .N, by = get(serogroup_col)][order(-N)]
+      setnames(serogroup_counts, "get", "serogroup")
+      
+      # Store in metadata
+      metadata$stec_serogroups <- as.list(serogroup_counts$N)
+      names(metadata$stec_serogroups) <- serogroup_counts$serogroup
+      
+      # Also store a flat list of names
+      metadata$stec_serogroup_names <- serogroup_counts$serogroup
+      
+      cat("Found", length(metadata$stec_serogroup_names), "STEC serogroups\n")
+    } else {
+      cat("No STEC serogroup column found in data\n")
+      # Create default O157/NON-O157 classification if possible
+      # This is a fallback for datasets without explicit serogroup information
+      metadata$stec_serogroups <- list("O157" = 0, "NON-O157" = 0)
+      metadata$stec_serogroup_names <- c("O157", "NON-O157")
+      cat("Created default O157/NON-O157 serogroup classification\n")
+    }
+  } else {
+    cat("No STEC data found\n")
+  }
+  
   return(metadata)
 }
 
