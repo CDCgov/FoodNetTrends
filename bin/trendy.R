@@ -1883,7 +1883,7 @@ tryCatch({
                 },
                 aes(x = year, y = ir), color = "darkblue", size = 2.5, alpha = 0.7) +
       labs(
-        title = paste(pathogen, "Spline Incidence Rate Trend"),
+        title = paste(target_pathogen, "Spline Incidence Rate Trend"),
         subtitle = "Bayesian hierarchical spline model with 95% credible intervals",
         x = "Year",
         y = "Incidence per 100,000"
@@ -1904,7 +1904,7 @@ tryCatch({
       geom_line(color = "blue", linewidth = 1) +
       geom_point(color = "blue", size = 2) +
       labs(
-        title = paste(pathogen, "Incidence Rate Trend (Observed Data)"),
+        title = paste(target_pathogen, "Incidence Rate Trend (Observed Data)"),
         x = "Year", y = "Incidence per 100,000"
       ) +
       theme_minimal()
@@ -1923,7 +1923,7 @@ tryCatch({
       geom_point(data = observed_data, aes(x = year, y = ir, color = state), 
                 size = 2, alpha = 0.7) +
       labs(
-        title = paste(pathogen, "Spline Incidence Rate Trends by State"),
+        title = paste(target_pathogen, "Spline Incidence Rate Trends by State"),
         subtitle = "Bayesian spline predictions with observed data points",
         x = "Year",
         y = "Incidence per 100,000",
@@ -1940,7 +1940,7 @@ tryCatch({
       geom_line(linewidth = 1) +
       geom_point(size = 2) +
       labs(
-        title = paste(pathogen, "Incidence Rate by State (Observed Data)"),
+        title = paste(target_pathogen, "Incidence Rate by State (Observed Data)"),
         x = "Year", y = "Incidence per 100,000", color = "State"
       ) +
       theme_minimal() +
@@ -1984,12 +1984,12 @@ tryCatch({
   
   # Create error indicator plots
   png(paste0(target_pathogen, "_spline_trend_error.png"), width = 800, height = 600)
-  plot(1:10, 1:10, type = "n", main = paste(pathogen, "Spline Trend (ERROR)"))
+  plot(1:10, 1:10, type = "n", main = paste(target_pathogen, "Spline Trend (ERROR)"))
   text(5, 5, "Error generating spline trend plot", col = "red", cex = 2)
   dev.off()
   
   png(paste0(target_pathogen, "_state_spline_trends_error.png"), width = 800, height = 600)
-  plot(1:10, 1:10, type = "n", main = paste(pathogen, "State Spline Trends (ERROR)"))
+  plot(1:10, 1:10, type = "n", main = paste(target_pathogen, "State Spline Trends (ERROR)"))
   text(5, 5, "Error generating state trends plot", col = "red", cex = 2)
   dev.off()
   
