@@ -1620,11 +1620,15 @@ ir_data <- tryCatch({
       }
       
       # Select only needed columns
+      log_message("DEBUG", paste("About to subset pred_grid, target_pathogen:", target_pathogen))
       pred_subset <- pred_grid[, .(state, year, ir, ir_lower, ir_upper, type)]
+      log_message("DEBUG", paste("About to subset observed_data, target_pathogen:", target_pathogen))
       obs_subset <- observed_data[, .(state, year, ir, ir_lower, ir_upper, type)]
       
       # Efficiently combine using data.table
+      log_message("DEBUG", paste("About to rbindlist, target_pathogen:", target_pathogen))
       ir_results <- rbindlist(list(pred_subset, obs_subset), use.names = TRUE)
+      log_message("DEBUG", paste("rbindlist completed, target_pathogen:", target_pathogen))
       
       log_message("INFO", paste("Generated", nrow(pred_grid), "spline trend points and", 
                                nrow(observed_data), "observed data points"))
