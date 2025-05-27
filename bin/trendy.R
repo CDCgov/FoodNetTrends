@@ -291,11 +291,11 @@ tryCatch({
 # ==========================================================================
 
 # Initialize progress tracking if available
-pathogen <- toupper(args$pathogen)
+target_pathogen <- toupper(args$pathogen)
 if (exists("has_progress_tracking") && has_progress_tracking) {
-  initialize_progress(pathogen)
+  initialize_progress(target_pathogen)
   log_progress("SETUP", "Initializing analysis for pathogen", milestone="SETUP")
-  log_progress("CONFIG", paste("Pathogen:", pathogen))
+  log_progress("CONFIG", paste("Pathogen:", target_pathogen))
   log_progress("CONFIG", paste("MMWR File:", args$mmwrFile))
   log_progress("CONFIG", paste("Census Bacterial:", args$censusFileB))
   log_progress("CONFIG", paste("Census Parasitic:", args$censusFileP))
@@ -303,8 +303,8 @@ if (exists("has_progress_tracking") && has_progress_tracking) {
   log_progress("CONFIG", paste("CIDT:", args$cidt))
   log_progress("CONFIG", paste("Preprocessed:", args$preprocessed))
 } else {
-  log_message("SETUP", "Initializing analysis for pathogen: PATHOGEN")
-  log_message("CONFIG", paste("Pathogen:", pathogen))
+  log_message("SETUP", paste("Initializing analysis for pathogen:", target_pathogen))
+  log_message("CONFIG", paste("Pathogen:", target_pathogen))
   log_message("CONFIG", paste("MMWR File:", args$mmwrFile))
   log_message("CONFIG", paste("Census Bacterial:", args$censusFileB))
   log_message("CONFIG", paste("Census Parasitic:", args$censusFileP))
@@ -563,7 +563,7 @@ if (is.null(censusPdata)) {
 
 # ---- Process Pathogen Data ----
 
-log_message("ANALYSIS", paste("Starting analysis for", pathogen))
+log_message("ANALYSIS", paste("Starting analysis for", target_pathogen))
 
 # Check if we have the specialized analysis functions from functions.R
 has_cyclospora_fn <- exists("cyclospora_analysis")
@@ -578,7 +578,7 @@ if ((!has_cyclospora_fn || !has_salmonella_fn) && file.exists(file.path(script_d
 }
 
 # Process data based on pathogen type
-if (pathogen == "CYCLOSPORA") {
+if (target_pathogen == "CYCLOSPORA") {
   log_message("MODEL", "Using specialized Cyclospora model approach")
   
   if (has_cyclospora_fn) {
@@ -648,7 +648,7 @@ if (pathogen == "CYCLOSPORA") {
     # Check if we have any data
     if (nrow(pathogen_data) == 0) {
       log_message("ERROR", "No Cyclospora data found in dataset")
-      stop(paste("Analysis terminated: No data available for", pathogen))
+      stop(paste("Analysis terminated: No data available for", target_pathogen))
     }
     
     # Aggregate data using data.table for efficiency
@@ -659,9 +659,9 @@ if (pathogen == "CYCLOSPORA") {
     
     # Verify census data before joining
     if (is.null(censusPdata)) {
-      log_message("ERROR", paste("CRITICAL: No valid parasitic census data available for", pathogen))
+      log_message("ERROR", paste("CRITICAL: No valid parasitic census data available for", target_pathogen))
       log_message("ERROR", "Cannot proceed with analysis - census data is required for rate calculations")
-      stop(paste("Analysis terminated: Missing parasitic census data for", pathogen))
+      stop(paste("Analysis terminated: Missing parasitic census data for", target_pathogen))
     } else {
       log_message("INFO", "Using real parasitic census data for population values")
     }
@@ -673,7 +673,7 @@ if (pathogen == "CYCLOSPORA") {
                                paste(missing_cols, collapse=", ")))
       log_message("ERROR", paste("Available columns:", paste(names(censusPdata), collapse=", ")))
       log_message("ERROR", "Cannot proceed - census data must have state, year, and population columns")
-      stop(paste("Analysis terminated: Census data structure invalid for", pathogen))
+      stop(paste("Analysis terminated: Census data structure invalid for", target_pathogen))
     }
     
     # Log column information before joining for debugging
@@ -722,12 +722,12 @@ if (pathogen == "CYCLOSPORA") {
     # Verify successful join
     if (nrow(analysis_data) == 0) {
       log_message("ERROR", "Join with census data produced 0 rows - check state/year values in both datasets")
-      stop("Critical error: Census data join failed for ", pathogen)
+      stop("Critical error: Census data join failed for ", target_pathogen)
     }
     
-    log_message("INFO", paste("Final analysis dataset has", nrow(analysis_data), "rows for", pathogen))
+    log_message("INFO", paste("Final analysis dataset has", nrow(analysis_data), "rows for", target_pathogen))
   }
-} else if (pathogen == "SALMONELLA") {
+} else if (target_pathogen == "SALMONELLA") {
   log_message("MODEL", "Using specialized Salmonella model approach")
   
   if (has_salmonella_fn) {
@@ -818,7 +818,7 @@ if (pathogen == "CYCLOSPORA") {
     # Check if we have any data
     if (nrow(pathogen_data) == 0) {
       log_message("ERROR", paste("No", pathogen, "data found in dataset"))
-      stop(paste("Analysis terminated: No data available for", pathogen))
+      stop(paste("Analysis terminated: No data available for", target_pathogen))
     }
     
     # Aggregate data using data.table for efficiency
@@ -829,9 +829,9 @@ if (pathogen == "CYCLOSPORA") {
     
     # Verify census data before joining
     if (is.null(censusBdata)) {
-      log_message("ERROR", paste("CRITICAL: No valid bacterial census data available for", pathogen))
+      log_message("ERROR", paste("CRITICAL: No valid bacterial census data available for", target_pathogen))
       log_message("ERROR", "Cannot proceed with analysis - census data is required for rate calculations")
-      stop(paste("Analysis terminated: Missing bacterial census data for", pathogen))
+      stop(paste("Analysis terminated: Missing bacterial census data for", target_pathogen))
     } else {
       log_message("INFO", "Using real bacterial census data for population values")
     }
@@ -843,7 +843,7 @@ if (pathogen == "CYCLOSPORA") {
                                paste(missing_cols, collapse=", ")))
       log_message("ERROR", paste("Available columns:", paste(names(censusBdata), collapse=", ")))
       log_message("ERROR", "Cannot proceed - census data must have state, year, and population columns")
-      stop(paste("Analysis terminated: Census data structure invalid for", pathogen))
+      stop(paste("Analysis terminated: Census data structure invalid for", target_pathogen))
     }
     
     # Log column information before joining for debugging
@@ -884,14 +884,14 @@ if (pathogen == "CYCLOSPORA") {
   # Verify successful join
   if (nrow(analysis_data) == 0) {
     log_message("ERROR", "Join with census data produced 0 rows - check state/year values in both datasets")
-    stop("Critical error: Census data join failed for ", pathogen)
+    stop("Critical error: Census data join failed for ", target_pathogen)
   }
   
-  log_message("INFO", paste("Final analysis dataset has", nrow(analysis_data), "rows for", pathogen))
+  log_message("INFO", paste("Final analysis dataset has", nrow(analysis_data), "rows for", target_pathogen))
   
 } else {
   # For other pathogens (standard approach)
-  log_message("MODEL", paste("Using standard model approach for", pathogen))
+  log_message("MODEL", paste("Using standard model approach for", target_pathogen))
   
   # Filter for the specific pathogen (handle both data.table and data.frame)
   log_message("DEBUG", paste("Total MMWR rows before filtering:", nrow(mmwrdata)))
@@ -904,17 +904,28 @@ if (pathogen == "CYCLOSPORA") {
     log_message("DEBUG", paste("  ", pathogen_summary$pathogen[i], ":", pathogen_summary$N[i], "cases"))
   }
   
+  # Debug pathogen filtering
+  log_message("DEBUG", paste("Filtering for pathogen:", target_pathogen))
+  log_message("DEBUG", paste("Pathogen argument case:", target_pathogen))
+  log_message("DEBUG", paste("First 5 pathogen values in data:", paste(head(unique(mmwrdata$pathogen), 5), collapse=", ")))
+  
   if (inherits(mmwrdata, "data.table")) {
     # Use get() to reference the column dynamically
-    pathogen_data <- mmwrdata[toupper(get("pathogen")) == pathogen]
+    pathogen_data <- mmwrdata[toupper(get("pathogen")) == toupper(pathogen)]
   } else {
-    pathogen_data <- mmwrdata[toupper(mmwrdata$pathogen) == pathogen, ]
+    pathogen_data <- mmwrdata[toupper(mmwrdata$pathogen) == toupper(pathogen), ]
   }
   
   log_message("DEBUG", paste("Rows after filtering for", pathogen, ":", nrow(pathogen_data)))
   
+  # Verify filtering worked correctly
+  if (nrow(pathogen_data) > 0) {
+    unique_pathogens_after <- unique(pathogen_data$pathogen)
+    log_message("DEBUG", paste("Unique pathogens in filtered data:", paste(unique_pathogens_after, collapse=", ")))
+  }
+  
   # Apply STEC serogroup filtering if this is STEC
-  if (pathogen == "STEC") {
+  if (target_pathogen == "STEC") {
     # Apply serogroup filtering for STEC if specified
     if (!is.null(args$stec_serogroups) && args$stec_serogroups != "ALL") {
       log_message("INFO", paste("Filtering STEC data for serogroup:", args$stec_serogroups))
@@ -955,7 +966,7 @@ if (pathogen == "CYCLOSPORA") {
   # Check if we have data
   if (nrow(pathogen_data) == 0) {
     log_message("ERROR", paste("No", pathogen, "data found in dataset"))
-    stop(paste("Analysis terminated: No data available for", pathogen))
+    stop(paste("Analysis terminated: No data available for", target_pathogen))
   }
   
   # Aggregate data
@@ -986,8 +997,8 @@ if (pathogen == "CYCLOSPORA") {
   pathogen_counts[, year := as.numeric(as.character(year))]
   
   # Determine pathogen type and select appropriate census data
-  # Cyclospora is parasitic, all others in standard processing are bacterial
-  if (pathogen == "CYCLOSPORA") {
+  # CRYPTOSPORIDIUM and CYCLOSPORA are parasitic, all others in standard processing are bacterial
+  if (target_pathogen %in% c("CRYPTOSPORIDIUM", "CYCLOSPORA")) {
     census_to_use <- censusPdata
     pathogen_type <- "Parasitic"
   } else {
@@ -995,13 +1006,13 @@ if (pathogen == "CYCLOSPORA") {
     pathogen_type <- "Bacterial"
   }
   
-  log_message("INFO", paste("Pathogen", pathogen, "classified as", pathogen_type, "- using appropriate census data"))
+  log_message("INFO", paste("Pathogen", target_pathogen, "classified as", pathogen_type, "- using appropriate census data"))
   
   # Verify census data before joining
   if (is.null(census_to_use)) {
-    log_message("ERROR", paste("CRITICAL: No valid", pathogen_type, "census data available for", pathogen))
+    log_message("ERROR", paste("CRITICAL: No valid", pathogen_type, "census data available for", target_pathogen))
     log_message("ERROR", "Cannot proceed with analysis - census data is required for rate calculations")
-    stop(paste("Analysis terminated: Missing", pathogen_type, "census data for", pathogen))
+    stop(paste("Analysis terminated: Missing", pathogen_type, "census data for", target_pathogen))
   } else {
     log_message("INFO", paste("Using real", pathogen_type, "census data for population values"))
   }
@@ -1013,7 +1024,7 @@ if (pathogen == "CYCLOSPORA") {
                              paste(missing_cols, collapse=", ")))
     log_message("ERROR", paste("Available columns:", paste(names(census_to_use), collapse=", ")))
     log_message("ERROR", "Cannot proceed - census data must have state, year, and population columns")
-    stop(paste("Analysis terminated: Census data structure invalid for", pathogen))
+    stop(paste("Analysis terminated: Census data structure invalid for", target_pathogen))
   }
   
   # Log column information before joining for debugging
@@ -1032,6 +1043,11 @@ if (pathogen == "CYCLOSPORA") {
   analysis_data <- census_to_use[pathogen_counts, on = .(state, year)]
   
   # Log join results
+  log_message("INFO", paste("Joined", nrow(pathogen_counts), "pathogen records with", 
+                           nrow(analysis_data), "census records"))
+  log_message("INFO", paste("Population range:", 
+                           min(analysis_data$population, na.rm=TRUE), "-", 
+                           max(analysis_data$population, na.rm=TRUE)))
   log_message("DEBUG", paste("After census join:", nrow(analysis_data), "rows"))
   log_message("DEBUG", paste("Population range:", min(analysis_data$population, na.rm=TRUE), "-", max(analysis_data$population, na.rm=TRUE)))
   log_message("DEBUG", paste("Count range:", min(analysis_data$count, na.rm=TRUE), "-", max(analysis_data$count, na.rm=TRUE)))
@@ -1054,17 +1070,17 @@ if (pathogen == "CYCLOSPORA") {
     
     # Check if we still have data after exclusion
     if (nrow(analysis_data) == 0) {
-      stop(paste("Analysis terminated: No complete data (with population) available for", pathogen))
+      stop(paste("Analysis terminated: No complete data (with population) available for", target_pathogen))
     }
   }
   
   # Verify successful join
   if (nrow(analysis_data) == 0) {
     log_message("ERROR", "Join with census data produced 0 rows - check state/year values in both datasets")
-    stop("Critical error: Census data join failed for ", pathogen)
+    stop("Critical error: Census data join failed for ", target_pathogen)
   }
   
-  log_message("INFO", paste("Final analysis dataset has", nrow(analysis_data), "rows for", pathogen))
+  log_message("INFO", paste("Final analysis dataset has", nrow(analysis_data), "rows for", target_pathogen))
 }
 
 # =============================================================================
@@ -1096,7 +1112,7 @@ check_model_convergence <- function(model_fit) {
 }
 
 #' Validate data quality before modeling
-validate_data_quality <- function(analysis_data, pathogen) {
+validate_data_quality <- function(analysis_data, target_pathogen) {
   issues <- character(0)
   
   # Check for negative counts
@@ -1136,7 +1152,7 @@ validate_data_quality <- function(analysis_data, pathogen) {
       log_message("WARNING", paste("  -", issue))
     }
   } else {
-    log_message("INFO", paste("Data quality validation passed for", pathogen))
+    log_message("INFO", paste("Data quality validation passed for", target_pathogen))
   }
   
   return(list(
@@ -1195,7 +1211,7 @@ if (exists("has_progress_tracking") && has_progress_tracking) {
 }
 
 # Validate data quality before modeling
-data_quality <- validate_data_quality(analysis_data, pathogen)
+data_quality <- validate_data_quality(analysis_data, target_pathogen)
 
 # Fit model with error handling
 model_fit <- tryCatch({
@@ -1952,7 +1968,7 @@ tryCatch({
       geom_point(data = overall_observed, aes(x = year, y = ir), 
                 color = "red", size = 3, alpha = 0.8) +
       labs(
-        title = paste("FoodNetTrends Analysis:", pathogen),
+        title = paste("FoodNetTrends Analysis:", target_pathogen),
         subtitle = "Blue line: Smooth spline trend | Red points: Observed data",
         x = "Year",
         y = "Incidence per 100,000"
@@ -2133,16 +2149,16 @@ if (!file.exists(summary_file_path)) {
 
 # Complete with final diagnostics summary
 log_message("INFO", "=== FINAL ANALYSIS SUMMARY ===")
-log_message("INFO", paste("Pathogen:", pathogen))
+log_message("INFO", paste("Pathogen:", target_pathogen))
 log_message("INFO", paste("Data Quality:", if(data_quality$passed) "PASSED" else "ISSUES DETECTED"))
 log_message("INFO", paste("Model Convergence:", if(is.na(convergence_check$converged)) "N/A" else if(convergence_check$converged) "CONVERGED" else "ISSUES"))
 log_message("INFO", paste("Trend Significance:", if(is.na(trend_significance$significant)) "N/A" else if(trend_significance$significant) "SIGNIFICANT" else "NOT SIGNIFICANT"))
 log_message("INFO", paste("Spline Trends Generated:", if("type" %in% names(ir_data) && any(ir_data$type == "spline_trend")) "YES" else "NO"))
 
 if (exists("has_progress_tracking") && has_progress_tracking) {
-  log_progress("COMPLETE", paste("FoodNetTrends analysis completed successfully for", pathogen), milestone="COMPLETE")
+  log_progress("COMPLETE", paste("FoodNetTrends analysis completed successfully for", target_pathogen), milestone="COMPLETE")
 } else {
-  log_message("COMPLETE", paste("FoodNetTrends analysis completed successfully for", pathogen))
+  log_message("COMPLETE", paste("FoodNetTrends analysis completed successfully for", target_pathogen))
 }
 
 # Final comprehensive memory cleanup
