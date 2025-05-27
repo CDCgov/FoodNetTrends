@@ -2155,21 +2155,21 @@ fi
 # Add dashboard parameters
 cmd="$cmd $dashboard_params"
 
-# Add background option if needed
+# Add serotype and serogroup parameters to command BEFORE background wrapper
+if [[ -n "$stec_serogroups" ]]; then
+    cmd="$cmd --stec_serogroups \"$stec_serogroups\""
+fi
+if [[ -n "$salmonella_serotypes" ]]; then
+    cmd="$cmd --salmonella_serotypes \"$salmonella_serotypes\""
+fi
+
+# Add background option if needed (AFTER all parameters are added)
 if [[ "$background" == true ]]; then
     # Create logs directory if it doesn't exist
     mkdir -p logs
     log_file="logs/foodnet_run_${timestamp}.log"
     cmd="nohup $cmd > \"${log_file}\" 2>&1 &"
     echo "Process will run in background with log: ${log_file}"
-fi
-
-# Add serotype and serogroup parameters to command
-if [[ -n "$stec_serogroups" ]]; then
-    cmd="$cmd --stec_serogroups \"$stec_serogroups\""
-fi
-if [[ -n "$salmonella_serotypes" ]]; then
-    cmd="$cmd --salmonella_serotypes \"$salmonella_serotypes\""
 fi
 
 # Analysis levels: STEC uses serogroups, Salmonella uses serotypes
