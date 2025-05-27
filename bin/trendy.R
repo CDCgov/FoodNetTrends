@@ -948,26 +948,39 @@ if (pathogen == "CYCLOSPORA") {
   
   # Aggregate data
   # Aggregate data using data.table for efficiency
-  pathogen_counts <- pathogen_data[, .(count = .N), by = .(state, year)]
+  # Include pathogen in aggregation to maintain pathogen specificity
+  pathogen_counts <- pathogen_data[, .(count = .N, pathogen = first(pathogen)), by = .(state, year)]
     
   # Ensure year is numeric before joining with census data
   pathogen_counts[, year := as.numeric(as.character(year))]
   
-  # Verify census data before joining
-  if (is.null(censusBdata)) {
-    log_message("ERROR", paste("CRITICAL: No valid bacterial census data available for", pathogen))
-    log_message("ERROR", "Cannot proceed with analysis - census data is required for rate calculations")
-    stop(paste("Analysis terminated: Missing bacterial census data for", pathogen))
+  # Determine pathogen type and select appropriate census data
+  # Cyclospora is parasitic, all others in standard processing are bacterial
+  if (pathogen == "CYCLOSPORA") {
+    census_to_use <- censusPdata
+    pathogen_type <- "Parasitic"
   } else {
-    log_message("INFO", "Using real bacterial census data for population values")
+    census_to_use <- censusBdata
+    pathogen_type <- "Bacterial"
+  }
+  
+  log_message("INFO", paste("Pathogen", pathogen, "classified as", pathogen_type, "- using appropriate census data"))
+  
+  # Verify census data before joining
+  if (is.null(census_to_use)) {
+    log_message("ERROR", paste("CRITICAL: No valid", pathogen_type, "census data available for", pathogen))
+    log_message("ERROR", "Cannot proceed with analysis - census data is required for rate calculations")
+    stop(paste("Analysis terminated: Missing", pathogen_type, "census data for", pathogen))
+  } else {
+    log_message("INFO", paste("Using real", pathogen_type, "census data for population values"))
   }
   
   # Check for required columns in census data
-  if (!all(c("state", "year", "population") %in% names(censusBdata))) {
-    missing_cols <- setdiff(c("state", "year", "population"), names(censusBdata))
-    log_message("ERROR", paste("CRITICAL: Census bacterial data missing required columns:", 
+  if (!all(c("state", "year", "population") %in% names(census_to_use))) {
+    missing_cols <- setdiff(c("state", "year", "population"), names(census_to_use))
+    log_message("ERROR", paste("CRITICAL: Census", pathogen_type, "data missing required columns:", 
                              paste(missing_cols, collapse=", ")))
-    log_message("ERROR", paste("Available columns:", paste(names(censusBdata), collapse=", ")))
+    log_message("ERROR", paste("Available columns:", paste(names(census_to_use), collapse=", ")))
     log_message("ERROR", "Cannot proceed - census data must have state, year, and population columns")
     stop(paste("Analysis terminated: Census data structure invalid for", pathogen))
   }
@@ -976,16 +989,16 @@ if (pathogen == "CYCLOSPORA") {
   log_message("DEBUG", paste("Pathogen counts columns before join:", 
                            paste(names(pathogen_counts), collapse=", ")))
   log_message("DEBUG", paste("Pathogen counts year class:", class(pathogen_counts$year)))
-  log_message("DEBUG", paste("Census data year class:", class(censusBdata$year)))
+  log_message("DEBUG", paste("Census data year class:", class(census_to_use$year)))
   
   # Join with census data using data.table syntax for efficiency
   log_message("MODEL", "Joining pathogen counts with census data")
   # Convert to data.table if needed
-  if (!inherits(censusBdata, "data.table")) {
-    setDT(censusBdata)
+  if (!inherits(census_to_use, "data.table")) {
+    setDT(census_to_use)
   }
   # Use data.table merge syntax - more memory efficient than dplyr::left_join
-  analysis_data <- censusBdata[pathogen_counts, on = .(state, year)]
+  analysis_data <- census_to_use[pathogen_counts, on = .(state, year)]
   # Clean up and force garbage collection after join
   rm(pathogen_counts)
   gc()
@@ -1318,6 +1331,13 @@ model_fit <- tryCatch({
   class(dummy) <- c("brmsfit", "list")
   return(dummy)
 })
+
+# Check if we got a dummy model
+if (isTRUE(model_fit$is_dummy)) {
+  log_message("CRITICAL", "WARNING: Model fitting failed - using dummy model!")
+  log_message("CRITICAL", paste("Failure reason:", model_fit$error_message))
+  log_message("CRITICAL", "Results will be INVALID - increase iterations or check data")
+}
 
 # Validate model quality and convergence
 log_message("INFO", "Performing model validation and diagnostics...")
