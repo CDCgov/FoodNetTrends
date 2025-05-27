@@ -1438,8 +1438,8 @@ if (exists("has_progress_tracking") && has_progress_tracking) {
 }
 
 ir_data <- tryCatch({
-  # Ensure target_pathogen is accessible in this scope
-  target_pathogen <- target_pathogen
+  # Force evaluation of target_pathogen in current scope
+  force(target_pathogen)
   
   # Generate spline predictions from the Bayesian hierarchical model
   if (!isTRUE(model_fit$is_dummy)) {
@@ -1724,10 +1724,10 @@ ir_data <- tryCatch({
   
   ir_results
 }, error = function(e) {
-  log_message("ERROR", paste("IR calculation failed:", e$message))
+  log_message("ERROR", paste("IR calculation failed for", target_pathogen, ":", e$message))
   
   # Return empty data frame on IR calculation failure
-  log_message("ERROR", "IR calculation failed - returning empty results")
+  log_message("ERROR", paste("IR calculation failed for", target_pathogen, "- returning empty results"))
   data.frame(
     state = character(),
     year = numeric(),
@@ -1777,6 +1777,9 @@ log_message("DEBUG", paste("About to start IRR calculation for:", target_pathoge
 
 for (period in periods) {
   tryCatch({
+    # Force evaluation of target_pathogen in current scope
+    force(target_pathogen)
+    
     # Parse period
     years <- as.numeric(strsplit(period, "_")[[1]])
     comparison_start <- years[1]
@@ -1867,6 +1870,9 @@ if (exists("has_progress_tracking") && has_progress_tracking) {
 }
 
 tryCatch({
+  # Force evaluation of target_pathogen in current scope
+  force(target_pathogen)
+  
   # Create spline trend plots using spline predictions
   plot_data <- ir_data
   
