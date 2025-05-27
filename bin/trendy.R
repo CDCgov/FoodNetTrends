@@ -894,12 +894,24 @@ if (pathogen == "CYCLOSPORA") {
   log_message("MODEL", paste("Using standard model approach for", pathogen))
   
   # Filter for the specific pathogen (handle both data.table and data.frame)
+  log_message("DEBUG", paste("Total MMWR rows before filtering:", nrow(mmwrdata)))
+  log_message("DEBUG", paste("Unique pathogens in MMWR data:", paste(unique(mmwrdata$pathogen), collapse=", ")))
+  
+  # Check if all pathogens have same data
+  pathogen_summary <- mmwrdata[, .N, by = pathogen][order(pathogen)]
+  log_message("DEBUG", "Case counts by pathogen in MMWR data:")
+  for (i in 1:nrow(pathogen_summary)) {
+    log_message("DEBUG", paste("  ", pathogen_summary$pathogen[i], ":", pathogen_summary$N[i], "cases"))
+  }
+  
   if (inherits(mmwrdata, "data.table")) {
     # Use get() to reference the column dynamically
     pathogen_data <- mmwrdata[toupper(get("pathogen")) == pathogen]
   } else {
     pathogen_data <- mmwrdata[toupper(mmwrdata$pathogen) == pathogen, ]
   }
+  
+  log_message("DEBUG", paste("Rows after filtering for", pathogen, ":", nrow(pathogen_data)))
   
   # Apply STEC serogroup filtering if this is STEC
   if (pathogen == "STEC") {
@@ -948,8 +960,27 @@ if (pathogen == "CYCLOSPORA") {
   
   # Aggregate data
   # Aggregate data using data.table for efficiency
-  # Include pathogen in aggregation to maintain pathogen specificity
-  pathogen_counts <- pathogen_data[, .(count = .N, pathogen = first(pathogen)), by = .(state, year)]
+  # Log data characteristics before aggregation
+  log_message("DEBUG", paste("Pathogen data before aggregation: ", nrow(pathogen_data), "rows"))
+  log_message("DEBUG", paste("Unique states:", length(unique(pathogen_data$state))))
+  log_message("DEBUG", paste("Unique years:", length(unique(pathogen_data$year))))
+  log_message("DEBUG", paste("Date range:", min(pathogen_data$year, na.rm=TRUE), "-", max(pathogen_data$year, na.rm=TRUE)))
+  
+  pathogen_counts <- pathogen_data[, .(count = .N), by = .(state, year)]
+  
+  log_message("DEBUG", paste("After aggregation:", nrow(pathogen_counts), "state-year combinations"))
+  log_message("DEBUG", paste("Total cases counted:", sum(pathogen_counts$count)))
+  
+  # Create data signature for comparison
+  data_signature <- digest::digest(pathogen_counts[order(state, year)], algo = "md5")
+  log_message("INFO", paste("Data signature for", pathogen, ":", data_signature))
+  
+  # Show sample of aggregated data
+  log_message("DEBUG", "Sample of aggregated data (first 5 rows):")
+  sample_data <- head(pathogen_counts[order(state, year)], 5)
+  for (i in 1:nrow(sample_data)) {
+    log_message("DEBUG", paste("  ", sample_data$state[i], sample_data$year[i], "count:", sample_data$count[i]))
+  }
     
   # Ensure year is numeric before joining with census data
   pathogen_counts[, year := as.numeric(as.character(year))]
@@ -999,6 +1030,16 @@ if (pathogen == "CYCLOSPORA") {
   }
   # Use data.table merge syntax - more memory efficient than dplyr::left_join
   analysis_data <- census_to_use[pathogen_counts, on = .(state, year)]
+  
+  # Log join results
+  log_message("DEBUG", paste("After census join:", nrow(analysis_data), "rows"))
+  log_message("DEBUG", paste("Population range:", min(analysis_data$population, na.rm=TRUE), "-", max(analysis_data$population, na.rm=TRUE)))
+  log_message("DEBUG", paste("Count range:", min(analysis_data$count, na.rm=TRUE), "-", max(analysis_data$count, na.rm=TRUE)))
+  log_message("DEBUG", paste("Has pathogentype column:", "pathogentype" %in% names(analysis_data)))
+  if ("pathogentype" %in% names(analysis_data)) {
+    log_message("DEBUG", paste("Pathogentype values:", unique(analysis_data$pathogentype)))
+  }
+  
   # Clean up and force garbage collection after join
   rm(pathogen_counts)
   gc()
@@ -1229,6 +1270,12 @@ model_fit <- tryCatch({
     log_message("INFO", "  - student_t(3, 0, 5) for spline smoothness (sds)")
     log_message("INFO", "  - normal(0, 5) for intercept")
     log_message("INFO", "  - normal(0, 2) for fixed effects")
+    
+    # Log model input data characteristics
+    log_message("DEBUG", paste("Model input data rows:", nrow(analysis_data)))
+    log_message("DEBUG", paste("Model input data columns:", paste(names(analysis_data), collapse=", ")))
+    model_data_signature <- digest::digest(analysis_data[order(state, year)], algo = "md5")
+    log_message("INFO", paste("Model input data signature for", pathogen, ":", model_data_signature))
     
     # Fit model with progress callback using command-line parameters
     brm(
