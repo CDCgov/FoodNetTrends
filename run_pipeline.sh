@@ -710,46 +710,61 @@ parse_metadata_json() {
     
     # Try R first (preferred method)
     if command -v Rscript >/dev/null 2>&1; then
+        echo "DEBUG: Parsing field '$field' from file '$json_file'" >&2
         local r_result=$(Rscript -e "
         tryCatch({
             library(jsonlite)
             data <- fromJSON('$json_file')
+            cat('DEBUG: Field to parse: $field\n', file=stderr())
+            cat('DEBUG: Available fields: ', paste(names(data), collapse=', '), '\n', file=stderr())
             
             # For serotype/serogroup fields, prioritize the _names field for better UX
             if('$field' == 'salmonella_serotypes' && 'salmonella_serotype_names' %in% names(data)) {
+                cat('DEBUG: Using salmonella_serotype_names path\n', file=stderr())
                 serotype_names <- data[['salmonella_serotype_names']]
+                cat('DEBUG: Found', length(serotype_names), 'serotype names\n', file=stderr())
                 # Limit to first 15 serotypes to avoid overwhelming the UI
                 if(length(serotype_names) > 15) {
                     serotype_names <- serotype_names[1:15]
                 }
                 cat(paste(as.character(serotype_names), collapse=','))
             } else if('$field' == 'stec_serogroups' && 'stec_serogroup_names' %in% names(data)) {
+                cat('DEBUG: Using stec_serogroup_names path\n', file=stderr())
                 serotype_names <- data[['stec_serogroup_names']]
                 cat(paste(as.character(serotype_names), collapse=','))
             } else if('$field' %in% names(data)) {
+                cat('DEBUG: Using main field parsing path\n', file=stderr())
                 field_data <- data[['$field']]
+                cat('DEBUG: Field data class:', class(field_data), '\n', file=stderr())
                 if(is.list(field_data) && !is.null(names(field_data)) && length(names(field_data)) > 0) {
+                    cat('DEBUG: Named list path - extracting keys\n', file=stderr())
                     # Handle named list (like serotype objects with counts) - extract keys
                     serotype_names <- names(field_data)
+                    cat('DEBUG: Found', length(serotype_names), 'keys\n', file=stderr())
                     # Limit to first 15 for UI purposes
                     if(length(serotype_names) > 15) {
                         serotype_names <- serotype_names[1:15]
                     }
                     cat(paste(serotype_names, collapse=','))
                 } else if(is.vector(field_data) && length(field_data) > 1) {
+                    cat('DEBUG: Vector path\n', file=stderr())
                     # Handle arrays - convert to character and paste
                     cat(paste(as.character(field_data), collapse=','))
                 } else if(is.list(field_data)) {
+                    cat('DEBUG: Unnamed list path\n', file=stderr())
                     # Handle unnamed lists - extract values and convert to character
                     values <- unlist(field_data)
                     cat(paste(as.character(values), collapse=','))
                 } else {
+                    cat('DEBUG: Single value path\n', file=stderr())
                     # Handle single values
                     cat(as.character(field_data))
                 }
+            } else {
+                cat('DEBUG: Field not found in data\n', file=stderr())
             }
-        }, error = function(e) { cat('') })
-        " 2>/dev/null)
+        }, error = function(e) { cat('DEBUG: R Error:', e$message, '\n', file=stderr()); cat('') })
+        ")
         
         if [[ -n "$r_result" ]]; then
             echo "$r_result"
