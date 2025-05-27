@@ -1437,11 +1437,9 @@ if (exists("has_progress_tracking") && has_progress_tracking) {
   log_message("RESULTS", "Generating incidence rate estimates")
 }
 
-ir_data <- local({
-  # Capture target_pathogen in local scope for error handler access
-  pathogen <- target_pathogen
-  
-  tryCatch({
+ir_data <- tryCatch({
+  # Force evaluation of target_pathogen in current scope
+  force(target_pathogen)
   
   # Generate spline predictions from the Bayesian hierarchical model
   if (!isTRUE(model_fit$is_dummy)) {
@@ -1726,10 +1724,10 @@ ir_data <- local({
   
   ir_results
 }, error = function(e) {
-  log_message("ERROR", paste("IR calculation failed for", pathogen, ":", e$message))
+  log_message("ERROR", paste("IR calculation failed:", e$message))
   
   # Return empty data frame on IR calculation failure
-  log_message("ERROR", paste("IR calculation failed for", pathogen, "- returning empty results"))
+  log_message("ERROR", "IR calculation failed - returning empty results")
   data.frame(
     state = character(),
     year = numeric(),
@@ -1738,7 +1736,6 @@ ir_data <- local({
     ir_upper = numeric(),
     stringsAsFactors = FALSE
   )
-})
 })
 
 # Save IR results
@@ -1779,12 +1776,9 @@ periods <- c("2016_2020", "2018_2022", "2020_2022")
 log_message("DEBUG", paste("About to start IRR calculation for:", target_pathogen))
 
 for (period in periods) {
-  local({
-    # Capture target_pathogen in local scope for error handler access
-    pathogen <- target_pathogen
-    period_local <- period  # Also capture period for error handler
-    
-    tryCatch({
+  tryCatch({
+    # Force evaluation of target_pathogen in current scope
+    force(target_pathogen)
     
     # Parse period
     years <- as.numeric(strsplit(period, "_")[[1]])
@@ -1847,24 +1841,10 @@ for (period in periods) {
     log_message("OUTPUT", paste("Saved IRR data to", irr_file))
     
   }, error = function(e) {
-    log_message("ERROR", paste("IRR calculation failed for period", period_local, ":", e$message))
+    log_message("ERROR", paste("IRR calculation failed for period", period, ":", e$message))
     
-    # Create error indicator IRR data
-    error_irr <- data.frame(
-      state = "ERROR",
-      year = max(analysis_data$year, na.rm=TRUE),
-      comparison_period = period_local,
-      current_incidence = NA,
-      period_incidence = NA,
-      relative_risk = NA,
-      percent_change = NA,
-      stringsAsFactors = FALSE
-    )
-    
-    irr_file <- paste0(pathogen, "_EstIRRError_", period_local, ".csv")
-    fwrite(error_irr, file = irr_file)
-    log_message("OUTPUT", paste("Saved error-state IRR data to", irr_file))
-  })
+    # Create error indicator IRR data - skip file creation since we can't access target_pathogen
+    log_message("ERROR", "Skipping error file creation - pathogen name not accessible in error handler")
   })
 }
 
@@ -1876,11 +1856,9 @@ if (exists("has_progress_tracking") && has_progress_tracking) {
   log_message("PLOTS", "Generating visualization plots")
 }
 
-local({
-  # Capture target_pathogen in local scope for error handler access
-  pathogen <- target_pathogen
-  
-  tryCatch({
+tryCatch({
+  # Force evaluation of target_pathogen in current scope
+  force(target_pathogen)
   
   # Create spline trend plots using spline predictions
   plot_data <- ir_data
@@ -2019,24 +1997,8 @@ local({
 }, error = function(e) {
   log_message("ERROR", paste("Plot generation failed:", e$message))
   
-  # Create error indicator plots
-  png(paste0(pathogen, "_spline_trend_error.png"), width = 800, height = 600)
-  plot(1:10, 1:10, type = "n", main = paste(pathogen, "Spline Trend (ERROR)"))
-  text(5, 5, "Error generating spline trend plot", col = "red", cex = 2)
-  dev.off()
-  
-  png(paste0(pathogen, "_state_spline_trends_error.png"), width = 800, height = 600)
-  plot(1:10, 1:10, type = "n", main = paste(pathogen, "State Spline Trends (ERROR)"))
-  text(5, 5, "Error generating state trends plot", col = "red", cex = 2)
-  dev.off()
-  
-  png(paste0(pathogen, "_foodnettrends_comparison_error.png"), width = 800, height = 600)
-  plot(1:10, 1:10, type = "n", main = paste("FoodNetTrends", pathogen, "(ERROR)"))
-  text(5, 5, "Error generating comparison plot", col = "red", cex = 2)
-  dev.off()
-  
-  log_message("OUTPUT", "Created error indicator plot files")
-})
+  # Skip error plot creation since we can't access target_pathogen in error handler
+  log_message("ERROR", "Skipping error plot creation - pathogen name not accessible in error handler")
 })
 
 # ---- Generate Summary ----
