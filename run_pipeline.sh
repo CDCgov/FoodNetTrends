@@ -719,9 +719,13 @@ parse_metadata_json() {
                 if(is.list(field_data) && !is.null(names(field_data)) && length(names(field_data)) > 0) {
                     # Handle named list (like serotype objects with counts) - extract keys
                     cat(paste(names(field_data), collapse=','))
-                } else if(is.list(field_data) || is.vector(field_data)) {
-                    # Handle arrays or unnamed lists - convert to character and paste
+                } else if(is.vector(field_data) && length(field_data) > 1) {
+                    # Handle arrays - convert to character and paste
                     cat(paste(as.character(field_data), collapse=','))
+                } else if(is.list(field_data)) {
+                    # Handle unnamed lists - extract values and convert to character
+                    values <- unlist(field_data)
+                    cat(paste(as.character(values), collapse=','))
                 } else {
                     # Handle single values
                     cat(as.character(field_data))
@@ -2324,14 +2328,8 @@ if [[ "$execute" =~ ^[Yy]$ ]]; then
     echo "Starting analysis..."
     echo "$(date): Executing command: $cmd" >> "$error_log"
     
-    # Debug: Show command before cleanup
-    echo "DEBUG: Raw command: $cmd"
-    
     # Clean up command string to prevent eval issues
     cmd=$(echo "$cmd" | tr '\n' ' ' | sed 's/  */ /g')
-    
-    # Debug: Show command after cleanup
-    echo "DEBUG: Cleaned command: $cmd"
     
     # Execute command using bash -c instead of eval to handle complex parameter strings
     if ! bash -c "$cmd"; then

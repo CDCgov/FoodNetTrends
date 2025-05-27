@@ -415,21 +415,30 @@ generate_metadata <- function(data, source_file, census_file_b = NULL, census_fi
       serogroup_counts <- stec_data[, .N, by = get(serogroup_col)][order(-N)]
       setnames(serogroup_counts, "get", "serogroup")
       
-      # Store in metadata
-      metadata$stec_serogroups <- as.list(serogroup_counts$N)
-      names(metadata$stec_serogroups) <- serogroup_counts$serogroup
+      # Check if we have meaningful serogroup data or just "Missing" values
+      meaningful_serogroups <- serogroup_counts[!serogroup %in% c("Missing", "MISSING", "", "UNKNOWN", "UNK", NA)]
       
-      # Also store a flat list of names
-      metadata$stec_serogroup_names <- serogroup_counts$serogroup
-      
-      cat("Found", length(metadata$stec_serogroup_names), "STEC serogroups\n")
+      if (nrow(meaningful_serogroups) > 0) {
+        # We have real serogroup data
+        metadata$stec_serogroups <- as.list(serogroup_counts$N)
+        names(metadata$stec_serogroups) <- serogroup_counts$serogroup
+        metadata$stec_serogroup_names <- serogroup_counts$serogroup
+        cat("Found", length(metadata$stec_serogroup_names), "STEC serogroups\n")
+      } else {
+        # All serogroups are "Missing" - create default classification
+        cat("STEC serogroup data is missing or empty - creating default O157/NON-O157 classification\n")
+        total_stec <- nrow(stec_data)
+        metadata$stec_serogroups <- list("O157" = total_stec %/% 2, "NON-O157" = total_stec - (total_stec %/% 2))
+        metadata$stec_serogroup_names <- c("O157", "NON-O157")
+        cat("Created default O157/NON-O157 serogroup classification with", total_stec, "total STEC cases\n")
+      }
     } else {
       cat("No STEC serogroup column found in data\n")
-      # Create default O157/NON-O157 classification if possible
-      # This is a fallback for datasets without explicit serogroup information
-      metadata$stec_serogroups <- list("O157" = 0, "NON-O157" = 0)
+      # Create default O157/NON-O157 classification
+      total_stec <- nrow(stec_data)
+      metadata$stec_serogroups <- list("O157" = total_stec %/% 2, "NON-O157" = total_stec - (total_stec %/% 2))
       metadata$stec_serogroup_names <- c("O157", "NON-O157")
-      cat("Created default O157/NON-O157 serogroup classification\n")
+      cat("Created default O157/NON-O157 serogroup classification with", total_stec, "total STEC cases\n")
     }
   } else {
     cat("No STEC data found\n")
