@@ -141,7 +141,11 @@ extract_pathogen <- function(filename) {
 #' Read IR data with basic processing
 read_ir_data <- function(file_path) {
   tryCatch({
-    data <- read.csv(file_path, stringsAsFactors = FALSE)
+    # Use fread for faster reading
+    if (!requireNamespace("data.table", quietly = TRUE)) {
+      stop("data.table package required")
+    }
+    data <- data.table::fread(file_path, stringsAsFactors = FALSE)
     data$pathogen <- extract_pathogen(file_path)
     return(data)
   }, error = function(e) {

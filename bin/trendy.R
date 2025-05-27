@@ -44,7 +44,7 @@
 # Load required packages with suppressed startup messages
 # PACKAGE DEPENDENCIES:
 # - argparse: Command line argument parsing
-# - dplyr/tidyr: Data manipulation and reshaping  
+# - data.table: Fast data manipulation and memory-efficient operations
 # - brms: Bayesian regression models using Stan backend
 # - ggplot2: Publication-quality visualization
 # - tidybayes: Bayesian model result extraction
@@ -52,17 +52,14 @@
 # - HDInterval: Highest density credible intervals
 suppressPackageStartupMessages({
   library(argparse)
-  library(dplyr)
-  library(tidyr)
+  library(data.table)
   library(brms)
   library(ggplot2)
   library(tidybayes)
   library(haven)
-  library(tibble)
   library(readr)
   library(HDInterval)
   library(gridExtra)
-  library(data.table)
 })
 
 options(warn = 1)  # Show warnings as they occur
@@ -2064,4 +2061,25 @@ if (exists("has_progress_tracking") && has_progress_tracking) {
 } else {
   log_message("COMPLETE", paste("FoodNetTrends analysis completed successfully for", pathogen))
 }
+
+# Final comprehensive memory cleanup
+log_message("INFO", "Performing final memory cleanup")
+
+# Remove all large objects
+large_objects <- c("mmwrdata", "censusBdata", "censusPdata", "analysis_data", 
+                   "pathogen_counts", "model_fit", "pred_grid", "fitted_summary",
+                   "ir_data", "ir_results", "results_list", "spline_data", 
+                   "observed_data", "plot_data")
+
+for (obj in large_objects) {
+  if (exists(obj)) {
+    rm(list = obj)
+  }
+}
+
+# Force garbage collection multiple times for thorough cleanup
+gc()
+gc()
+
+log_message("INFO", "Memory cleanup completed")
                 

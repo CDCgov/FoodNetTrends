@@ -18,14 +18,11 @@
 
 # Load required libraries
 suppressPackageStartupMessages({
-  # library(dplyr)  # Commented out - using data.table instead
-  # library(tidyr)  # Commented out - using data.table instead
   library(gtools)
   library(brms)
   library(ggplot2)
-  library(tidybayes)
+  library(tidybayes)  # Still needed for epred_draws
   library(haven)
-  library(tibble)
   library(readr)  
   library(HDInterval)
   library(data.table)
@@ -241,47 +238,64 @@ path_analysis <- function(mmwrdata, census) {
     stop("CRITICAL ERROR: No Bacterial pathogentype found in census data. Cannot proceed without census data.")
   }
   
-  # Create a data frame with counts per year, state, and pathogen
-  message("Filtering MMWR data for pathogens of interest")
-  filtered_data <- mmwrdata %>%
-    filter(pathogen %in% pathogens)
-  
-  if (nrow(filtered_data) == 0) {
-    stop("CRITICAL ERROR: No matching pathogen data found in MMWR data. Cannot proceed with analysis.")
+  # Ensure mmwrdata is data.table
+  if (!inherits(mmwrdata, "data.table")) {
+    setDT(mmwrdata)
   }
   
-  message("Aggregating pathogen counts by year, state, and pathogen")
-  pathogen_counts <- filtered_data %>%
-    group_by(year, state, pathogen) %>%
-    summarise(count = n(), .groups = "drop")
+  # Create a data frame with counts per year, state, and pathogen
+  message("Filtering MMWR data for pathogens of interest")
+  # Filter and count in one operation using data.table
+  pathogen_counts <- mmwrdata[pathogen %in% pathogens, 
+                              .(count = .N), 
+                              by = .(year, state, pathogen)]
+  
+  if (nrow(pathogen_counts) == 0) {
+    stop("CRITICAL ERROR: No matching pathogen data found in MMWR data. Cannot proceed with analysis.")
+  }
   
   message("Number of pathogen count rows: ", nrow(pathogen_counts))
   
   # Complete the dataset with all state/year/pathogen combinations
   message("Completing dataset with all combinations")
-  pathogen_counts_complete <- pathogen_counts %>%
-    complete(
-      year = unique(pathogen_counts$year), 
-      state = unique(pathogen_counts$state),
-      pathogen = unique(pathogen_counts$pathogen), 
-      fill = list(count = 0)
-    )
+  # Get unique values
+  all_years <- unique(pathogen_counts$year)
+  all_states <- unique(pathogen_counts$state)
+  all_pathogens <- unique(pathogen_counts$pathogen)
+  
+  # Create complete grid using CJ (cross join)
+  pathogen_counts_complete <- CJ(year = all_years, 
+                                state = all_states, 
+                                pathogen = all_pathogens)
+  
+  # Merge with actual counts, filling missing with 0
+  pathogen_counts_complete <- pathogen_counts[pathogen_counts_complete, 
+                                             on = .(year, state, pathogen)]
+  pathogen_counts_complete[is.na(count), count := 0]
   
   message("Number of rows after completion: ", nrow(pathogen_counts_complete))
   
+  # Clean up intermediate object
+  rm(pathogen_counts)
+  gc()
+  
+  # Ensure census is data.table
+  if (!inherits(census, "data.table")) {
+    setDT(census)
+  }
+  
   # Filter census for bacterial entries
   message("Filtering census data for bacterial records")
-  census_bacterial <- census %>% 
-    filter(toupper(pathogentype) == "BACTERIAL")
+  census_bacterial <- census[toupper(pathogentype) == "BACTERIAL"]
   
   message("Number of bacterial census records: ", nrow(census_bacterial))
   
   if (nrow(census_bacterial) == 0) {
     warning("No bacterial census records found after filtering. Using all census records.")
-    census_bacterial <- census
+    census_bacterial <- copy(census)  # Use copy to avoid modifying original
   }
   
-  # Join with census data carefully
+  # Join with census data using data.table syntax
   message("Joining pathogen counts with census data")
   pre_join_rows <- nrow(pathogen_counts_complete)
   
@@ -297,12 +311,8 @@ path_analysis <- function(mmwrdata, census) {
     stop("CRITICAL ERROR: Essential join columns (state, year) missing from data. Check data structure and preprocessing.")
   }
   
-  # Perform the join
-  selectDf <- left_join(
-    pathogen_counts_complete,
-    census_bacterial,
-    by = join_cols
-  )
+  # Perform the join using data.table syntax
+  selectDf <- census_bacterial[pathogen_counts_complete, on = .(year, state)]
   
   post_join_rows <- nrow(selectDf)
   message("Rows before join: ", pre_join_rows, ", after join: ", post_join_rows)
@@ -329,6 +339,11 @@ path_analysis <- function(mmwrdata, census) {
   }
   
   message("Final dataset has", nrow(selectDf), "rows")
+  
+  # Clean up intermediate objects
+  rm(census_bacterial, pathogen_counts_complete)
+  gc()
+  
   return(selectDf)
 }
 
@@ -910,12 +925,13 @@ linpred_draw <- function(data, model) {
   }
 
   # Regular processing for normal models
-  # Prepare data for prediction
-  data <- as_tibble(data) %>%
-    ungroup() %>%
-    mutate(
-      .row = row_number()
-    )
+  # Convert to data.table for processing
+  if (!inherits(data, "data.table")) {
+    data <- as.data.table(data)
+  }
+  
+  # Add row numbers
+  data[, .row := .I]
   
   # Ensure year is numeric for prediction
   if ("year" %in% names(data)) {
@@ -959,15 +975,23 @@ linpred_draw <- function(data, model) {
 
   # Generate posterior predictions
   tryCatch({
-    # Get posterior predictive draws
-    epred <- epred_draws(model, newdata = data) %>% ungroup()
+    # Get posterior predictive draws (tidybayes returns a tibble)
+    epred <- epred_draws(model, newdata = data)
+    
+    # Convert to data.table
+    epred <- as.data.table(epred)
     
     # Remove population column from posterior draws to avoid duplication during join
-    epred <- epred %>% select(-one_of("population", "Population"))
+    cols_to_remove <- intersect(names(epred), c("population", "Population"))
+    if (length(cols_to_remove) > 0) {
+      epred[, (cols_to_remove) := NULL]
+    }
     
-    # Rejoin population values using row identifier to maintain data integrity
-    pop_df <- data %>% select(.row, population) %>% ungroup()
-    draws <- left_join(epred, pop_df, by = ".row") %>% ungroup()
+    # Extract population data for rejoining
+    pop_data <- data[, .(.row, population)]
+    
+    # Join population values back using data.table syntax
+    draws <- epred[pop_data, on = .(.row)]
     
     if (!is.numeric(draws$population) || any(is.na(draws$population))) {
       stop("Population column is not numeric in the joined data")
@@ -975,7 +999,7 @@ linpred_draw <- function(data, model) {
     
     # Calculate incidence rate per 100,000 population
     # Model predictions (.epred) are counts; divide by population for rate
-    draws <- draws %>% mutate(pred_incidence = (.epred / population) * 100000)
+    draws[, pred_incidence := (.epred / population) * 100000]
     
     return(draws)
   }, error = function(e) {
@@ -989,24 +1013,28 @@ linpred_draw <- function(data, model) {
 #' Summarizes posterior draws by year and state to produce catchment-level estimates.
 #'
 #' @param draws Tibble with posterior draws from linpred_draw()
-#' @return A tibble with summarized incidence estimates by year and state
+#' @return A data.table with summarized incidence estimates by year and state
 catchment <- function(draws) {
-  # Group by relevant variables and calculate summary statistics
-  catchment_data <- draws %>%
-    group_by(year, state, .draw) %>%
-    summarise(
-      pred_incidence = mean(pred_incidence),
-      .groups = "drop"
-    ) %>%
-    # Calculate HDI intervals for each Year/State combination
-    group_by(year, state) %>%
-    summarise(
-      mean_incidence = mean(pred_incidence),
-      median_incidence = median(pred_incidence),
-      lower_hdi = hdi(pred_incidence, credMass = 0.95)[1],
-      upper_hdi = hdi(pred_incidence, credMass = 0.95)[2],
-      .groups = "drop"
-    )
+  # Convert to data.table if needed
+  if (!inherits(draws, "data.table")) {
+    draws <- as.data.table(draws)
+  }
+  
+  # First aggregate by year, state, and draw
+  catchment_temp <- draws[, .(pred_incidence = mean(pred_incidence)), 
+                         by = .(year, state, .draw)]
+  
+  # Then calculate HDI intervals for each Year/State combination
+  catchment_data <- catchment_temp[, .(
+    mean_incidence = mean(pred_incidence),
+    median_incidence = median(pred_incidence),
+    lower_hdi = hdi(pred_incidence, credMass = 0.95)[1],
+    upper_hdi = hdi(pred_incidence, credMass = 0.95)[2]
+  ), by = .(year, state)]
+  
+  # Clean up intermediate object
+  rm(catchment_temp)
+  gc()
 
   return(catchment_data)
 }
@@ -1015,21 +1043,28 @@ catchment <- function(draws) {
 #'
 #' Formats the catchment data for output, rounding values and arranging by year and state.
 #'
-#' @param catchment_data Tibble from catchment()
-#' @return A formatted tibble with incidence estimates by year and state
+#' @param catchment_data data.table from catchment()
+#' @return A formatted data.table with incidence estimates by year and state
 linpred_to_catchir <- function(catchment_data) {
-  # Format the data for output
-  ir_data <- catchment_data %>%
-    mutate(
-      year = as.integer(year),
-      # Round numeric values to 2 decimal places
-      mean_incidence = round(mean_incidence, 2),
-      median_incidence = round(median_incidence, 2),
-      lower_hdi = round(lower_hdi, 2),
-      upper_hdi = round(upper_hdi, 2)
-    ) %>%
-    # Arrange by Year and State for better readability
-    arrange(year, state)
+  # Convert to data.table if needed
+  if (!inherits(catchment_data, "data.table")) {
+    catchment_data <- as.data.table(catchment_data)
+  }
+  
+  # Make a copy to avoid modifying the original
+  ir_data <- copy(catchment_data)
+  
+  # Format the data for output using := for efficiency
+  ir_data[, `:=`(
+    year = as.integer(year),
+    mean_incidence = round(mean_incidence, 2),
+    median_incidence = round(median_incidence, 2),
+    lower_hdi = round(lower_hdi, 2),
+    upper_hdi = round(upper_hdi, 2)
+  )]
+  
+  # Sort by year and state
+  setorder(ir_data, year, state)
 
   return(ir_data)
 }
@@ -1038,29 +1073,33 @@ linpred_to_catchir <- function(catchment_data) {
 #'
 #' Formats the site-specific draws for output, rounding values and arranging by state and year.
 #'
-#' @param draws Tibble with posterior draws from linpred_draw()
-#' @return A formatted tibble with incidence estimates by state and year
+#' @param draws data.table with posterior draws from linpred_draw()
+#' @return A formatted data.table with incidence estimates by state and year
 linpred_to_siteir <- function(draws) {
-  # Format the data for site-specific outputs
-  ir_data <- draws %>%
-    group_by(year, state) %>%
-    summarise(
-      mean_incidence = mean(pred_incidence),
-      median_incidence = median(pred_incidence),
-      lower_hdi = hdi(pred_incidence, credMass = 0.95)[1],
-      upper_hdi = hdi(pred_incidence, credMass = 0.95)[2],
-      .groups = "drop"
-    ) %>%
-    # Round numeric values to 2 decimal places
-    mutate(
-      year = as.integer(year),
-      mean_incidence = round(mean_incidence, 2),
-      median_incidence = round(median_incidence, 2),
-      lower_hdi = round(lower_hdi, 2),
-      upper_hdi = round(upper_hdi, 2)
-    ) %>%
-    # Arrange by state and year for better readability
-    arrange(state, year)
+  # Convert to data.table if needed
+  if (!inherits(draws, "data.table")) {
+    draws <- as.data.table(draws)
+  }
+  
+  # Calculate summary statistics by year and state
+  ir_data <- draws[, .(
+    mean_incidence = mean(pred_incidence),
+    median_incidence = median(pred_incidence),
+    lower_hdi = hdi(pred_incidence, credMass = 0.95)[1],
+    upper_hdi = hdi(pred_incidence, credMass = 0.95)[2]
+  ), by = .(year, state)]
+  
+  # Format the data using := for efficiency
+  ir_data[, `:=`(
+    year = as.integer(year),
+    mean_incidence = round(mean_incidence, 2),
+    median_incidence = round(median_incidence, 2),
+    lower_hdi = round(lower_hdi, 2),
+    upper_hdi = round(upper_hdi, 2)
+  )]
+  
+  # Sort by state and year
+  setorder(ir_data, state, year)
 
   return(ir_data)
 }
@@ -1108,15 +1147,17 @@ plot_site_trends <- function(catchir_data, pathogen, outDir) {
 #' @param outDir Directory to save the plot
 #' @return A ggplot object with the plot
 plot_overall_trend <- function(catchir_data, pathogen, outDir) {
+  # Convert to data.table if needed
+  if (!inherits(catchir_data, "data.table")) {
+    catchir_data <- as.data.table(catchir_data)
+  }
+  
   # Calculate overall incidence by year (weighted by population)
-  overall_data <- catchir_data %>%
-    group_by(year) %>%
-    summarise(
-      median_incidence = mean(median_incidence),
-      lower_hdi = mean(lower_hdi),
-      upper_hdi = mean(upper_hdi),
-      .groups = "drop"
-    )
+  overall_data <- catchir_data[, .(
+    median_incidence = mean(median_incidence),
+    lower_hdi = mean(lower_hdi),
+    upper_hdi = mean(upper_hdi)
+  ), by = year]
 
   # Create the plot
   p <- ggplot(overall_data, aes(x = year, y = median_incidence)) +
@@ -1172,9 +1213,13 @@ plot_combined <- function(site_plot, overall_plot, pathogen, outDir) {
 #' @param output_file Optional file path to save results
 #' @return A data frame with relative risks and percent changes
 ir_comp <- function(catchir_data, start_year, end_year, output_file = NULL) {
+  # Convert to data.table if needed
+  if (!inherits(catchir_data, "data.table")) {
+    catchir_data <- as.data.table(catchir_data)
+  }
+  
   # Filter data for the comparison period
-  period_data <- catchir_data %>%
-    filter(year >= start_year & year <= end_year)
+  period_data <- catchir_data[year >= start_year & year <= end_year]
 
   # Handle no data for requested period
   if (nrow(period_data) == 0) {
@@ -1198,40 +1243,37 @@ ir_comp <- function(catchir_data, start_year, end_year, output_file = NULL) {
   }
 
   # Calculate average incidence for the period by state
-  period_avg <- period_data %>%
-    group_by(state) %>%
-    summarise(
-      period_incidence = mean(median_incidence),
-      period_lower = mean(lower_hdi),
-      period_upper = mean(upper_hdi),
-      .groups = "drop"
-    )
+  period_avg <- period_data[, .(
+    period_incidence = mean(median_incidence),
+    period_lower = mean(lower_hdi),
+    period_upper = mean(upper_hdi)
+  ), by = state]
 
   # Get the most recent year's data
   latest_year <- max(catchir_data$year)
-  latest_data <- catchir_data %>%
-    filter(year == latest_year)
+  latest_data <- catchir_data[year == latest_year]
 
-  # Join and calculate relative risks
-  result <- latest_data %>%
-    left_join(period_avg, by = "state") %>%
-    mutate(
-      relative_risk = median_incidence / period_incidence,
-      percent_change = ((median_incidence / period_incidence) - 1) * 100,
-      comparison_period = paste0(start_year, "-", end_year)
-    ) %>%
-    select(
-      state, year, comparison_period,
-      current_incidence = median_incidence,
-      period_incidence,
-      relative_risk,
-      percent_change
-    ) %>%
-    arrange(state)
+  # Join and calculate relative risks using data.table syntax
+  result <- period_avg[latest_data, on = .(state)]
+  
+  # Add calculated columns
+  result[, `:=`(
+    relative_risk = median_incidence / period_incidence,
+    percent_change = ((median_incidence / period_incidence) - 1) * 100,
+    comparison_period = paste0(start_year, "-", end_year),
+    current_incidence = median_incidence
+  )]
+  
+  # Select only needed columns
+  result <- result[, .(state, year, comparison_period, current_incidence, 
+                      period_incidence, relative_risk, percent_change)]
+  
+  # Sort by state
+  setorder(result, state)
 
   # Round numeric columns for readability
-  result <- result %>%
-    mutate(across(where(is.numeric), ~round(., 4)))
+  numeric_cols <- c("current_incidence", "period_incidence", "relative_risk", "percent_change")
+  result[, (numeric_cols) := lapply(.SD, function(x) round(x, 4)), .SDcols = numeric_cols]
 
   # Write to file if specified
   if (!is.null(output_file)) {

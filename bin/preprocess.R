@@ -56,7 +56,6 @@ tryCatch({
 # Load required packages
 suppressPackageStartupMessages({
   library("argparse")
-  library("dplyr")
   library("haven")
   library("jsonlite")
   library("data.table")
