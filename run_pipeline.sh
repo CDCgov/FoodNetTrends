@@ -1052,7 +1052,7 @@ if [[ "$input_method" == "1" ]]; then
             preprocessed_data="$mmwrFile"
         else
             echo "✗ MMWR data file not found: $mmwr_filename"
-            exit 1
+            echo "Continuing with available data..."
         fi
     fi
     
