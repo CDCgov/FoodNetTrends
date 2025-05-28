@@ -355,6 +355,7 @@ EOF
     cp "$full_config_path" "$history_path" 2>/dev/null
     
     echo "✓ Configuration saved: $config_dir/$config_file"
+    echo "  (Note: Clean with 'rm -rf .nextflow_configs' if needed)"
 }
 
 # Display configuration summary
@@ -389,8 +390,8 @@ show_configuration_summary() {
     echo ""
     echo "OUTPUT:"
     echo "  Directory: $outDir/$projID"
-    echo "  Dashboard: $([ "$dashboard_params" == *"true"* ] && echo "Yes" || echo "No")"
-    echo "  Background: $([ "$background" == true ] && echo "Yes" || echo "No")"
+    echo "  Dashboard: Yes (HTML report will be generated)"
+    echo "  Run Mode: $([ "$background" == true ] && echo "Background (check logs)" || echo "Interactive")"
     echo "========================================================="
 }
 
@@ -1060,12 +1061,12 @@ if [[ "$input_method" == "1" ]]; then
             mmwrFile="$mmwr_filename"
         fi
         if [[ -f "$mmwrFile" ]]; then
-            echo -e "\033[32m✓ Preprocessed MMWR data: $mmwrFile\033[0m"
+            echo -e "\033[92m✓ Preprocessed MMWR data: $mmwrFile\033[0m"
             preprocessed_data="$mmwrFile"
             # Get original source for display
             original_mmwr=$(parse_metadata_json "$preprocessed_metadata" "source_file")
             if [[ -n "$original_mmwr" ]]; then
-                echo -e "   \033[35mOriginal: $original_mmwr\033[0m"
+                echo "   Original: $original_mmwr"
             fi
         else
             echo "✗ MMWR data file not found: $mmwr_filename"
@@ -1081,21 +1082,21 @@ if [[ "$input_method" == "1" ]]; then
     if [[ -n "$census_b_file" ]]; then
         censusFileB="${metadata_dir}/${census_b_file}"
         if [[ -f "$censusFileB" ]]; then
-            echo -e "\033[32m✓ Preprocessed bacterial census: $censusFileB\033[0m"
+            echo -e "\033[92m✓ Preprocessed bacterial census: $censusFileB\033[0m"
             # Get original source for display
             original_census_b=$(parse_metadata_json "$preprocessed_metadata" "census_file_bacterial_original")
             if [[ -n "$original_census_b" ]]; then
-                echo -e "   \033[35mOriginal: $original_census_b\033[0m"
+                echo "   Original: $original_census_b"
             fi
         else
             # If not in metadata dir, try as absolute path
             if [[ -f "$census_b_file" ]]; then
                 censusFileB="$census_b_file"
-                echo -e "\033[32m✓ Preprocessed bacterial census: $censusFileB\033[0m"
+                echo -e "\033[92m✓ Preprocessed bacterial census: $censusFileB\033[0m"
                 # Get original source for display
                 original_census_b=$(parse_metadata_json "$preprocessed_metadata" "census_file_bacterial_original")
                 if [[ -n "$original_census_b" ]]; then
-                    echo -e "   \033[35mOriginal: $original_census_b\033[0m"
+                    echo "   Original: $original_census_b"
                 fi
             else
                 echo "✗ Bacterial census not found: $census_b_file"
@@ -1118,21 +1119,21 @@ if [[ "$input_method" == "1" ]]; then
     if [[ -n "$census_p_file" ]]; then
         censusFileP="${metadata_dir}/${census_p_file}"
         if [[ -f "$censusFileP" ]]; then
-            echo -e "\033[32m✓ Preprocessed parasitic census: $censusFileP\033[0m"
+            echo -e "\033[92m✓ Preprocessed parasitic census: $censusFileP\033[0m"
             # Get original source for display
             original_census_p=$(parse_metadata_json "$preprocessed_metadata" "census_file_parasitic_original")
             if [[ -n "$original_census_p" ]]; then
-                echo -e "   \033[35mOriginal: $original_census_p\033[0m"
+                echo "   Original: $original_census_p"
             fi
         else
             # If not in metadata dir, try as absolute path
             if [[ -f "$census_p_file" ]]; then
                 censusFileP="$census_p_file"
-                echo -e "\033[32m✓ Preprocessed parasitic census: $censusFileP\033[0m"
+                echo -e "\033[92m✓ Preprocessed parasitic census: $censusFileP\033[0m"
                 # Get original source for display
                 original_census_p=$(parse_metadata_json "$preprocessed_metadata" "census_file_parasitic_original")
                 if [[ -n "$original_census_p" ]]; then
-                    echo -e "   \033[35mOriginal: $original_census_p\033[0m"
+                    echo "   Original: $original_census_p"
                 fi
             else
                 echo "✗ Parasitic census not found: $census_p_file"
@@ -1635,14 +1636,14 @@ if [[ -n "${preprocessed_metadata}" && -f "${preprocessed_metadata}" ]]; then
     if [[ -n "$available_serotypes" ]]; then
         # Add spaces around pipes for better readability
         spaced_serotypes=$(echo "$available_serotypes" | sed 's/|/ | /g')
-        echo -e "\033[32m✓ Salmonella serotypes available in metadata: $spaced_serotypes\033[0m"
+        echo -e "\033[92m✓ Salmonella serotypes available in metadata: $spaced_serotypes\033[0m"
     else
         echo "⚠️  No Salmonella serotypes found in metadata"
     fi
     if [[ -n "$available_serogroups" ]]; then
         # Add spaces around pipes for better readability
         spaced_serogroups=$(echo "$available_serogroups" | sed 's/|/ | /g')
-        echo -e "\033[32m✓ STEC serogroups available in metadata: $spaced_serogroups\033[0m"
+        echo -e "\033[92m✓ STEC serogroups available in metadata: $spaced_serogroups\033[0m"
     else
         echo "⚠️  No STEC serogroups found in metadata"
     fi
@@ -1789,26 +1790,25 @@ if [[ -n "$valid_pathogens" ]]; then
     available_pathogens="$valid_pathogens"
     
     echo "Select pathogens:"
-    echo "  A) Run ALL available pathogens"
-    echo "  S) Select specific pathogens by number"
-    echo "  B) Go back to previous menu"
+    echo "  1) Run ALL available pathogens"
+    echo "  2) Select specific pathogens by number"
+    echo "  3) Go back to previous menu"
     
     while true; do
-        read -p "Enter selection [S]: " pathogen_mode
-        pathogen_mode=${pathogen_mode:-S}
-        pathogen_mode=$(echo "$pathogen_mode" | tr '[:lower:]' '[:upper:]')
+        read -p "Enter selection [1]: " pathogen_mode
+        pathogen_mode=${pathogen_mode:-1}
         
         case "$pathogen_mode" in
-            A)
+            1)
                 pathogens="$available_pathogens"
                 echo "Selected: ALL available pathogens"
                 break
                 ;;
-            B)
+            3)
                 parameter_menu="cidt"
                 break
                 ;;
-            S)
+            2)
                 echo ""
                 echo "Enter pathogen numbers (comma-separated, e.g., 1,3,5):"
                 while true; do
@@ -1898,7 +1898,6 @@ if [[ "$pathogens" == *"STEC"* ]]; then
     echo "--- STEC Serogroup Selection ---"
     
     # Discover available STEC serogroups from data
-    echo "Discovering STEC serogroups in your data..."
     available_stec_serogroups=$(discover_pathogen_subtypes "STEC" "$mmwrFile" "$preprocessed_metadata" "serogroup")
     
     if [[ -n "$available_stec_serogroups" ]]; then
@@ -1930,9 +1929,6 @@ fi
 if [[ "$pathogens" == *"SALMONELLA"* ]]; then
     echo ""
     echo "--- Salmonella Serotype Selection ---"
-    
-    # Discover available Salmonella serotypes from data
-    echo "Discovering Salmonella serotypes in your data..."
     
     # Use metadata serotypes if available, otherwise discover from data
     if [[ -n "$available_serotypes" ]]; then
@@ -2105,7 +2101,7 @@ echo ""
 
 echo "1) Use ALL available states"
 echo "2) Select specific states"
-echo "3) Go back to Pathogen selection"
+# TODO: Add go back option when full navigation is implemented
 read -p "Enter selection [1]: " state_mode
 state_mode=${state_mode:-1}
 
@@ -2119,11 +2115,6 @@ elif [[ "$state_mode" == "2" ]]; then
     echo "Enter states to analyze (comma-separated with NO spaces)"
     read -p "Leave blank for all states: " states
     states=${states:-"$ALL_STATES"}
-elif [[ "$state_mode" == "3" ]]; then
-    # Go back - for now, restart the script
-    echo "Returning to beginning..."
-    echo ""
-    exec bash "$0" "$@"
 else
     # Default to all states
     echo "Invalid selection. Using ALL states."
