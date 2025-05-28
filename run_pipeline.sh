@@ -2654,3 +2654,4 @@ else
     echo "Execution canceled."
     echo "$(date): User canceled execution" >> "$error_log"
 fi
+
