@@ -278,10 +278,10 @@ verify_spline_trends() {
     done
     
     if [[ $spline_generated -eq 1 ]]; then
-        echo "✓ Spline trend visualizations generated - 'spikey' graph issue should be resolved"
+        echo "✓ Spline trend visualizations generated"
         return 0
     else
-        echo "✗ No spline trend plots found - spikey graph issue may persist"
+        echo "✗ No spline trend plots found"
         return 1
     fi
 }
@@ -981,15 +981,11 @@ else
     echo ""
     echo "Select data input method:"
     echo "1) Manual file selection (raw data → preprocessing → analysis)"
-    echo "2) Load saved configuration"
+    # echo "2) Load saved configuration"  # Disabled for rc1
     read -p "Enter selection [1]: " input_method
     
-    # Remap choices since we don't have metadata option
-    if [[ "$input_method" == "2" ]]; then
-        input_method=4  # Configuration
-    else
-        input_method=2  # Manual
-    fi
+    # Remap choices since we don't have metadata or config options
+    input_method=2  # Manual
 fi
 
 # Map input method to workflow mode
@@ -997,31 +993,32 @@ if [[ "$input_method" == "1" || "$input_method" == "3" ]]; then
     workflow_mode=2  # Use existing preprocessed data
 elif [[ "$input_method" == "2" ]]; then
     workflow_mode=1  # Full preprocessing
-elif [[ "$input_method" == "4" ]]; then
-    # Load saved configuration
-    echo ""
-    echo "Available configurations:"
-    if [[ -d "./configs" ]]; then
-        ls -1 ./configs/*.sh 2>/dev/null | nl -w2 -s') '
-        echo ""
-        read -p "Select configuration file number: " config_choice
-        config_file=$(ls -1 ./configs/*.sh 2>/dev/null | sed -n "${config_choice}p")
-        if [[ -f "$config_file" ]]; then
-            echo "Loading configuration from: $config_file"
-            source "$config_file"
-            # Configuration loaded, skip to parameter validation
-            workflow_mode=2
-        else
-            echo "Invalid selection. Starting manual setup."
-            input_method=2
-            workflow_mode=1
-        fi
-    else
-        echo "No saved configurations found. Starting manual setup."
-        input_method=2
-        workflow_mode=1
-    fi
-fi
+# Configuration loading disabled for rc1
+# elif [[ "$input_method" == "4" ]]; then
+#     # Load saved configuration
+#     echo ""
+#     echo "Available configurations:"
+#     if [[ -d "./configs" ]]; then
+#         ls -1 ./configs/*.sh 2>/dev/null | nl -w2 -s') '
+#         echo ""
+#         read -p "Select configuration file number: " config_choice
+#         config_file=$(ls -1 ./configs/*.sh 2>/dev/null | sed -n "${config_choice}p")
+#         if [[ -f "$config_file" ]]; then
+#             echo "Loading configuration from: $config_file"
+#             source "$config_file"
+#             # Configuration loaded, skip to parameter validation
+#             workflow_mode=2
+#         else
+#             echo "Invalid selection. Starting manual setup."
+#             input_method=2
+#             workflow_mode=1
+#         fi
+#     else
+#         echo "No saved configurations found. Starting manual setup."
+#         input_method=2
+#         workflow_mode=1
+#     fi
+# fi
 
 # Initialize variables
 preprocessed_data=""
@@ -1381,11 +1378,13 @@ if [[ "$workflow_mode" == "1" ]]; then
     
 # Mode 2: Use existing preprocessed data
 elif [[ "$workflow_mode" == "2" ]]; then
-    echo ""
-    echo "======== Input Files ========"
+    # Skip file selection if we already have preprocessed_data from metadata
+    if [[ -z "$preprocessed_data" ]]; then
+        echo ""
+        echo "======== Input Files ========"
 
-    # Search for preprocessed CSV files in the organized directory structure
-    echo "Searching for preprocessed CSV files..."
+        # Search for preprocessed CSV files in the organized directory structure
+        echo "Searching for preprocessed CSV files..."
     mapfile -t found_csv < <(find . -type f \( \
         -path "./preprocessed/*/foodnet_data_*.csv" -o \
         -path "preprocessed_*/preprocessed/*.csv" -o \
@@ -1527,6 +1526,7 @@ elif [[ "$workflow_mode" == "2" ]]; then
             preprocessed_metadata=""
         fi
     fi
+    fi  # End of "if preprocessed_data is empty" check
 fi
 
 # Initialize default pathogen and state lists
@@ -2449,22 +2449,14 @@ fi
 # Show configuration summary and save
 show_configuration_summary
 
-echo "Save this configuration for future use?"
-read -p "Save configuration? (y/n) [y]: " save_config
-save_config=${save_config:-y}
+# Configuration saving disabled for rc1
+# echo "Save this configuration for future use?"
+# read -p "Save configuration? (y/n) [y]: " save_config
+# save_config=${save_config:-y}
 
-if [[ "$save_config" =~ ^[Yy]$ ]]; then
-    save_configuration
-fi
-
-echo ""
-read -p "Proceed with this configuration? (y/n) [y]: " proceed
-proceed=${proceed:-y}
-
-if [[ ! "$proceed" =~ ^[Yy]$ ]]; then
-    echo "Analysis cancelled by user."
-    exit 0
-fi
+# if [[ "$save_config" =~ ^[Yy]$ ]]; then
+#     save_configuration
+# fi
 
 echo ""
 echo "========= Analysis Summary ==========="
@@ -2650,19 +2642,13 @@ if [[ "$execute" =~ ^[Yy]$ ]]; then
     if [[ "$validation_passed" == true ]]; then
         echo ""
         echo "🎉 Analysis completed successfully with all expected outputs!"
-        echo "📊 Smooth trend visualizations should resolve the 'spikey graph' issue."
     else
         echo ""
         echo "⚠ Analysis completed but some outputs may be missing or incomplete."
         echo "Check the validation messages above for details."
     fi
     
-    # Apply standard file permissions for HPC compatibility
-    # All pipeline outputs must have 755 permissions per infrastructure requirements
-    echo ""
-    echo "Setting file permissions to 755 for HPC compatibility..."
-    find "$outDir" -type f -exec chmod 755 {} + 2>/dev/null
-    echo "✓ File permissions updated"
+    # File permissions handling removed for rc1
     fi  # End of background check
 else
     echo "Execution canceled."
