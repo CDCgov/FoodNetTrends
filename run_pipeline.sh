@@ -710,7 +710,7 @@ parse_metadata_json() {
     
     # Use Python for reliable JSON parsing
     if command -v python3 >/dev/null 2>&1; then
-        echo "DEBUG: Python available, parsing field '$field' from file '$json_file'" >&2
+        # echo "DEBUG: Python available, parsing field '$field' from file '$json_file'" >&2
         
         local python_result=$(python3 -c "
 import json
@@ -721,13 +721,13 @@ try:
         data = json.load(f)
     
     field_name = '$field'
-    print(f'DEBUG: Parsing field: {field_name}', file=sys.stderr)
+    # print(f'DEBUG: Parsing field: {field_name}', file=sys.stderr)
     
     # Handle specific serotype/serogroup fields
     if field_name == 'salmonella_serotypes':
         # Try _names field first (preferred)
         if 'salmonella_serotype_names' in data:
-            print('DEBUG: Using salmonella_serotype_names field', file=sys.stderr)
+            # print('DEBUG: Using salmonella_serotype_names field', file=sys.stderr)
             serotype_names = data['salmonella_serotype_names']
             # Limit to first 5 for cleaner display
             if len(serotype_names) > 5:
@@ -736,22 +736,22 @@ try:
                 result = serotype_names
             print('|'.join(result))
         else:
-            print('DEBUG: No salmonella serotype data found', file=sys.stderr)
+            # print('DEBUG: No salmonella serotype data found', file=sys.stderr)
             print('')
     
     elif field_name == 'stec_serogroups':
         # Try _names field first (preferred)
         if 'stec_serogroup_names' in data:
-            print('DEBUG: Using stec_serogroup_names field', file=sys.stderr)
+            # print('DEBUG: Using stec_serogroup_names field', file=sys.stderr)
             serogroup_names = data['stec_serogroup_names']
-            print(','.join(serogroup_names))
+            print('|'.join(serogroup_names))
         # Fallback to object keys
         elif 'stec_serogroups' in data and isinstance(data['stec_serogroups'], dict):
-            print('DEBUG: Using stec_serogroups object keys', file=sys.stderr)
+            # print('DEBUG: Using stec_serogroups object keys', file=sys.stderr)
             serogroup_names = list(data['stec_serogroups'].keys())
-            print(','.join(serogroup_names))
+            print('|'.join(serogroup_names))
         else:
-            print('DEBUG: No STEC serogroup data found', file=sys.stderr)
+            # print('DEBUG: No STEC serogroup data found', file=sys.stderr)
             print('')
     
     # Generic field handling for other fields (pathogens, states, etc.)
@@ -767,23 +767,23 @@ try:
             # Single value
             print(str(field_data))
     else:
-        print(f'DEBUG: Field {field_name} not found in metadata', file=sys.stderr)
+        # print(f'DEBUG: Field {field_name} not found in metadata', file=sys.stderr)
         print('')
 
 except Exception as e:
-    print(f'DEBUG: Python Error: {e}', file=sys.stderr)
+    # print(f'DEBUG: Python Error: {e}', file=sys.stderr)
     print('')
 ")
         
         if [[ -n "$python_result" ]]; then
-            echo "DEBUG: Python parsing succeeded, returning: '$python_result'" >&2
+            # echo "DEBUG: Python parsing succeeded, returning: '$python_result'" >&2
             echo "$python_result"
             return 0
         else
-            echo "DEBUG: Python parsing failed or returned empty" >&2
+            # echo "DEBUG: Python parsing failed or returned empty" >&2
         fi
     else
-        echo "DEBUG: Python not available" >&2
+        # echo "DEBUG: Python not available" >&2
     fi
     
     # Fallback: Simple bash parsing for basic JSON arrays
@@ -831,6 +831,69 @@ except Exception as e:
     # If all else fails, return empty
     echo ""
     return 1
+}
+
+# Process user-entered serotypes with flexible separators and case handling
+process_user_serotypes() {
+    local user_input="$1"
+    local available_serotypes="$2"  # Pipe-separated list from metadata
+    
+    # Convert to uppercase
+    user_input=$(echo "$user_input" | tr '[:lower:]' '[:upper:]')
+    
+    # Replace multiple separators (comma, pipe, space) with a single pipe
+    # Also handle combinations like ", " or " | "
+    user_input=$(echo "$user_input" | sed 's/[,|]/ /g' | tr -s ' ' | tr ' ' '|')
+    
+    # Convert available serotypes to array for validation
+    IFS='|' read -ra AVAILABLE_ARRAY <<< "$available_serotypes"
+    
+    # Process user input
+    IFS='|' read -ra USER_ARRAY <<< "$user_input"
+    
+    # Validate and build final list
+    local valid_serotypes=()
+    local invalid_serotypes=()
+    
+    for serotype in "${USER_ARRAY[@]}"; do
+        serotype=$(echo "$serotype" | xargs)  # Trim whitespace
+        if [[ -n "$serotype" ]]; then
+            # Check if serotype exists in available list
+            local found=0
+            for available in "${AVAILABLE_ARRAY[@]}"; do
+                if [[ "${available^^}" == "${serotype^^}" ]]; then
+                    # Use the properly cased version from metadata
+                    valid_serotypes+=("$available")
+                    found=1
+                    break
+                fi
+            done
+            if [[ $found -eq 0 ]]; then
+                invalid_serotypes+=("$serotype")
+            fi
+        fi
+    done
+    
+    # Display results
+    if [[ ${#valid_serotypes[@]} -gt 0 ]]; then
+        echo ""
+        echo "Selected serotypes:"
+        echo "  $(IFS=' | '; echo "${valid_serotypes[*]}")"
+    fi
+    
+    if [[ ${#invalid_serotypes[@]} -gt 0 ]]; then
+        echo ""
+        echo "⚠️  Warning: The following serotypes were not found in the dataset:"
+        echo "  $(IFS=' | '; echo "${invalid_serotypes[*]}")"
+    fi
+    
+    # Return comma-separated list for pipeline (maintaining compatibility)
+    if [[ ${#valid_serotypes[@]} -gt 0 ]]; then
+        IFS=',' 
+        echo "${valid_serotypes[*]}"
+    else
+        echo ""
+    fi
 }
 
 # Set up paths, files
@@ -1511,13 +1574,13 @@ if [[ -n "${preprocessed_metadata}" && -f "${preprocessed_metadata}" ]]; then
     fi
     
     # Load serotypes/serogroups from metadata
-    echo "DEBUG: Parsing salmonella_serotypes from: ${preprocessed_metadata}" >&2
+    # echo "DEBUG: Parsing salmonella_serotypes from: ${preprocessed_metadata}" >&2
     available_serotypes=$(parse_metadata_json "${preprocessed_metadata}" "salmonella_serotypes")
-    echo "DEBUG: Raw salmonella result: '$available_serotypes' (length: ${#available_serotypes})" >&2
+    # echo "DEBUG: Raw salmonella result: '$available_serotypes' (length: ${#available_serotypes})" >&2
     
-    echo "DEBUG: Parsing stec_serogroups" >&2
+    # echo "DEBUG: Parsing stec_serogroups" >&2
     available_serogroups=$(parse_metadata_json "${preprocessed_metadata}" "stec_serogroups")
-    echo "DEBUG: Raw stec result: '$available_serogroups' (length: ${#available_serogroups})" >&2
+    # echo "DEBUG: Raw stec result: '$available_serogroups' (length: ${#available_serogroups})" >&2
     
     if [[ -n "$available_serotypes" ]]; then
         echo "✓ Salmonella serotypes available in metadata: $available_serotypes"
@@ -1774,9 +1837,9 @@ if [[ "$pathogens" == *"SALMONELLA"* ]]; then
         # Show hierarchical selection
         echo "1) Top 5 most common serotypes:"
         if [[ ${#SALMONELLA_SEROTYPES_ARRAY[@]} -ge 5 ]]; then
-            echo "   ${SALMONELLA_SEROTYPES_ARRAY[0]}, ${SALMONELLA_SEROTYPES_ARRAY[1]}, ${SALMONELLA_SEROTYPES_ARRAY[2]}, ${SALMONELLA_SEROTYPES_ARRAY[3]}, ${SALMONELLA_SEROTYPES_ARRAY[4]}"
+            echo "   ${SALMONELLA_SEROTYPES_ARRAY[0]} | ${SALMONELLA_SEROTYPES_ARRAY[1]} | ${SALMONELLA_SEROTYPES_ARRAY[2]} | ${SALMONELLA_SEROTYPES_ARRAY[3]} | ${SALMONELLA_SEROTYPES_ARRAY[4]}"
         else
-            echo "   $(IFS=', '; echo "${SALMONELLA_SEROTYPES_ARRAY[*]}")"
+            echo "   $(IFS=' | '; echo "${SALMONELLA_SEROTYPES_ARRAY[*]}")"
         fi
         echo ""
         
@@ -1858,8 +1921,17 @@ if [[ "$pathogens" == *"SALMONELLA"* ]]; then
                 ;;
             $((next_opt + 1)))
                 # Manual entry
-                read -p "Enter Salmonella serotypes (comma-separated): " salmonella_serotypes
-                salmonella_serotypes=${salmonella_serotypes:-"ALL"}
+                read -p "Enter Salmonella serotypes (comma, pipe, or space separated): " user_serotypes
+                if [[ -z "$user_serotypes" ]]; then
+                    salmonella_serotypes="ALL"
+                else
+                    # Process user input with validation
+                    salmonella_serotypes=$(process_user_serotypes "$user_serotypes" "$available_serotypes")
+                    if [[ -z "$salmonella_serotypes" ]]; then
+                        echo "No valid serotypes found. Using ALL serotypes."
+                        salmonella_serotypes="ALL"
+                    fi
+                fi
                 ;;
             *)
                 # Default to all
@@ -1870,7 +1942,7 @@ if [[ "$pathogens" == *"SALMONELLA"* ]]; then
         # Fallback to data discovery if no metadata
         salmonella_serotype_list=$(discover_pathogen_subtypes "SALMONELLA" "$mmwrFile" "$preprocessed_metadata" "serotype")
         if [[ -n "$salmonella_serotype_list" ]]; then
-            IFS=',' read -ra SALMONELLA_SEROTYPES_ARRAY <<< "$salmonella_serotype_list"
+            IFS='|' read -ra SALMONELLA_SEROTYPES_ARRAY <<< "$salmonella_serotype_list"
             echo "Detected Salmonella serotypes in data:"
             for i in "${!SALMONELLA_SEROTYPES_ARRAY[@]}"; do
                 printf "%2d) %s\n" $((i+1)) "${SALMONELLA_SEROTYPES_ARRAY[$i]}"
