@@ -2647,9 +2647,7 @@ if [[ "$execute" =~ ^[Yy]$ ]]; then
         echo "⚠ Analysis completed but some outputs may be missing or incomplete."
         echo "Check the validation messages above for details."
     fi
-    fi  # End of background check
-    
-    # File permissions handling removed for rc1
+    fi
 else
     echo "Execution canceled."
     echo "$(date): User canceled execution" >> "$error_log"
