@@ -876,17 +876,17 @@ process_user_serotypes() {
         fi
     done
     
-    # Display results
+    # Display results to stderr so they don't interfere with return value
     if [[ ${#valid_serotypes[@]} -gt 0 ]]; then
-        echo ""
-        echo "Selected serotypes:"
-        echo "  $(IFS=' | '; echo "${valid_serotypes[*]}")"
+        echo "" >&2
+        echo "Selected serotypes:" >&2
+        echo "  $(IFS=' | '; echo "${valid_serotypes[*]}")" >&2
     fi
     
     if [[ ${#invalid_serotypes[@]} -gt 0 ]]; then
-        echo ""
-        echo "⚠️  Warning: The following serotypes were not found in the dataset:"
-        echo "  $(IFS=' | '; echo "${invalid_serotypes[*]}")"
+        echo "" >&2
+        echo "⚠️  Warning: The following serotypes were not found in the dataset:" >&2
+        echo "  $(IFS=' | '; echo "${invalid_serotypes[*]}")" >&2
     fi
     
     # Return comma-separated list for pipeline (maintaining compatibility)
@@ -952,8 +952,13 @@ if [[ ${#found_json[@]} -gt 0 ]]; then
         state_info=$(parse_metadata_json "$json_file" "states" | tr ',' ' ' | wc -w)
         year_info=$(parse_metadata_json "$json_file" "years")
         
-        printf "%2d) %s\n" $((i+1)) "$json_file"
-        printf "    Modified: %s | %s pathogens | %s states | Years: %s\n" \
+        # Extract just the filename for highlighting
+        filename=$(basename "$json_file")
+        dirname=$(dirname "$json_file")
+        
+        # Use ANSI colors for formatting
+        printf "%2d) %s/\033[1m%s\033[0m\n" $((i+1)) "$dirname" "$filename"
+        printf "    \033[36mModified: %s\033[0m | %s pathogens | %s states | Years: %s\n" \
                "$mod_time" "$pathogen_info" "$state_info" "$year_info"
         echo ""
     done
@@ -1585,12 +1590,16 @@ if [[ -n "${preprocessed_metadata}" && -f "${preprocessed_metadata}" ]]; then
     # echo "DEBUG: Raw stec result: '$available_serogroups' (length: ${#available_serogroups})" >&2
     
     if [[ -n "$available_serotypes" ]]; then
-        echo "✓ Salmonella serotypes available in metadata: $available_serotypes"
+        # Add spaces around pipes for better readability
+        spaced_serotypes=$(echo "$available_serotypes" | sed 's/|/ | /g')
+        echo "✓ Salmonella serotypes available in metadata: $spaced_serotypes"
     else
         echo "⚠️  No Salmonella serotypes found in metadata"
     fi
     if [[ -n "$available_serogroups" ]]; then
-        echo "✓ STEC serogroups available in metadata: $available_serogroups"
+        # Add spaces around pipes for better readability
+        spaced_serogroups=$(echo "$available_serogroups" | sed 's/|/ | /g')
+        echo "✓ STEC serogroups available in metadata: $spaced_serogroups"
     else
         echo "⚠️  No STEC serogroups found in metadata"
     fi
@@ -1709,40 +1718,81 @@ fi
 if [[ -n "$valid_pathogens" ]]; then
     echo "Available pathogens in this dataset:"
     IFS=',' read -ra PATHOGEN_ARRAY <<< "$valid_pathogens"
-    for p in "${PATHOGEN_ARRAY[@]}"; do
-        if [[ -n "$p" ]]; then
-            echo "- $p"
+    
+    # Display numbered list
+    echo ""
+    for i in "${!PATHOGEN_ARRAY[@]}"; do
+        if [[ -n "${PATHOGEN_ARRAY[$i]}" ]]; then
+            printf "%2d) %s\n" $((i+1)) "${PATHOGEN_ARRAY[$i]}"
         fi
     done
-    available_pathogens="$valid_pathogens"
     echo ""
+    available_pathogens="$valid_pathogens"
     
-    echo "1) Run ALL available pathogens"
-    echo "2) Select specific pathogens"
-    read -p "Enter selection [2]: " pathogen_mode
-    pathogen_mode=${pathogen_mode:-2}
+    echo "Select pathogens:"
+    echo "  A) Run ALL available pathogens"
+    echo "  S) Select specific pathogens by number"
+    echo "  B) Go back to previous menu"
     
-    if [[ "$pathogen_mode" == "1" ]]; then
-        pathogens="$available_pathogens"
-        echo "Selected: ALL available pathogens"
-    else
-        echo ""
-        echo "Enter pathogens to analyze (comma-separated from list above):"
-        read -p "Pathogens: " pathogens
+    while true; do
+        read -p "Enter selection [S]: " pathogen_mode
+        pathogen_mode=${pathogen_mode:-S}
+        pathogen_mode=$(echo "$pathogen_mode" | tr '[:lower:]' '[:upper:]')
         
-        # Validate selection against available pathogens
-        if [[ -z "$pathogens" ]]; then
-            # Default to first two pathogens if available
-            IFS=',' read -ra DEFAULT_ARRAY <<< "$available_pathogens"
-            if [[ ${#DEFAULT_ARRAY[@]} -ge 2 ]]; then
-                pathogens="${DEFAULT_ARRAY[0]},${DEFAULT_ARRAY[1]}"
-                echo "Using default: $pathogens"
-            else
+        case "$pathogen_mode" in
+            A)
                 pathogens="$available_pathogens"
-                echo "Using all available: $pathogens"
-            fi
-        fi
-    fi
+                echo "Selected: ALL available pathogens"
+                break
+                ;;
+            B)
+                echo "Returning to previous menu..."
+                exit 0
+                ;;
+            S)
+                echo ""
+                echo "Enter pathogen numbers (comma-separated, e.g., 1,3,5):"
+                while true; do
+                    read -p "Pathogen numbers: " pathogen_nums
+                    
+                    if [[ -z "$pathogen_nums" ]]; then
+                        echo "Please enter at least one pathogen number."
+                        continue
+                    fi
+                    
+                    # Convert numbers to pathogen names
+                    pathogens=""
+                    IFS=',' read -ra NUM_ARRAY <<< "$pathogen_nums"
+                    valid_selection=true
+                    
+                    for num in "${NUM_ARRAY[@]}"; do
+                        num=$(echo "$num" | xargs)  # Trim whitespace
+                        if [[ "$num" =~ ^[0-9]+$ ]] && [[ $num -ge 1 ]] && [[ $num -le ${#PATHOGEN_ARRAY[@]} ]]; then
+                            idx=$((num-1))
+                            if [[ -n "$pathogens" ]]; then
+                                pathogens="$pathogens,${PATHOGEN_ARRAY[$idx]}"
+                            else
+                                pathogens="${PATHOGEN_ARRAY[$idx]}"
+                            fi
+                        else
+                            echo "Invalid number: $num (must be between 1 and ${#PATHOGEN_ARRAY[@]})"
+                            valid_selection=false
+                            break
+                        fi
+                    done
+                    
+                    if [[ "$valid_selection" == true ]]; then
+                        echo "Selected pathogens: $pathogens"
+                        break
+                    fi
+                done
+                break
+                ;;
+            *)
+                echo "Invalid selection. Please enter A, S, or B."
+                ;;
+        esac
+    done
 else
     echo "⚠️  Could not automatically discover valid pathogens from data."
     echo ""
@@ -1872,74 +1922,87 @@ if [[ "$pathogens" == *"SALMONELLA"* ]]; then
         echo "$next_opt) All serotypes (no filtering) - $total_serotypes total serotypes"
         echo "$((next_opt + 1))) Enter specific serotypes manually"
         echo ""
+        echo "B) Go back to previous menu"
+        echo ""
         
         read -p "Select Salmonella serotype analysis [$next_opt]: " sal_sero_choice
         sal_sero_choice=${sal_sero_choice:-$next_opt}
         
-        case $sal_sero_choice in
-            1)
-                # Top 5
-                if [[ ${#SALMONELLA_SEROTYPES_ARRAY[@]} -ge 5 ]]; then
-                    salmonella_serotypes="${SALMONELLA_SEROTYPES_ARRAY[0]},${SALMONELLA_SEROTYPES_ARRAY[1]},${SALMONELLA_SEROTYPES_ARRAY[2]},${SALMONELLA_SEROTYPES_ARRAY[3]},${SALMONELLA_SEROTYPES_ARRAY[4]}"
-                else
-                    salmonella_serotypes=$(IFS=','; echo "${SALMONELLA_SEROTYPES_ARRAY[*]}")
-                fi
-                ;;
-            2)
-                # Top 10 (if available)
-                if [[ ${#SALMONELLA_SEROTYPES_ARRAY[@]} -ge 10 ]]; then
-                    salmonella_serotypes="${SALMONELLA_SEROTYPES_ARRAY[0]},${SALMONELLA_SEROTYPES_ARRAY[1]},${SALMONELLA_SEROTYPES_ARRAY[2]},${SALMONELLA_SEROTYPES_ARRAY[3]},${SALMONELLA_SEROTYPES_ARRAY[4]},${SALMONELLA_SEROTYPES_ARRAY[5]},${SALMONELLA_SEROTYPES_ARRAY[6]},${SALMONELLA_SEROTYPES_ARRAY[7]},${SALMONELLA_SEROTYPES_ARRAY[8]},${SALMONELLA_SEROTYPES_ARRAY[9]}"
-                else
-                    salmonella_serotypes="ALL"
-                fi
-                ;;
-            3)
-                # Top 15 (if available)
-                if [[ ${#SALMONELLA_SEROTYPES_ARRAY[@]} -ge 15 ]]; then
-                    salmonella_serotypes=""
-                    for i in {0..14}; do
-                        [[ $i -gt 0 ]] && salmonella_serotypes+=","
-                        salmonella_serotypes+="${SALMONELLA_SEROTYPES_ARRAY[$i]}"
-                    done
-                else
-                    salmonella_serotypes="ALL"
-                fi
-                ;;
-            4)
-                # Top 20 (if available)
-                if [[ ${#SALMONELLA_SEROTYPES_ARRAY[@]} -ge 20 ]]; then
-                    salmonella_serotypes=""
-                    for i in {0..19}; do
-                        [[ $i -gt 0 ]] && salmonella_serotypes+=","
-                        salmonella_serotypes+="${SALMONELLA_SEROTYPES_ARRAY[$i]}"
-                    done
-                else
-                    salmonella_serotypes="ALL"
-                fi
-                ;;
-            $next_opt)
-                # All serotypes
+        # Handle go back option
+        if [[ "${sal_sero_choice^^}" == "B" ]]; then
+            echo "Returning to previous menu..."
+            exit 0
+        fi
+        
+        # Handle selection dynamically based on available options
+        if [[ "$sal_sero_choice" == "$((next_opt + 1))" ]]; then
+            # Manual entry
+            read -p "Enter Salmonella serotypes (comma, pipe, or space separated): " user_serotypes
+            if [[ -z "$user_serotypes" ]]; then
                 salmonella_serotypes="ALL"
-                ;;
-            $((next_opt + 1)))
-                # Manual entry
-                read -p "Enter Salmonella serotypes (comma, pipe, or space separated): " user_serotypes
-                if [[ -z "$user_serotypes" ]]; then
+            else
+                # Process user input with validation
+                salmonella_serotypes=$(process_user_serotypes "$user_serotypes" "$available_serotypes")
+                if [[ -z "$salmonella_serotypes" ]]; then
+                    echo "No valid serotypes found. Using ALL serotypes."
                     salmonella_serotypes="ALL"
-                else
-                    # Process user input with validation
-                    salmonella_serotypes=$(process_user_serotypes "$user_serotypes" "$available_serotypes")
-                    if [[ -z "$salmonella_serotypes" ]]; then
-                        echo "No valid serotypes found. Using ALL serotypes."
+                fi
+            fi
+        elif [[ "$sal_sero_choice" == "$next_opt" ]]; then
+            # All serotypes
+            salmonella_serotypes="ALL"
+        else
+            # Handle numbered options
+            case $sal_sero_choice in
+                1)
+                    # Top 5
+                    if [[ ${#SALMONELLA_SEROTYPES_ARRAY[@]} -ge 5 ]]; then
+                        salmonella_serotypes="${SALMONELLA_SEROTYPES_ARRAY[0]},${SALMONELLA_SEROTYPES_ARRAY[1]},${SALMONELLA_SEROTYPES_ARRAY[2]},${SALMONELLA_SEROTYPES_ARRAY[3]},${SALMONELLA_SEROTYPES_ARRAY[4]}"
+                    else
+                        salmonella_serotypes=$(IFS=','; echo "${SALMONELLA_SEROTYPES_ARRAY[*]}")
+                    fi
+                    ;;
+                2)
+                    # Top 10 (only if we have enough serotypes)
+                    if [[ ${#SALMONELLA_SEROTYPES_ARRAY[@]} -ge 10 ]]; then
+                        salmonella_serotypes="${SALMONELLA_SEROTYPES_ARRAY[0]},${SALMONELLA_SEROTYPES_ARRAY[1]},${SALMONELLA_SEROTYPES_ARRAY[2]},${SALMONELLA_SEROTYPES_ARRAY[3]},${SALMONELLA_SEROTYPES_ARRAY[4]},${SALMONELLA_SEROTYPES_ARRAY[5]},${SALMONELLA_SEROTYPES_ARRAY[6]},${SALMONELLA_SEROTYPES_ARRAY[7]},${SALMONELLA_SEROTYPES_ARRAY[8]},${SALMONELLA_SEROTYPES_ARRAY[9]}"
+                    else
+                        # This shouldn't be option 2 if we have < 10 serotypes
                         salmonella_serotypes="ALL"
                     fi
-                fi
-                ;;
-            *)
-                # Default to all
-                salmonella_serotypes="ALL"
-                ;;
-        esac
+                    ;;
+                3)
+                    # Top 15 (only if we have enough serotypes)
+                    if [[ ${#SALMONELLA_SEROTYPES_ARRAY[@]} -ge 15 ]]; then
+                        salmonella_serotypes=""
+                        for i in {0..14}; do
+                            [[ $i -gt 0 ]] && salmonella_serotypes+=","
+                            salmonella_serotypes+="${SALMONELLA_SEROTYPES_ARRAY[$i]}"
+                        done
+                    else
+                        # This shouldn't be option 3 if we have < 15 serotypes
+                        salmonella_serotypes="ALL"
+                    fi
+                    ;;
+                4)
+                    # Top 20 (only if we have enough serotypes)
+                    if [[ ${#SALMONELLA_SEROTYPES_ARRAY[@]} -ge 20 ]]; then
+                        salmonella_serotypes=""
+                        for i in {0..19}; do
+                            [[ $i -gt 0 ]] && salmonella_serotypes+=","
+                            salmonella_serotypes+="${SALMONELLA_SEROTYPES_ARRAY[$i]}"
+                        done
+                    else
+                        # This shouldn't be option 4 if we have < 20 serotypes
+                        salmonella_serotypes="ALL"
+                    fi
+                    ;;
+                *)
+                    # Default to all
+                    salmonella_serotypes="ALL"
+                    ;;
+            esac
+        fi
     else
         # Fallback to data discovery if no metadata
         salmonella_serotype_list=$(discover_pathogen_subtypes "SALMONELLA" "$mmwrFile" "$preprocessed_metadata" "serotype")
