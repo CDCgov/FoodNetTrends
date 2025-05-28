@@ -983,9 +983,7 @@ else
     echo "1) Manual file selection (raw data → preprocessing → analysis)"
     # echo "2) Load saved configuration"  # Disabled for rc1
     read -p "Enter selection [1]: " input_method
-    
-    # Remap choices since we don't have metadata or config options
-    input_method=2  # Manual
+    input_method=${input_method:-1}  # Default to 1 if empty
 fi
 
 # Map input method to workflow mode
@@ -1019,6 +1017,7 @@ elif [[ "$input_method" == "2" ]]; then
 #         workflow_mode=1
 #     fi
 # fi
+fi
 
 # Initialize variables
 preprocessed_data=""
@@ -2666,7 +2665,4 @@ if [[ "$execute" =~ ^[Yy]$ ]]; then
 else
     echo "Execution canceled."
     echo "$(date): User canceled execution" >> "$error_log"
-fi
-
-
 fi
