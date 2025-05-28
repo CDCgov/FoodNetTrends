@@ -1126,7 +1126,18 @@ if [[ "$input_method" == "1" ]]; then
                 echo "✓ Parasitic census (preprocessed): $censusFileP"
             else
                 echo "✗ Parasitic census not found: $census_p_file"
-                exit 1
+                echo ""
+                echo "Census files are required for analysis. Options:"
+                echo "1) Go back and run full preprocessing workflow"
+                echo "2) Exit and check file paths"
+                read -p "Select option [1]: " census_missing_option
+                census_missing_option=${census_missing_option:-1}
+                if [[ "$census_missing_option" == "1" ]]; then
+                    echo "Switching to full preprocessing workflow..."
+                    workflow_mode=1
+                else
+                    exit 1
+                fi
             fi
         fi
     fi
@@ -1461,7 +1472,10 @@ elif [[ "$workflow_mode" == "2" ]]; then
     
     # CRITICAL CHECK: Ensure preprocessed census files are available for analysis
     # This prevents the pipeline from using raw county-level data which causes join explosion
-    if [[ ! -f "$potential_census_b" || ! -f "$potential_census_p" ]]; then
+    # Check if census files were already loaded from metadata first
+    if [[ -n "$censusFileB" && -f "$censusFileB" && -n "$censusFileP" && -f "$censusFileP" ]]; then
+        echo "✓ Using census files loaded from metadata"
+    elif [[ ! -f "$potential_census_b" || ! -f "$potential_census_p" ]]; then
         echo ""
         echo "ERROR: Preprocessed census files not found!"
         echo "Expected files:"
