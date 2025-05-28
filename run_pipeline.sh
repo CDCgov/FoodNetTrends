@@ -1433,10 +1433,9 @@ elif [[ "$workflow_mode" == "2" ]]; then
 
     # Validate file exists
     if [ ! -f "${preprocessed_data}" ]; then
-        echo "Error: Preprocessed data file does not exist: ${preprocessed_data}"
+        echo "Warning: Preprocessed data file does not exist: ${preprocessed_data}"
         echo "$(date): Missing preprocessed data file: ${preprocessed_data}" >> "$error_log"
-        echo "Exiting."
-        exit 1
+        echo "Continuing anyway..."
     fi
 
     # Set MMWR file to preprocessed data
