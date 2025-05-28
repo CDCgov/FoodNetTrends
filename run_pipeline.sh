@@ -729,18 +729,9 @@ try:
         if 'salmonella_serotype_names' in data:
             print('DEBUG: Using salmonella_serotype_names field', file=sys.stderr)
             serotype_names = data['salmonella_serotype_names']
-            # Limit to first 10 for UI
-            if len(serotype_names) > 10:
-                result = serotype_names[:10] + [f'...and {len(serotype_names) - 10} others']
-            else:
-                result = serotype_names
-            print('|'.join(result))
-        # Fallback to object keys
-        elif 'salmonella_serotypes' in data and isinstance(data['salmonella_serotypes'], dict):
-            print('DEBUG: Using salmonella_serotypes object keys', file=sys.stderr)
-            serotype_names = list(data['salmonella_serotypes'].keys())
-            if len(serotype_names) > 10:
-                result = serotype_names[:10] + [f'...and {len(serotype_names) - 10} others']
+            # Limit to first 5 for cleaner display
+            if len(serotype_names) > 5:
+                result = serotype_names[:5] + [f'...and {len(serotype_names) - 5} others']
             else:
                 result = serotype_names
             print('|'.join(result))
@@ -2478,9 +2469,23 @@ if [[ "$execute" =~ ^[Yy]$ ]]; then
         exit 1
     fi
     
-    # Validate outputs after successful execution
-    echo ""
-    echo "======== Output Validation ========"
+    # Skip validation for background jobs
+    if [[ "$background" == true ]]; then
+        echo ""
+        echo "======== Analysis Running in Background ========"
+        echo "Process is running in background. Check log file for progress:"
+        echo "  $log_file"
+        echo ""
+        echo "To monitor progress:"
+        echo "  tail -f $log_file"
+        echo ""
+        echo "To check if still running:"
+        echo "  ps aux | grep nextflow"
+        echo ""
+    else
+        # Validate outputs after successful execution (foreground only)
+        echo ""
+        echo "======== Output Validation ========"
     echo "Output directory structure:"
     ls -la "$outDir" 2>/dev/null || echo "Output directory does not exist: $outDir"
     
@@ -2521,6 +2526,7 @@ if [[ "$execute" =~ ^[Yy]$ ]]; then
     echo "Setting file permissions to 755 for HPC compatibility..."
     find "$outDir" -type f -exec chmod 755 {} + 2>/dev/null
     echo "✓ File permissions updated"
+    fi  # End of background check
 else
     echo "Execution canceled."
     echo "$(date): User canceled execution" >> "$error_log"
