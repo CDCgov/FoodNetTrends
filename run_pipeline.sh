@@ -292,12 +292,17 @@ verify_spline_trends() {
 
 # Save current configuration to file
 save_configuration() {
-    local config_file="foodnet_config_$(date +%Y%m%d_%H%M%S).sh"
-    local config_dir="./configs"
+    local config_file="foodnet_config_${projID}.sh"
+    local config_dir="./.nextflow_configs"
     
     # Create configs directory if it doesn't exist
     mkdir -p "$config_dir" 2>/dev/null
     local full_config_path="$config_dir/$config_file"
+    
+    # Also save a timestamped version for history
+    local history_file="foodnet_config_${projID}_$(date +%Y%m%d_%H%M%S).sh"
+    local history_path="$config_dir/history/$history_file"
+    mkdir -p "$config_dir/history" 2>/dev/null
     
     cat > "$full_config_path" <<EOF
 #!/bin/bash
@@ -321,64 +326,72 @@ export states="$states"
 # Resource settings
 export cores="$cores"
 export memory="$memory"
+export chains="$chains"
+export iterations="$iterations"
+export adapt_delta="$adapt_delta"
+export max_treedepth="$max_treedepth"
 export queue="$queue"
 export runtime="$runtime"
+export flag="$flag"
 
 # Output settings
 export outDir="$outDir"
 export projID="$projID"
-export enable_dashboard="$enable_dashboard"
+export dashboard_params="$dashboard_params"
 export background="$background"
 
 # Workflow mode
 export workflow_mode="$workflow_mode"
+export preprocessed_data="$preprocessed_data"
 
 echo "Configuration loaded from: $full_config_path"
+echo "Project ID: $projID"
 echo "Generated on: $(date)"
 EOF
 
     chmod +x "$full_config_path"
-    echo "✓ Configuration saved to: $full_config_path"
-    echo "  To reuse: source $full_config_path && ./run_pipeline.sh"
+    
+    # Copy to both current and history
+    cp "$full_config_path" "$history_path" 2>/dev/null
+    
+    echo "✓ Configuration saved: $config_dir/$config_file"
 }
 
 # Display configuration summary
 show_configuration_summary() {
     echo ""
-    echo "======== CONFIGURATION SUMMARY ========="
-    echo "Input Files:"
-    echo "  MMWR Data: $mmwrFile"
-    echo "  Census Bacterial: ${censusFileB:-'(not specified)'}"
-    echo "  Census Parasitic: ${censusFileP:-'(not specified)'}"
-    if [[ -n "$preprocessed_metadata" ]]; then
-        echo "  Metadata: $preprocessed_metadata"
-    fi
+    echo "================= ANALYSIS CONFIGURATION ================="
     echo ""
-    echo "Analysis Settings:"
+    echo "INPUT DATA:"
+    echo "  MMWR File: $(basename "$mmwrFile")"
+    echo "  Census Files: $(basename "${censusFileB:-'Not specified'}") | $(basename "${censusFileP:-'Not specified'}")"
+    if [[ -n "$preprocessed_metadata" ]]; then
+        echo "  Metadata: $(basename "$preprocessed_metadata")"
+    fi
+    echo "  Data Type: $([ "$workflow_mode" == "1" ] || [ "$workflow_mode" == "2" ] && echo "Preprocessed" || echo "Raw")"
+    echo ""
+    echo "ANALYSIS PARAMETERS:"
     echo "  Pathogens: $pathogens"
-    echo "  Travel Filter: $travel"
-    echo "  CIDT Filter: $cidt"
-    if [[ -n "$stec_serogroups" ]]; then
+    echo "  States: ${states:-'ALL'}"
+    echo "  Travel Status: $travel"
+    echo "  CIDT Methods: $cidt"
+    if [[ -n "$stec_serogroups" ]] && [[ "$stec_serogroups" != "ALL" ]]; then
         echo "  STEC Serogroups: $stec_serogroups"
     fi
-    if [[ -n "$salmonella_serotypes" ]]; then
+    if [[ -n "$salmonella_serotypes" ]] && [[ "$salmonella_serotypes" != "ALL" ]]; then
         echo "  Salmonella Serotypes: $salmonella_serotypes"
     fi
-    echo "  States: ${states:-'ALL'}"
     echo ""
-    echo "Resources:"
-    echo "  Cores: $cores"
-    echo "  Memory: ${memory}GB"
-    echo "  Queue: $queue"
-    echo "  Runtime: $runtime"
+    echo "COMPUTATIONAL RESOURCES:"
+    echo "  Profile: $flag"
+    echo "  Cores: $cores | Memory: $memory | Chains: $chains | Iterations: $iterations"
+    echo "  Adapt Delta: $adapt_delta | Max Treedepth: $max_treedepth"
     echo ""
-    echo "Output:"
-    echo "  Directory: $outDir"
-    echo "  Project ID: $projID"
-    echo "  Dashboard: $enable_dashboard"
-    echo "  Background: $background"
-    echo "========================================="
-    echo ""
+    echo "OUTPUT:"
+    echo "  Directory: $outDir/$projID"
+    echo "  Dashboard: $([ "$dashboard_params" == *"true"* ] && echo "Yes" || echo "No")"
+    echo "  Background: $([ "$background" == true ] && echo "Yes" || echo "No")"
+    echo "========================================================="
 }
 
 # =============================================================================
@@ -1063,65 +1076,44 @@ if [[ "$input_method" == "1" ]]; then
         echo "✓ Original MMWR source: $original_mmwr"
     fi
     
-    # Load original census files (these will be used by the pipeline)
-    original_census_b=$(parse_metadata_json "$preprocessed_metadata" "census_file_bacterial_original")
-    if [[ -n "$original_census_b" ]]; then
-        censusFileB="$original_census_b"
+    # Load preprocessed census files (required when using preprocessed MMWR data)
+    # First try to load preprocessed census files
+    census_b_file=$(parse_metadata_json "$preprocessed_metadata" "census_file_bacterial_preprocessed")
+    if [[ -n "$census_b_file" ]]; then
+        censusFileB="${metadata_dir}/${census_b_file}"
         if [[ -f "$censusFileB" ]]; then
-            echo "✓ Original bacterial census: $censusFileB"
+            echo "✓ Bacterial census (preprocessed): $censusFileB"
         else
-            echo "⚠️  Warning: Original bacterial census not found at: $censusFileB"
-            # Fall back to preprocessed census if original not found
-            census_b_file=$(parse_metadata_json "$preprocessed_metadata" "census_file_bacterial_preprocessed")
-            if [[ -n "$census_b_file" ]]; then
-                censusFileB="${metadata_dir}/${census_b_file}"
-                if [[ -f "$censusFileB" ]]; then
-                    echo "   Using preprocessed census instead: $censusFileB"
-                else
-                    echo "✗ Neither original nor preprocessed bacterial census found"
-                    echo "Continuing without bacterial census..."
-                fi
-            fi
-        fi
-    else
-        # For older metadata files without original paths, use preprocessed
-        census_b_file=$(parse_metadata_json "$preprocessed_metadata" "census_file_bacterial_preprocessed")
-        if [[ -n "$census_b_file" ]]; then
-            censusFileB="${metadata_dir}/${census_b_file}"
-            if [[ -f "$censusFileB" ]]; then
+            # If not in metadata dir, try as absolute path
+            if [[ -f "$census_b_file" ]]; then
+                censusFileB="$census_b_file"
                 echo "✓ Bacterial census (preprocessed): $censusFileB"
             else
                 echo "✗ Bacterial census not found: $census_b_file"
                 echo "Continuing without bacterial census..."
             fi
         fi
+    else
+        # Fallback: Check for original census file paths in metadata
+        original_census_b=$(parse_metadata_json "$preprocessed_metadata" "census_file_bacterial_original")
+        if [[ -n "$original_census_b" ]]; then
+            echo "⚠️  Warning: Only original census path found in metadata."
+            echo "   Original census files are county-level and should not be used with preprocessed data."
+            echo "   Path: $original_census_b"
+            echo "   Please ensure preprocessed (state-level) census files are available."
+        fi
     fi
     
-    original_census_p=$(parse_metadata_json "$preprocessed_metadata" "census_file_parasitic_original")
-    if [[ -n "$original_census_p" ]]; then
-        censusFileP="$original_census_p"
+    # Load preprocessed parasitic census file
+    census_p_file=$(parse_metadata_json "$preprocessed_metadata" "census_file_parasitic_preprocessed")
+    if [[ -n "$census_p_file" ]]; then
+        censusFileP="${metadata_dir}/${census_p_file}"
         if [[ -f "$censusFileP" ]]; then
-            echo "✓ Original parasitic census: $censusFileP"
+            echo "✓ Parasitic census (preprocessed): $censusFileP"
         else
-            echo "⚠️  Warning: Original parasitic census not found at: $censusFileP"
-            # Fall back to preprocessed census if original not found
-            census_p_file=$(parse_metadata_json "$preprocessed_metadata" "census_file_parasitic_preprocessed")
-            if [[ -n "$census_p_file" ]]; then
-                censusFileP="${metadata_dir}/${census_p_file}"
-                if [[ -f "$censusFileP" ]]; then
-                    echo "   Using preprocessed census instead: $censusFileP"
-                else
-                    echo "✗ Neither original nor preprocessed parasitic census found"
-                    echo "Continuing without parasitic census..."
-                fi
-            fi
-        fi
-    else
-        # For older metadata files without original paths, use preprocessed
-        census_p_file=$(parse_metadata_json "$preprocessed_metadata" "census_file_parasitic_preprocessed")
-        if [[ -n "$census_p_file" ]]; then
-            censusFileP="${metadata_dir}/${census_p_file}"
-            if [[ -f "$censusFileP" ]]; then
+            # If not in metadata dir, try as absolute path
+            if [[ -f "$census_p_file" ]]; then
+                censusFileP="$census_p_file"
                 echo "✓ Parasitic census (preprocessed): $censusFileP"
             else
                 echo "✗ Parasitic census not found: $census_p_file"
@@ -1138,6 +1130,15 @@ if [[ "$input_method" == "1" ]]; then
                     exit 1
                 fi
             fi
+        fi
+    else
+        # Fallback: Check for original census file paths in metadata
+        original_census_p=$(parse_metadata_json "$preprocessed_metadata" "census_file_parasitic_original")
+        if [[ -n "$original_census_p" ]]; then
+            echo "⚠️  Warning: Only original census path found in metadata."
+            echo "   Original census files are county-level and should not be used with preprocessed data."
+            echo "   Path: $original_census_p"
+            echo "   Please ensure preprocessed (state-level) census files are available."
         fi
     fi
     
@@ -1390,8 +1391,11 @@ if [[ "$workflow_mode" == "1" ]]; then
     
 # Mode 2: Use existing preprocessed data
 elif [[ "$workflow_mode" == "2" ]]; then
+    # Initialize skip flag
+    skip_mode_2=${skip_mode_2:-false}
+    
     # Skip file selection if we already have preprocessed_data from metadata
-    if [[ -z "$preprocessed_data" ]]; then
+    if [[ -z "$preprocessed_data" && "$skip_mode_2" != "true" ]]; then
         echo ""
         echo "======== Input Files ========"
 
@@ -1431,18 +1435,24 @@ elif [[ "$workflow_mode" == "2" ]]; then
         no_data_choice=${no_data_choice:-1}
         
         if [[ "$no_data_choice" == "1" ]]; then
-            echo "Returning to workflow selection..."
+            echo "Switching to full preprocessing workflow..."
             echo ""
-            # Reset workflow mode to trigger main menu
-            workflow_mode=""
-            exec "$0" "$@"
+            # Switch to preprocessing workflow
+            workflow_mode=1
+            # Set a flag to skip the rest of mode 2
+            skip_mode_2=true
         else
             read -p "Preprocessed data file: " preprocessed_data
         fi
     fi
 
-    # Validate file exists
-    if [ ! -f "${preprocessed_data}" ]; then
+    # Check if we should skip to mode 1
+    if [[ "$skip_mode_2" == "true" ]]; then
+        workflow_mode=1
+    else
+        # Continue with mode 2 processing
+        # Validate file exists
+        if [ ! -f "${preprocessed_data}" ]; then
         echo "Warning: Preprocessed data file does not exist: ${preprocessed_data}"
         echo "$(date): Missing preprocessed data file: ${preprocessed_data}" >> "$error_log"
         echo "Continuing anyway..."
@@ -1617,6 +1627,7 @@ if [[ -n "${preprocessed_metadata}" && -f "${preprocessed_metadata}" ]]; then
     else
         echo "⚠️  No STEC serogroups found in metadata"
     fi
+    fi
 fi
 
 # Ensure key pathogens are always available (for backward compatibility)
@@ -1638,63 +1649,78 @@ if ! validate_required_files; then
     exit 1
 fi
 
-# Get travel status filter
-echo ""
-echo "======== Travel Status Filter ========"
-echo "Select travel status to include:"
-echo "1) All travel statuses (NO, UNKNOWN, YES)"
-echo "2) Only non-travel related (NO only)"
-echo "3) Non-travel and unknown (NO, UNKNOWN)"
-echo "4) Travel-related only (YES only)"
-echo "5) Custom selection"
-read -p "Enter selection [1]: " travel_choice
-travel_choice=${travel_choice:-1}
+# Parameter selection loop
+parameter_menu="travel"
+while true; do
+    case "$parameter_menu" in
+        "travel")
+            # Get travel status filter
+            echo ""
+            echo "======== Travel Status Filter ========"
+            echo "Select travel status to include:"
+            echo "1) All travel statuses (NO, UNKNOWN, YES)"
+            echo "2) Only non-travel related (NO only)"
+            echo "3) Non-travel and unknown (NO, UNKNOWN)"
+            echo "4) Travel-related only (YES only)"
+            echo "5) Custom selection"
+            read -p "Enter selection [1]: " travel_choice
+            travel_choice=${travel_choice:-1}
 
-case $travel_choice in
-    1) travel="NO,UNKNOWN,YES" ;;
-    2) travel="NO" ;;
-    3) travel="NO,UNKNOWN" ;;
-    4) travel="YES" ;;
-    5)
-        echo "Enter comma-separated travel statuses (NO,UNKNOWN,YES):"
-        read -p "Travel statuses: " travel
-        # Default if empty
-        travel=${travel:-NO,UNKNOWN,YES}
-        ;;
-    *)
-        echo "Invalid selection. Using default (All travel statuses)."
-        travel="NO,UNKNOWN,YES"
-        ;;
-esac
+            case $travel_choice in
+                1) travel="NO,UNKNOWN,YES"; parameter_menu="cidt" ;;
+                2) travel="NO"; parameter_menu="cidt" ;;
+                3) travel="NO,UNKNOWN"; parameter_menu="cidt" ;;
+                4) travel="YES"; parameter_menu="cidt" ;;
+                5)
+                    echo "Enter comma-separated travel statuses (NO,UNKNOWN,YES):"
+                    read -p "Travel statuses: " travel
+                    # Default if empty
+                    travel=${travel:-NO,UNKNOWN,YES}
+                    parameter_menu="cidt"
+                    ;;
+                *)
+                    echo "Invalid selection. Using default (All travel statuses)."
+                    travel="NO,UNKNOWN,YES"
+                    parameter_menu="cidt"
+                    ;;
+            esac
+            ;;
+            
+        "cidt")
+            # Get CIDT/culture method filter
+            echo ""
+            echo "======== CIDT/Culture Method Filter ========"
+            echo "Select CIDT/culture methods to include:"
+            echo "1) All methods (CIDT+, CX+, PARASITIC)"
+            echo "2) Culture positive only (CX+)"
+            echo "3) CIDT positive only (CIDT+)"
+            echo "4) Custom selection"
+            echo "5) Go back to Travel Status selection"
+            read -p "Enter selection [1]: " cidt_choice
+            cidt_choice=${cidt_choice:-1}
 
-# Get CIDT/culture method filter
-echo ""
-echo "======== CIDT/Culture Method Filter ========"
-echo "Select CIDT/culture methods to include:"
-echo "1) All methods (CIDT+, CX+, PARASITIC)"
-echo "2) Culture positive only (CX+)"
-echo "3) CIDT positive only (CIDT+)"
-echo "4) Custom selection"
-read -p "Enter selection [1]: " cidt_choice
-cidt_choice=${cidt_choice:-1}
-
-case $cidt_choice in
-    1) cidt="CIDT+,CX+,PARASITIC" ;;
-    2) cidt="CX+" ;;
-    3) cidt="CIDT+" ;;
-    4)
-        echo "Enter comma-separated CIDT/culture methods (CIDT+,CX+,PARASITIC):"
-        read -p "CIDT/culture methods: " cidt
-        # Default if empty
-        cidt=${cidt:-CIDT+,CX+,PARASITIC}
-        ;;
-    *)
-        echo "Invalid selection. Using default (All methods)."
-        cidt="CIDT+,CX+,PARASITIC"
-        ;;
-esac
-
-# Get pathogen selection
+            case $cidt_choice in
+                1) cidt="CIDT+,CX+,PARASITIC"; parameter_menu="pathogen" ;;
+                2) cidt="CX+"; parameter_menu="pathogen" ;;
+                3) cidt="CIDT+"; parameter_menu="pathogen" ;;
+                4)
+                    echo "Enter comma-separated CIDT/culture methods (CIDT+,CX+,PARASITIC):"
+                    read -p "CIDT/culture methods: " cidt
+                    # Default if empty
+                    cidt=${cidt:-CIDT+,CX+,PARASITIC}
+                    parameter_menu="pathogen"
+                    ;;
+                5) parameter_menu="travel" ;;
+                *)
+                    echo "Invalid selection. Using default (All methods)."
+                    cidt="CIDT+,CX+,PARASITIC"
+                    parameter_menu="pathogen"
+                    ;;
+            esac
+            ;;
+            
+        "pathogen")
+            # Get pathogen selection
 echo ""
 echo "======== Pathogen Selection ========"
 
@@ -1760,8 +1786,8 @@ if [[ -n "$valid_pathogens" ]]; then
                 break
                 ;;
             B)
-                echo "Returning to previous menu..."
-                exit 0
+                parameter_menu="cidt"
+                break
                 ;;
             S)
                 echo ""
@@ -1835,6 +1861,13 @@ else
     # Clean up manually entered pathogens
     pathogens=$(echo "$pathogens" | tr '[:lower:]' '[:upper:]' | sed 's/[[:space:]]//g')
 fi
+            # Exit parameter loop when pathogen selection is complete
+            if [[ -n "$pathogens" && "$pathogens" != "PLACEHOLDER" ]]; then
+                break
+            fi
+            ;;
+    esac
+done
 
 # Advanced pathogen configuration - serotypes and serogroups
 echo ""
@@ -2068,6 +2101,7 @@ echo ""
 
 echo "1) Use ALL available states"
 echo "2) Select specific states"
+echo "3) Go back to Pathogen selection"
 read -p "Enter selection [1]: " state_mode
 state_mode=${state_mode:-1}
 
@@ -2075,12 +2109,21 @@ if [[ "$state_mode" == "1" ]]; then
     # Use all states
     echo "Selected: ALL states"
     states="$ALL_STATES"
-else
+elif [[ "$state_mode" == "2" ]]; then
     # Ask for specific states
     echo ""
     echo "Enter states to analyze (comma-separated with NO spaces)"
     read -p "Leave blank for all states: " states
     states=${states:-"$ALL_STATES"}
+elif [[ "$state_mode" == "3" ]]; then
+    # Go back - for now, restart the script
+    echo "Returning to beginning..."
+    echo ""
+    exec bash "$0" "$@"
+else
+    # Default to all states
+    echo "Invalid selection. Using ALL states."
+    states="$ALL_STATES"
 fi
 
 # Calculate pathogen count to recommend appropriate resources
@@ -2297,19 +2340,7 @@ case $performance_profile in
         ;;
 esac
 
-# Get resume option
-echo ""
-echo "Resume previous failed run?"
-echo "1) No, start fresh"
-echo "2) Yes, resume from last successful step"
-read -p "Enter selection [1]: " resume_choice
-resume_choice=${resume_choice:-1}
-
-resume_flag=""
-if [[ "$resume_choice" == "2" ]]; then
-    resume_flag="-resume"
-    echo "Run will resume from last successful step"
-fi
+# Note: To resume a previous run, use ./resume_pipeline.sh instead
 
 # Get background execution preference
 echo ""
@@ -2383,9 +2414,6 @@ fi
 
 # Build the command
 cmd="nextflow run main.nf -profile singularity,production"
-if [[ -n "$resume_flag" ]]; then
-    cmd="$cmd $resume_flag"
-fi
 
 # Add HPC configuration optimizations
 cmd="$cmd -process.memory $memory"
@@ -2459,56 +2487,12 @@ fi
 
 # Analysis levels: STEC uses serogroups, Salmonella uses serotypes
 
-# Display summary
-# Show configuration summary and save
+# Display configuration summary
 show_configuration_summary
 
-# Configuration saving disabled for rc1
-# echo "Save this configuration for future use?"
-# read -p "Save configuration? (y/n) [y]: " save_config
-# save_config=${save_config:-y}
+# Automatically save configuration for resume capability
+save_configuration
 
-# if [[ "$save_config" =~ ^[Yy]$ ]]; then
-#     save_configuration
-# fi
-
-echo ""
-echo "========= Analysis Summary ==========="
-echo "Mode: $flag"
-if [[ -n "$resume_flag" ]]; then
-    echo "Resume previous run: Yes"
-else
-    echo "Resume previous run: No"
-fi
-
-if [[ "$workflow_mode" == "1" || "$workflow_mode" == "3" ]]; then
-    echo "Using preprocessed data: Yes"
-else
-    echo "Using preprocessed data: No"
-fi
-
-echo "Pathogens: $pathogens"
-echo "States: $states"
-echo "Travel status: $travel"
-echo "CIDT/culture methods: $cidt"
-
-echo "Input files:"
-echo "  Data file: $mmwrFile"
-echo "  Census file (bacterial): $censusFileB" 
-echo "  Census file (parasitic): $censusFileP"
-if [[ -n "$preprocessed_metadata" ]]; then
-    echo "  Metadata: $preprocessed_metadata"
-fi
-
-echo "Chains: $chains"
-echo "Iterations: $iterations"
-echo "Adapt delta: $adapt_delta"
-echo "Max treedepth: $max_treedepth"
-echo "Cores: $cores"
-echo "Memory: $memory"
-
-echo "Output directory: $outDir"
-echo "Run in background: $([ "$background" == true ] && echo "Yes" || echo "No")"
 echo ""
 echo "Command to run:"
 # Clean command for display (remove extra spaces and newlines)
