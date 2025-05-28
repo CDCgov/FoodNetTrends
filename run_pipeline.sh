@@ -781,9 +781,11 @@ except Exception as e:
             return 0
         else
             # echo "DEBUG: Python parsing failed or returned empty" >&2
+            :  # No-op to prevent empty else block
         fi
     else
         # echo "DEBUG: Python not available" >&2
+        :  # No-op to prevent empty else block
     fi
     
     # Fallback: Simple bash parsing for basic JSON arrays
