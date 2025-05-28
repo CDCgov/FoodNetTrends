@@ -1053,6 +1053,8 @@ if [[ "$input_method" == "1" ]]; then
         else
             echo "✗ MMWR data file not found: $mmwr_filename"
             echo "Continuing with available data..."
+            # Set fallback to prevent hanging in CSV search
+            preprocessed_data="$mmwr_filename"
         fi
     fi
     
@@ -1078,7 +1080,7 @@ if [[ "$input_method" == "1" ]]; then
                     echo "   Using preprocessed census instead: $censusFileB"
                 else
                     echo "✗ Neither original nor preprocessed bacterial census found"
-                    exit 1
+                    echo "Continuing without bacterial census..."
                 fi
             fi
         fi
@@ -1091,7 +1093,7 @@ if [[ "$input_method" == "1" ]]; then
                 echo "✓ Bacterial census (preprocessed): $censusFileB"
             else
                 echo "✗ Bacterial census not found: $census_b_file"
-                exit 1
+                echo "Continuing without bacterial census..."
             fi
         fi
     fi
@@ -1111,7 +1113,7 @@ if [[ "$input_method" == "1" ]]; then
                     echo "   Using preprocessed census instead: $censusFileP"
                 else
                     echo "✗ Neither original nor preprocessed parasitic census found"
-                    exit 1
+                    echo "Continuing without parasitic census..."
                 fi
             fi
         fi
