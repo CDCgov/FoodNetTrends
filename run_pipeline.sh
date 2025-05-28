@@ -734,7 +734,7 @@ try:
                 result = serotype_names[:10] + [f'...and {len(serotype_names) - 10} others']
             else:
                 result = serotype_names
-            print(','.join(result))
+            print('|'.join(result))
         # Fallback to object keys
         elif 'salmonella_serotypes' in data and isinstance(data['salmonella_serotypes'], dict):
             print('DEBUG: Using salmonella_serotypes object keys', file=sys.stderr)
@@ -743,7 +743,7 @@ try:
                 result = serotype_names[:10] + [f'...and {len(serotype_names) - 10} others']
             else:
                 result = serotype_names
-            print(','.join(result))
+            print('|'.join(result))
         else:
             print('DEBUG: No salmonella serotype data found', file=sys.stderr)
             print('')
@@ -1758,7 +1758,7 @@ if [[ "$pathogens" == *"SALMONELLA"* ]]; then
     # Use metadata serotypes if available, otherwise discover from data
     if [[ -n "$available_serotypes" ]]; then
         # Parse serotypes and filter out the "...and X others" entry if present
-        IFS=',' read -ra RAW_SEROTYPES_ARRAY <<< "$available_serotypes"
+        IFS='|' read -ra RAW_SEROTYPES_ARRAY <<< "$available_serotypes"
         SALMONELLA_SEROTYPES_ARRAY=()
         total_count=""
         
@@ -1808,7 +1808,7 @@ if [[ "$pathogens" == *"SALMONELLA"* ]]; then
         fi
         
         # Determine next option numbers
-        local next_opt=2
+        next_opt=2
         [[ ${#SALMONELLA_SEROTYPES_ARRAY[@]} -ge 10 ]] && ((next_opt++))
         [[ ${#SALMONELLA_SEROTYPES_ARRAY[@]} -ge 15 ]] && ((next_opt++))
         [[ ${#SALMONELLA_SEROTYPES_ARRAY[@]} -ge 20 ]] && ((next_opt++))
