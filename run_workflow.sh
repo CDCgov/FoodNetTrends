@@ -30,23 +30,27 @@ echo ""
 
 # Ask for run mode
 echo -e "Select run mode:"
-echo "1) Test run (minimal settings - automatically sets: chains=1, iterations=100)"
-echo "2) Full analysis (custom settings - you'll specify parameters)"
-echo "3) Resume previous run (continues from last execution)"
+echo "1) Test"
+echo "2) Publication" 
+echo "3) Max"
+echo "4) Custom"
+echo "5) Resume previous run"
 read -p "Enter selection [1]: " run_mode
 run_mode=${run_mode:-1}
 
 # Validate run mode
-if [[ ! "$run_mode" =~ ^[1-3]$ ]]; then
-    echo -e "${RED}Invalid selection. Using default (Test run).${NC}"
+if [[ ! "$run_mode" =~ ^[1-5]$ ]]; then
+    echo -e "${RED}Invalid selection. Using default (Test).${NC}"
     run_mode=1
 fi
 
 # Convert run mode to flag for backward compatibility
 case $run_mode in
     1) flag="test" ;;
-    2) flag="full" ;;
-    3) flag="resume" ;;
+    2) flag="publication" ;;
+    3) flag="max" ;;
+    4) flag="custom" ;;
+    5) flag="resume" ;;
 esac
 
 # Ask if user wants to run in background
@@ -125,20 +129,45 @@ fi
 
 # Set MCMC parameters based on the run mode
 if [[ "$flag" == "test" ]]; then
-    # Test mode: use minimal settings
     chains=1
     iterations=100
     adapt_delta=0.8
     max_treedepth=8
     
     echo ""
-    echo -e "${BLUE}Test Mode: Using minimal settings${NC}"
+    echo -e "${BLUE}Test Profile${NC}"
     echo -e "Chains: ${GREEN}$chains${NC}"
     echo -e "Iterations: ${GREEN}$iterations${NC}"
     echo -e "Adapt delta: ${GREEN}$adapt_delta${NC}"
     echo -e "Max treedepth: ${GREEN}$max_treedepth${NC}"
     
-elif [[ "$flag" == "full" ]]; then
+elif [[ "$flag" == "publication" ]]; then
+    chains=6
+    iterations=10001
+    adapt_delta=0.99
+    max_treedepth=15
+    
+    echo ""
+    echo -e "${BLUE}Publication Profile${NC}"
+    echo -e "Chains: ${GREEN}$chains${NC}"
+    echo -e "Iterations: ${GREEN}$iterations${NC}"
+    echo -e "Adapt delta: ${GREEN}$adapt_delta${NC}"
+    echo -e "Max treedepth: ${GREEN}$max_treedepth${NC}"
+    
+elif [[ "$flag" == "max" ]]; then
+    chains=8
+    iterations=20000
+    adapt_delta=0.99
+    max_treedepth=15
+    
+    echo ""
+    echo -e "${BLUE}Max Profile${NC}"
+    echo -e "Chains: ${GREEN}$chains${NC}"
+    echo -e "Iterations: ${GREEN}$iterations${NC}"
+    echo -e "Adapt delta: ${GREEN}$adapt_delta${NC}"
+    echo -e "Max treedepth: ${GREEN}$max_treedepth${NC}"
+    
+elif [[ "$flag" == "custom" ]]; then
     # Full mode: ask for user input
     echo ""
     echo -e "${BLUE}======== MCMC Parameters ========${NC}"
@@ -262,7 +291,7 @@ fi
 # Review and confirm
 echo ""
 echo -e "${BLUE}========= Analysis Summary ==========${NC}"
-echo -e "Mode: ${GREEN}$([ "$flag" == "test" ] && echo "Test run" || [ "$flag" == "full" ] && echo "Full analysis" || echo "Resume previous run")${NC}"
+echo -e "Mode: ${GREEN}$([ "$flag" == "test" ] && echo "Test" || [ "$flag" == "publication" ] && echo "Publication" || [ "$flag" == "max" ] && echo "Max" || [ "$flag" == "custom" ] && echo "Custom" || echo "Resume previous run")${NC}"
 echo -e "Pathogens: ${GREEN}$pathogens${NC}"
 
 if [[ "$flag" != "resume" ]]; then

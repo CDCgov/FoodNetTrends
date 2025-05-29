@@ -299,64 +299,28 @@ report_progress("ANALYSIS DETAILS", message=paste0(
 # Import MMWR data
 report_progress("DATA", message="Importing MMWR data")
 tryCatch({
-  if (preprocessed && !is.null(cleanFile) && file.exists(cleanFile)) {
-    report_progress("DATA", message=paste("Using preprocessed data from:", cleanFile))
-    # Read the preprocessed CSV file
-    mmwrdata <- readr::read_csv(cleanFile, show_col_types = FALSE)
-  } else {
-    # Process the raw SAS file
-    mmwrdata <- haven::read_sas(mmwrFile) %>%
-      filter(SiteID != "COEX")
-    
-    # Convert to data frame
-    mmwrdata <- as.data.frame(mmwrdata)
-    
-    # Update serotype information
-    seroList <- c("NOT SPECIATED", "UNKNOWN", "PARTIAL SERO", "NOT SERO", "")
-    mmwrdata$SERO2 <- ifelse(mmwrdata$SERO1 %in% seroList, "Missing", mmwrdata$SERO1)
-    mmwrdata$SERO2 <- ifelse(grepl("UNDET", mmwrdata$SERO2), "Missing", mmwrdata$SERO2)
-    mmwrdata$serotypesummary <- mmwrdata$SERO2
-    
-    # Clean and filter data
-    mmwrdata <- mmwrdata %>%
-      setNames(tolower(names(.))) %>%
-      # Filter by detection method and travel status
-      filter((cxcidt %in% cidt) & (travelint %in% travel)) %>%
-      # Fix county names
-      filter(!county %in% c("OUT OF STATE", "UNKNOWN", "99997")) %>%
-      mutate(county = if_else(county %in% c("ST. MARYS'S", "ST. MARYS"), "ST. MARY'S", county)) %>%
-      mutate(county = if_else(county %in% c("PRINCE GEORGES"), "PRINCE GEORGE'S", county)) %>%
-      mutate(county = if_else(county %in% c("QUEEN ANNES"), "QUEEN ANNE'S", county)) %>%
-      mutate(county = if_else(county %in% c("DE BACA"), "DEBACA", county)) %>%
-      # Create pathogen type variable
-      mutate(pathogentype = ifelse(pathogen %in% c("CRYPTOSPORIDIUM", "CYCLOSPORA"),
-                                   "Parasitic", "Bacterial"))
+  # When using Nextflow pipeline, data should always be preprocessed
+  if (!preprocessed || is.null(cleanFile) || !file.exists(cleanFile)) {
+    stop("This script requires preprocessed data. Please ensure preprocess.R has been run first.")
   }
   
-  # Create separate data sets for each "group of pathogens that have unique exclusions. Note to adapt this to Non-FoodNet datasets
-  # we will need to modify this code
-  pathogens<-c("CAMPYLOBACTER", "CYCLOSPORA", "SALMONELLA", "SHIGELLA", "STEC", "VIBRIO", "YERSINIA")
-
-  mmwrdata<-gtools::smartbind(as.data.frame(mmwrdata%>% filter(pathogen %in%  pathogens)), # all pathogens but Listeria
-                              as.data.frame(mmwrdata%>% filter(pathogen == "STEC" & stec_class=="STEC O157")%>%mutate(pathogen="STEC O157")), # make a dataset for STEC O157
-                              as.data.frame(mmwrdata%>% filter(pathogen == "STEC" & (stec_class=="STEC NONO157" | stec_class== "STEC O AG UNDET"))%>%mutate(pathogen="STEC NONO157")), # make a dataset for STEC NONO157
-                              as.data.frame(mmwrdata%>% filter(pathogen == "LISTERIA" & cste=="YES")))
+  report_progress("DATA", message=paste("Using preprocessed data from:", cleanFile))
+  # Read the preprocessed CSV file
+  mmwrdata <- readr::read_csv(cleanFile, show_col_types = FALSE)
   
-  # Convert column names to be consistent
-  names(mmwrdata) <- tolower(names(mmwrdata))
+  # Apply filters specific to this analysis
+  mmwrdata <- mmwrdata %>%
+    # Filter by detection method and travel status
+    filter((cxcidt %in% cidt) & (travelint %in% travel)) %>%
+    # Exclude invalid counties (if not already done in preprocessing)
+    filter(!county %in% c("OUT OF STATE", "UNKNOWN", "99997"))
   
   # Ensure required columns exist
-  required_cols <- c("pathogen", "year", "state")
+  required_cols <- c("pathogen", "year", "state", "pathogentype")
   missing_cols <- required_cols[!required_cols %in% names(mmwrdata)]
   if (length(missing_cols) > 0) {
-    stop("Required columns missing from MMWR data: ", paste(missing_cols, collapse=", "))
+    stop("Required columns missing from preprocessed data: ", paste(missing_cols, collapse=", "))
   }
-  
-  # Ensure pathogentype column exists
-  # if (!"pathogentype" %in% names(mmwrdata)) {
-  #  mmwrdata$pathogentype <- ifelse(mmwrdata$pathogen %in% c("CRYPTOSPORIDIUM", "CYCLOSPORA"), 
-  #                                  "Parasitic", "Bacterial")
-  #}
   
   report_progress("DATA", message=paste("Processed", nrow(mmwrdata), "MMWR records"))
 }, error = function(e) {
@@ -426,44 +390,38 @@ tryCatch({
     # If a specific pathogen was requested, filter for it
     bact <- subset(bact, pathogen == opts$pathogen)
     if (nrow(bact) == 0) {
-      # Instead of stopping, create a minimal dataset for the pathogen
-      # This will allow the pipeline to continue but produce empty results
-      #################################
-      ################################
-      ###############################
-      ### What is the benefit of this? Instead, can we return an error that no illnesses of the requested disease were found?
-      report_progress("WARNING", message=paste("No data found for pathogen:", opts$pathogen, "- Creating minimal dataset"))
+      # No data found for the requested pathogen
+      report_progress("ERROR", message=paste("No data found for pathogen:", opts$pathogen))
       
-      # Create a minimal dataset with the requested pathogen for all sites
-      states <- c("CA", "CO", "CT", "GA", "MD", "MN", "NM", "NY", "OR", "TN")
-      years <- unique(census$year)
-      
-      minimal_data <- expand.grid(
-        year = years,
-        state = states,
-        pathogen = opts$pathogen,
-        stringsAsFactors = FALSE
+      # Create error file for this pathogen
+      error_file <- paste0(outDir, "/", opts$pathogen, "_error.txt")
+      error_content <- c(
+        paste("ERROR: No data found for pathogen:", opts$pathogen),
+        paste("Date:", Sys.time()),
+        paste("Project ID:", projID),
+        "",
+        "This pathogen had no cases in the dataset after applying the following filters:",
+        paste("- Travel types:", paste(travel, collapse=", ")),
+        paste("- CIDT types:", paste(cidt, collapse=", ")),
+        paste("- Time period: Check your input data file"),
+        "",
+        "Please verify:",
+        "1. The pathogen name is spelled correctly",
+        "2. The pathogen exists in your MMWR data file",
+        "3. The filters (travel, CIDT) are not excluding all cases"
       )
+      writeLines(error_content, error_file)
       
-      # Add required columns
-      minimal_data$count <- 0
+      # Create empty summary file to satisfy pipeline expectations
+      summary_file <- paste0(outDir, "/", opts$pathogen, "_summary.txt")
+      writeLines("No data available for analysis - see error file for details", summary_file)
       
-      # Merge with census data to get populations
-      if (opts$pathogen %in% c("CRYPTOSPORIDIUM", "CYCLOSPORA")) {
-        pathogen_type <- "Parasitic"
-      } else {
-        pathogen_type <- "Bacterial"
-      }
+      # Create empty CSV files that might be expected by downstream processes
+      ir_file <- paste0(outDir, "/", opts$pathogen, "_IRCatch.csv")
+      write.csv(data.frame(message = "No data available"), ir_file, row.names = FALSE)
       
-      minimal_data$pathogentype <- pathogen_type
-      minimal_data <- left_join(minimal_data, 
-                                census %>% filter(pathogentype == pathogen_type), 
-                                by = c("year", "state"))
-      
-      # Remove any NA rows that might have been created in the join
-      minimal_data <- minimal_data[!is.na(minimal_data$population), ]
-      
-      bact <- minimal_data
+      # Exit gracefully with status 0 so other pathogens can continue
+      quit(save = "no", status = 0)
     }
   } else {
     # Otherwise use the default filtering from the original code

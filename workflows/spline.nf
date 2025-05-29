@@ -95,7 +95,7 @@ workflow SPLINE {
             params.cidt,
             params.projID,
             params.trendyScript,
-            params.preprocessed,
+            true,
             processedFile
         )
     }

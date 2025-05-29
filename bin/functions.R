@@ -1,19 +1,32 @@
-# FUNCTIONS.R
+#!/usr/bin/env Rscript
 ################################################################################
-# can we add text similar to calcIR.R? maybe for each function that explains how/where it fits into the workflow? I am having trouble linking these functions to trendy.R and calcIR.R
-# functions.R
+# functions.R - Core Statistical Functions for FoodNet Trends Pipeline
 #
 # Purpose:
-#   This script ...
+#   This script provides all statistical modeling and analysis functions used by
+#   trendy.R in the FoodNet Trends pipeline. It contains the Bayesian hierarchical
+#   model implementations, data processing functions, and visualization utilities.
 #
-#   This includes:
-#     - ...
+# Workflow Integration:
+#   1. Sourced by trendy.R at the beginning of execution
+#   2. Uses cleaned data from preprocess.R (lowercase column names expected)
+#   3. Provides pathogen-specific analysis functions called by trendy.R
+#   4. Generates all statistical outputs (models, plots, CSV files)
+#
+# Key Function Groups:
+#   - Utility Functions: CLEAN_LIST, SAFE_WRITE
+#   - Pathogen Analysis: PATH_ANALYSIS, CYCLOSPORA_ANALYSIS, SALMONELLA_ANALYSIS
+#   - Bayesian Modeling: PROPOSED_BM (main model fitting function)
+#   - Post-processing: LINPREAD_DRAW_FN, CATCHMENT, LINPRED_TO_CATCHIR, LINPRED_TO_SITEIR
+#   - Visualization: PLOT_SITE_TRENDS, PLOT_OVERALL_TREND
+#   - Results Generation: IR_COMP_CATCH
 #
 # Usage:
-#   ...
+#   This file is automatically sourced by trendy.R and should not be run directly.
+#   All functions expect data with lowercase column names as produced by preprocess.R.
 #
-# Example:
-#   ...
+# Example workflow:
+#   preprocess.R → clean_mmwr.csv → trendy.R → sources functions.R → analysis outputs
 #
 ################################################################################
 
@@ -33,6 +46,7 @@ suppressPackageStartupMessages({
 })
 
 # Helper: Clean up list strings and handle vector inputs
+# Used by trendy.R to parse comma-separated pathogen and filter parameters
 CLEAN_LIST <- function(input_string) {
   if (length(input_string) > 1) {
     # If input is a vector, collapse into a single string
@@ -43,6 +57,8 @@ CLEAN_LIST <- function(input_string) {
 }
 
 # Helper: Write data to a file safely
+# Used throughout the pipeline to save outputs (CSV files, RDS objects)
+# Handles directory creation and error logging
 SAFE_WRITE <- function(data, file_path) {
   tryCatch({
     dir_path <- dirname(file_path)
@@ -66,7 +82,17 @@ SAFE_WRITE <- function(data, file_path) {
   })
 }
 
-# PATH_ANALYSIS function
+################################################################################
+# PATH_ANALYSIS - Prepare bacterial pathogen data for modeling
+# 
+# Called by: trendy.R for bacterial pathogens (CAMPYLOBACTER, SALMONELLA, etc.)
+# Inputs: 
+#   - mmwrdata: Cleaned MMWR data from preprocess.R (lowercase columns)
+#   - census: Census data for population denominators
+# Output: Data frame ready for PROPOSED_BM modeling
+#
+# Workflow position: trendy.R → PATH_ANALYSIS → PROPOSED_BM
+################################################################################
 PATH_ANALYSIS <- function(mmwrdata, census) {
   pathogens <- c("CAMPYLOBACTER", "CYCLOSPORA", "SALMONELLA", "SHIGELLA", "STEC", "VIBRIO", "YERSINIA", "LISTERIA", "STEC", "STEC NONO157","STEC O157")
   
@@ -88,7 +114,18 @@ PATH_ANALYSIS <- function(mmwrdata, census) {
   return(selectDf)
 }
 
-# CYCLOSPORA_ANALYSIS function
+################################################################################
+# CYCLOSPORA_ANALYSIS - Prepare Cyclospora (parasitic) data for modeling
+# 
+# Called by: trendy.R specifically for CYCLOSPORA pathogen
+# Inputs: 
+#   - mmwrdata: Cleaned MMWR data from preprocess.R (lowercase columns)
+#   - census: Census data with parasitic population denominators
+# Output: Data frame ready for PROPOSED_BM modeling
+#
+# Note: Uses different census data (Parasitic) than bacterial pathogens
+# Workflow position: trendy.R → CYCLOSPORA_ANALYSIS → PROPOSED_BM
+################################################################################
 CYCLOSPORA_ANALYSIS <- function(mmwrdata, census) {
   cyclo <- mmwrdata %>%
     filter(pathogen == "CYCLOSPORA") %>%
@@ -107,7 +144,18 @@ CYCLOSPORA_ANALYSIS <- function(mmwrdata, census) {
   return(cyclo)
 }
 
-# SALMONELLA_ANALYSIS function
+################################################################################
+# SALMONELLA_ANALYSIS - Prepare Salmonella-specific data for modeling
+# 
+# Called by: trendy.R specifically for SALMONELLA pathogen
+# Inputs: 
+#   - mmwrdata: Cleaned MMWR data from preprocess.R (lowercase columns)
+#   - census: Census data with bacterial population denominators
+# Output: Data frame ready for PROPOSED_BM modeling
+#
+# Note: Similar to PATH_ANALYSIS but Salmonella-specific
+# Workflow position: trendy.R → SALMONELLA_ANALYSIS → PROPOSED_BM
+################################################################################
 SALMONELLA_ANALYSIS <- function(mmwrdata, census) {
   sal <- mmwrdata %>%
     filter(pathogen == "SALMONELLA") %>%
@@ -126,7 +174,26 @@ SALMONELLA_ANALYSIS <- function(mmwrdata, census) {
   return(sal)
 }
 
-# PROPOSED_BM function - Updated to handle zero-count data
+################################################################################
+# PROPOSED_BM - Main Bayesian hierarchical modeling function
+# 
+# Called by: trendy.R after data preparation by PATH/CYCLOSPORA/SALMONELLA_ANALYSIS
+# Purpose: Fits a Bayesian hierarchical model with splines to estimate incidence rates
+# 
+# Inputs:
+#   - data: Prepared data frame with count, year, state, population columns
+#   - cores: Number of CPU cores for parallel processing
+#   - chains: Number of MCMC chains (default: 2, paper uses 6)
+#   - iterations: Iterations per chain (default: 500, paper uses 10,001)
+#   - adapt_delta: HMC adaptation parameter (default: 0.95)
+#   - max_treedepth: Maximum tree depth for HMC (default: 10)
+#   - seed: Random seed for reproducibility
+#
+# Output: brms model object with posterior samples
+#
+# Workflow position: Data preparation functions → PROPOSED_BM → Post-processing
+# Memory requirements: 48GB/56GB h_vmem for 6 chains, 64GB/72GB for 8 chains
+################################################################################
 PROPOSED_BM <- function(data, cores = 16, chains = 2, iterations = 500,
                         adapt_delta = 0.95, max_treedepth = 10, seed = 123) {
   # Ensure data is properly formatted
@@ -183,9 +250,21 @@ PROPOSED_BM <- function(data, cores = 16, chains = 2, iterations = 500,
   return(model)
 }
 
-# LINPREAD_DRAW_FN function
-## Draw untransformed (link-level) predictions for a new (or the original) data using add_linpred (which is an alternate spelling of add_fitted_draws) and transform them
-## This generates a distribution of estimates for each site
+################################################################################
+# LINPREAD_DRAW_FN - Extract posterior predictions from fitted model
+# 
+# Called by: trendy.R after PROPOSED_BM completes successfully
+# Purpose: Generate posterior draws of incidence rates for each state-year
+# 
+# Inputs:
+#   - data: Original data used in model fitting
+#   - model: Fitted brms model object from PROPOSED_BM
+#
+# Output: Data frame with posterior draws and calculated incidence rates
+# Note: Uses add_linpred_draws to get untransformed predictions
+#
+# Workflow position: PROPOSED_BM → LINPREAD_DRAW_FN → CATCHMENT
+################################################################################
 LINPREAD_DRAW_FN <- function(data, model) {
   # Prepare data: convert to tibble, ungroup, add a row identifier, and force the Population column to be numeric.
   data <- as_tibble(data) %>%
@@ -231,9 +310,17 @@ LINPREAD_DRAW_FN <- function(data, model) {
   })
 }
 
-# Implementation of CATCHMENT function
-## Convert draws from site-level to catchment-level estimates
-## This uses the output from LINPREAD_DRAW_FN
+################################################################################
+# CATCHMENT - Aggregate state-level draws to catchment-level estimates
+# 
+# Called by: trendy.R after LINPREAD_DRAW_FN
+# Purpose: Combine state-level posterior draws into overall catchment estimates
+# 
+# Input: Posterior draws from LINPREAD_DRAW_FN (state-level)
+# Output: Catchment-level aggregated draws
+#
+# Workflow position: LINPREAD_DRAW_FN → CATCHMENT → LINPRED_TO_CATCHIR
+################################################################################
 CATCHMENT <- function(draws) {
   # Group by relevant variables and calculate summary statistics
   catchment_data <- draws %>%
@@ -249,8 +336,18 @@ CATCHMENT <- function(draws) {
   return(catchment_data)
 }
 
-# Implementation of LINPRED_TO_CATCHIR function
-## Convert catchment-level draws to catchment-level estimates, including equal-tailed credibility interval
+################################################################################
+# LINPRED_TO_CATCHIR - Calculate summary statistics for catchment-level data
+# 
+# Called by: trendy.R after CATCHMENT
+# Purpose: Convert posterior draws to point estimates and credible intervals
+# 
+# Input: Catchment-level draws from CATCHMENT function
+# Output: Summary statistics (median, mean, CI) for catchment incidence rates
+# Note: Uses median as primary estimate (more robust for skewed distributions)
+#
+# Workflow position: CATCHMENT → LINPRED_TO_CATCHIR → CSV output
+################################################################################
 LINPRED_TO_CATCHIR <- function(catchment_data) {
   ir_data<-catchment_data %>% 
     group_by(year) %>% 
@@ -277,8 +374,18 @@ LINPRED_TO_CATCHIR <- function(catchment_data) {
   return(ir_data)
 }
 
-# Implementation of LINPRED_TO_SITEIR function
-## Convert catchment-level draws to catchment-level estimates, including equal-tailed credibility interval
+################################################################################
+# LINPRED_TO_SITEIR - Calculate summary statistics for state-level data
+# 
+# Called by: trendy.R after LINPREAD_DRAW_FN
+# Purpose: Convert posterior draws to point estimates and credible intervals by state
+# 
+# Input: State-level draws from LINPREAD_DRAW_FN
+# Output: Summary statistics (median, mean, CI) for state-specific incidence rates
+# Note: Parallel to LINPRED_TO_CATCHIR but maintains state-level granularity
+#
+# Workflow position: LINPREAD_DRAW_FN → LINPRED_TO_SITEIR → PLOT_SITE_TRENDS
+################################################################################
 LINPRED_TO_SITEIR <- function(site_data) {
   ir_data<-site_data %>% 
     group_by(year, state) %>% 
@@ -306,9 +413,21 @@ LINPRED_TO_SITEIR <- function(site_data) {
   return(ir_data)
 }
 
-##### stopped work here.
-
-# New function: Plot site-specific trends
+################################################################################
+# PLOT_SITE_TRENDS - Generate state-specific trend plots
+# 
+# Called by: trendy.R after LINPRED_TO_SITEIR
+# Purpose: Create faceted plots showing incidence trends by state
+# 
+# Inputs:
+#   - site: State-level summary data from LINPRED_TO_SITEIR
+#   - pathogen: Name of pathogen for plot title
+#   - outDir: Output directory for saving plot
+#
+# Output: PNG file with state-specific trend plots
+#
+# Workflow position: LINPRED_TO_SITEIR → PLOT_SITE_TRENDS → PNG output
+################################################################################
 PLOT_SITE_TRENDS <- function(site, pathogen, outDir) {
   # Create a plot for each state showing trends over time
   p <- ggplot(site, aes(x = year, y = median_ir)) +
@@ -336,7 +455,21 @@ PLOT_SITE_TRENDS <- function(site, pathogen, outDir) {
   return(p)
 }
 
-# New function: Plot overall trend
+################################################################################
+# PLOT_OVERALL_TREND - Generate catchment-wide trend plot
+# 
+# Called by: trendy.R after LINPRED_TO_CATCHIR
+# Purpose: Create single plot showing overall catchment incidence trends
+# 
+# Inputs:
+#   - catchir_data: Catchment-level summary data from LINPRED_TO_CATCHIR
+#   - pathogen: Name of pathogen for plot title
+#   - outDir: Output directory for saving plot
+#
+# Output: PNG file with catchment-wide trend plot
+#
+# Workflow position: LINPRED_TO_CATCHIR → PLOT_OVERALL_TREND → PNG output
+################################################################################
 PLOT_OVERALL_TREND <- function(catchir_data, pathogen, outDir) {
 # Create the plot
   p <- ggplot(catchir_data, aes(x = year, y = median_ir)) +
@@ -362,7 +495,23 @@ PLOT_OVERALL_TREND <- function(catchir_data, pathogen, outDir) {
   return(p)
 }
 
-# Implementation of IR_COMP function for calculating relative risks
+################################################################################
+# IR_COMP_CATCH - Calculate incidence rate ratios between time periods
+# 
+# Called by: trendy.R to generate comparative statistics
+# Purpose: Compare incidence rates between specified years (e.g., 2023 vs 1996-1998)
+# 
+# Inputs:
+#   - catch: Raw posterior draws from CATCHMENT
+#   - catchir_data: Summary data from LINPRED_TO_CATCHIR
+#   - start_year, end_year: Years to compare
+#   - output_file: Optional CSV output path
+#
+# Output: Data frame with IRR estimates and confidence intervals
+# Note: Uses median() for robust estimation with skewed posteriors
+#
+# Workflow position: CATCHMENT → IR_COMP_CATCH → CSV output
+################################################################################
 IR_COMP_CATCH <- function(catch, catchir_data, start_year, end_year, output_file = NULL) {
   
   # Filter data for the comparison period
@@ -409,7 +558,7 @@ IR_COMP_CATCH <- function(catch, catchir_data, start_year, end_year, output_file
       relative_risk_est=median(relative_risk),
       percent_change_lower_hdi = (hdi(percent_change, credMass = 0.95)[1]),
       percent_change_upper_hdi = (hdi(percent_change, credMass = 0.95)[2]),
-      percent_change_est=median(percent_change))%>% # should we do the mean or median?
+      percent_change_est=median(percent_change))%>% # Using median as it's more robust for potentially skewed posterior distributions
     mutate(comparison_period = paste0(start_year, "-", end_year))
   # Calculate relative risks for each year in the dataset relative to the baseline period
   # latest_year <- max(catchir_data$year) $ if you only want the more recent year, you can modify the code to use "latest_year"

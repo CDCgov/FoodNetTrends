@@ -8,6 +8,12 @@ work/
 dev_backups/
 bin/dev_backups/
 workflows/dev_backup/
+# backup folder
+backup/
+# TODO file
+TODO.md
+# archive folder for legacy/unnecessary files
+archive/
 # container
 foodnet.sif
 *.sif

@@ -15,7 +15,7 @@ process PREPROCESS {
 
     script:
     // Use absolute path to the script or a relative path from the current directory
-    def scriptPath = "${workflow.projectDir}/bin/calcIR.R"
+    def scriptPath = "${workflow.projectDir}/bin/preprocess.R"
 
     """
     Rscript ${scriptPath} \\
