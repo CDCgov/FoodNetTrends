@@ -112,8 +112,8 @@ workflow SPLINE {
                         error "Resource profile is empty - no pathogen data found"
                     }
                     def metrics = [:]
-                    tupleList.each { pathogen, data ->
-                        metrics[pathogen] = data
+                    tupleList.each { tuple ->
+                        metrics[tuple[0]] = tuple[1]
                     }
                     return metrics
                 }
@@ -142,8 +142,8 @@ workflow SPLINE {
                         error "Resource profile is empty - no pathogen data found"
                     }
                     def metrics = [:]
-                    tupleList.each { pathogen, data ->
-                        metrics[pathogen] = data
+                    tupleList.each { tuple ->
+                        metrics[tuple[0]] = tuple[1]
                     }
                     return metrics
                 }
@@ -241,8 +241,8 @@ workflow SPLINE {
             .map { tupleList ->
                 // Convert list of tuples into a map
                 def metrics = [:]
-                tupleList.each { pathogen, data ->
-                    metrics[pathogen] = data
+                tupleList.each { tuple ->
+                    metrics[tuple[0]] = tuple[1]
                 }
                 return metrics
             }
