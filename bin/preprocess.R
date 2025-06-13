@@ -331,7 +331,7 @@ mmwrdata <- mmwrdata %>%
 
 # --- Pathogen Standardization ---
 # Standardize pathogen names before any other processing
-standardization_result <- standardize_pathogens(mmwrdata, sensitivity = args$`matching-sensitivity`)
+standardization_result <- standardize_pathogens(mmwrdata, sensitivity = args$matching_sensitivity)
 mmwrdata <- standardization_result$data
 
 # Write standardization report
@@ -341,9 +341,9 @@ cat("Pathogen standardization report saved to:", report_file, "\n")
 
 # --- Data Cleaning: Recoding SERO Variables ---
 # Load serotype configuration (use defaults if no config file provided)
-serotype_config <- read_serotype_config(args$`serotype-config`)
-if (!is.null(args$`serotype-config`)) {
-  cat("Using serotype configuration from:", args$`serotype-config`, "\n")
+serotype_config <- read_serotype_config(args$serotype_config)
+if (!is.null(args$serotype_config)) {
+  cat("Using serotype configuration from:", args$serotype_config, "\n")
 } else {
   cat("Using default serotype configuration\n")
 }
