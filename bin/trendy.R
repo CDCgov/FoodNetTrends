@@ -525,9 +525,7 @@ for (pathogen_name in target_pathogens) {
     )
     
     # Construct output filename prefix including subgroup if specified
-    output_prefix <- ifelse(opts$subgroup == "combined", 
-                           pathogen_name, 
-                           paste(pathogen_name, opts$subgroup, sep="_"))
+    output_prefix <- paste(pathogen_name, opts$subgroup, sep="_")
     
     # Save model
     saveFile <- paste0(outDir, "/", output_prefix, "_brm.Rds")
