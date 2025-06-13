@@ -251,7 +251,7 @@ workflow SPLINE {
         if (params.pathogen == 'AUTO_DISCOVER') {
             // Extract pathogen list from metrics and create groupings
             pathogenGrouping = metricsChannel
-                .map { metrics ->
+                .flatMap { metrics ->
                     def pathogenList = metrics.keySet().toList()
                     if (pathogenList.isEmpty()) {
                         error "No pathogens found in preprocessed data. Check if preprocessing completed successfully."
@@ -259,7 +259,6 @@ workflow SPLINE {
                     log.info "Auto-discovered pathogens: ${pathogenList.join(', ')}"
                     return pathogenList
                 }
-                .flatMap()
                 .map { p -> "${p}:combined" }
             
             // Create pathogens channel for consistency
