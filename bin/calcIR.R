@@ -5,7 +5,6 @@
 # Purpose:
 #   This script cleans and aggregates raw MMWR SAS data and writes out a CSV file
 #   with standardized column names required for downstream analysis.
-#   Question - what is the benefit to having this as a separate function here, and in lines 204- of trendy.R?
 #
 #   The cleaning includes:
 #     - Reading the raw SAS file.
@@ -51,7 +50,7 @@ mmwrdata <- mmwrdata %>% rename_all(tolower)
 
 # --- Data Cleaning: Recoding SERO Variables ---
 # Define a list of SERO values to be considered non-informative.
-seroList <- c("NOT SPECIATED", "UNKNOWN", "PARTIAL SERO", "NOT SERO", "") # can we add a parameter to the function and to the code so folks can input a list of species and serotype values that should be re-coded as "Missing"
+seroList <- c("NOT SPECIATED", "UNKNOWN", "PARTIAL SERO", "NOT SERO", "")
 # Create a new column 'sero2': recode values in SERO1 that are in seroList as "Missing"
 mmwrdata$sero2 <- ifelse(mmwrdata$sero1 %in% seroList, "Missing", mmwrdata$sero1)
 # Further, if 'sero2' contains the string "UNDET", recode it to "Missing"
@@ -69,8 +68,9 @@ mmwrdata <- mmwrdata %>%
     county = if_else(county == "DE BACA", "DEBACA", county)
   )
 
-# Create separate data sets for each "group of pathogens that have unique exclusions. Note to adapt this to Non-FoodNet datasets
-# we will need to modify this code
+# Create separate data sets for each pathogen group with specific data requirements
+# FoodNet-specific logic: STEC is split into O157/non-O157 subtypes, and Listeria requires CSTE case definition filtering
+# To adapt for other surveillance systems: modify the pathogen list and filtering criteria below
 pathogens <- c("CAMPYLOBACTER", "CYCLOSPORA", "SALMONELLA", "SHIGELLA", "STEC", "VIBRIO", "YERSINIA")
 mmwrdata<-gtools::smartbind(as.data.frame(mmwrdata%>% filter(pathogen %in%  pathogens)), # all pathogens but Listeria
                             as.data.frame(mmwrdata%>% filter(pathogen == "STEC" & stec_class=="STEC O157")%>%mutate(pathogen="STEC O157")), # make a dataset for STEC O157
@@ -83,12 +83,12 @@ mmwrdata<-gtools::smartbind(as.data.frame(mmwrdata%>% filter(pathogen %in%  path
 # --- Standardize and Rename Key Columns ---
 # Ensure the raw data has the necessary columns and then rename them:
 # If the cleaned file still has lowercase names (e.g., 'pathogen', 'state', 'year'),
-# we explicitly rename them to the expected format. Why are we re-capitalizing things after converting to lower case?
+# we explicitly rename them to the expected format.
 # mmwrdata <- mmwrdata %>% rename(Pathogen = pathogen, State = state, Year = year)
 
 # --- Create or Verify Derived Columns ---
 # Create a derived column 'pathogentype' if not already present.
-# We assume that if Pathogen is one of "CRYPTOSPORIDIUM" or "CYCLOSPORA", it is "Parasitic"; otherwise "Bacterial".
+# Pathogen classification: CRYPTOSPORIDIUM and CYCLOSPORA are parasitic pathogens; all others are bacterial
 if(!"pathogentype" %in% names(mmwrdata)) {
   mmwrdata <- mmwrdata %>%
     mutate(pathogentype = ifelse(pathogen %in% c("CRYPTOSPORIDIUM", "CYCLOSPORA"), "Parasitic", "Bacterial"))

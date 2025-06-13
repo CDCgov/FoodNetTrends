@@ -1,7 +1,6 @@
 #!/usr/bin/env Rscript
 ################################################################################
-# can we add text similar to calcIR.R? 
-# functions.R
+# grab_snippet.R
 #
 # Purpose:
 #   This script ...

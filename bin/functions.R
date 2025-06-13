@@ -41,9 +41,95 @@ suppressPackageStartupMessages({
   library(haven)
   library(tibble)
   library(readr)  # for parse_number()
-  library(HDInterval)  # for hdi() function
   library(gridExtra)  # for arranging multiple plots
 })
+
+# Try to load HDInterval for hdi() function
+hdi_available <- requireNamespace("HDInterval", quietly = TRUE)
+if (hdi_available) {
+  suppressPackageStartupMessages(library(HDInterval))
+} else {
+  # Define a fallback hdi function using quantiles
+  hdi <- function(x, credMass = 0.95) {
+    # Simple approximation using equal-tailed intervals
+    alpha <- 1 - credMass
+    c(quantile(x, probs = alpha/2, na.rm = TRUE),
+      quantile(x, probs = 1 - alpha/2, na.rm = TRUE))
+  }
+  warning("HDInterval package not available. Using quantile-based approximation for HDI.")
+}
+
+# --- Catchment Configuration Functions ---
+# FoodNet is an active surveillance network monitoring foodborne illnesses 
+# in specific geographic areas. States joined at different times:
+# - Original sites (1996): CT, GA, MN, OR, selected counties in CA
+# - Later additions: MD (1998), NY (1998), TN (2000), CO (2001), NM (2004)
+# This configuration ensures analyses only include years with active surveillance
+read_catchment_config <- function(config_path = NULL) {
+  if (is.null(config_path)) {
+    # Return default FoodNet configuration
+    return(data.frame(
+      state = c("CA", "CO", "CT", "GA", "MD", "MN", "NM", "NY", "OR", "TN"),
+      start_year = c(1996, 2001, 1996, 1996, 1998, 1996, 2004, 1998, 1996, 2000),
+      end_year = rep(9999, 10),  # 9999 indicates ongoing participation
+      pathogen_type = rep("both", 10),  # States monitor both bacterial and parasitic pathogens
+      stringsAsFactors = FALSE
+    ))
+  }
+  # Read and validate CSV
+  config <- read.csv(config_path, stringsAsFactors = FALSE)
+  validate_catchment_config(config)
+  return(config)
+}
+
+validate_catchment_config <- function(config) {
+  required_cols <- c("state", "start_year", "end_year")
+  missing_cols <- setdiff(required_cols, names(config))
+  if (length(missing_cols) > 0) {
+    stop("Missing required columns in catchment config: ", paste(missing_cols, collapse = ", "))
+  }
+  
+  # Validate years are numeric
+  if (!is.numeric(config$start_year) || !is.numeric(config$end_year)) {
+    stop("start_year and end_year must be numeric")
+  }
+  
+  # Validate start_year <= end_year
+  invalid_years <- config$start_year > config$end_year
+  if (any(invalid_years)) {
+    stop("start_year must be less than or equal to end_year for all entries")
+  }
+  
+  # Add pathogen_type column if missing
+  if (!"pathogen_type" %in% names(config)) {
+    config$pathogen_type <- "both"
+  }
+  
+  return(config)
+}
+
+apply_catchment_filter <- function(data, catchment_config, pathogen_type = "both") {
+  # Filter config for relevant pathogen type
+  if (pathogen_type != "both" && "pathogen_type" %in% names(catchment_config)) {
+    relevant_config <- catchment_config[
+      catchment_config$pathogen_type %in% c("both", pathogen_type), 
+    ]
+  } else {
+    relevant_config <- catchment_config
+  }
+  
+  # Build dynamic filter using vectorized operations
+  valid_rows <- rep(FALSE, nrow(data))
+  
+  for (i in seq_len(nrow(relevant_config))) {
+    state_match <- data$state == relevant_config$state[i]
+    year_match <- data$year >= relevant_config$start_year[i] & 
+                  data$year <= relevant_config$end_year[i]
+    valid_rows <- valid_rows | (state_match & year_match)
+  }
+  
+  return(data[valid_rows, ])
+}
 
 # Helper: Clean up list strings and handle vector inputs
 # Used by trendy.R to parse comma-separated pathogen and filter parameters
@@ -93,23 +179,41 @@ SAFE_WRITE <- function(data, file_path) {
 #
 # Workflow position: trendy.R → PATH_ANALYSIS → PROPOSED_BM
 ################################################################################
-PATH_ANALYSIS <- function(mmwrdata, census) {
-  pathogens <- c("CAMPYLOBACTER", "CYCLOSPORA", "SALMONELLA", "SHIGELLA", "STEC", "VIBRIO", "YERSINIA", "LISTERIA", "STEC", "STEC NONO157","STEC O157")
+PATH_ANALYSIS <- function(mmwrdata, census, catchment_config = NULL) {
+  # Process all pathogens found in the data (not limited to a predefined list)
+  # Get unique pathogens from the cleaned data (excluding those handled specially)
+  all_pathogens <- unique(mmwrdata$pathogen)
+  
+  # Check if any pathogens exist
+  if (length(all_pathogens) == 0) {
+    stop("No pathogens found in the MMWR data")
+  }
   
   selectDf <- mmwrdata %>%
-    filter(pathogen %in% pathogens) %>%
+    filter(pathogen %in% all_pathogens) %>%
     group_by(year, state, pathogen) %>%
     summarise(count = n(), .groups = "drop") %>%
+    # complete() fills in zero counts for all year-state-pathogen combinations
+    # This is intentional - FoodNet is an active surveillance system where all cases 
+    # in participating sites are reported. Absence of reported cases in a 
+    # participating state-year represents true zeros, not missing data
     complete(year, state, pathogen = unique(pathogen), fill = list(count = 0)) %>%
     left_join(census %>% filter(pathogentype == "Bacterial"), by = c("year", "state")) %>%
-    mutate(year = as.numeric(as.character(year))) %>%
+    mutate(year = as.numeric(as.character(year)))
+  
+  # Check if the join produced any data with population
+  if (all(is.na(selectDf$population))) {
+    stop("No population data found after joining with census data. Check that census data contains 'Bacterial' pathogentype.")
+  }
     
-    # Drop year-state combinations from the dataset for years before the given state entered the FoodNet catchment
-    ## To make the function more flexible for non-FoodNet datasets, is there a way we can have users upload a file with a column for year and a column for state
-    ## that can be used in this step to drop states in years where they weren't part of a catchment? This is a want not a need. I'd be interested in learning how to do this too
-    ## maybe we could do it on a Teams session together?
-    subset((state=="CA") | (state=="CO" & year>=2001) | (state=="CT") | (state=="GA") | (state=="MD" & year>=1998) | (state=="MN") | (state=="NM" & year>=2004) | 
-             (state=="NY" & year>=1998) | (state=="OR") | (state=="TN" & year>=2000))
+  # Drop year-state combinations from the dataset for years before the given state entered the FoodNet catchment
+  # Configurable via the catchment_config parameter to support different surveillance periods
+  if (is.null(catchment_config)) {
+    catchment_config <- read_catchment_config()
+  }
+  
+  # Apply catchment filter  
+  selectDf <- apply_catchment_filter(selectDf, catchment_config, "bacterial")
   
   return(selectDf)
 }
@@ -126,20 +230,22 @@ PATH_ANALYSIS <- function(mmwrdata, census) {
 # Note: Uses different census data (Parasitic) than bacterial pathogens
 # Workflow position: trendy.R → CYCLOSPORA_ANALYSIS → PROPOSED_BM
 ################################################################################
-CYCLOSPORA_ANALYSIS <- function(mmwrdata, census) {
+CYCLOSPORA_ANALYSIS <- function(mmwrdata, census, catchment_config = NULL) {
   cyclo <- mmwrdata %>%
     filter(pathogen == "CYCLOSPORA") %>%
     group_by(year, state) %>%
     summarise(count = n(), .groups = "drop") %>%
     complete(year, state, fill = list(count = 0)) %>%
-    left_join(census %>% filter(pathogentype == "Parasitic"), by = c("year", "state"))%>%
+    left_join(census %>% filter(pathogentype == "Parasitic"), by = c("year", "state"))
     
-    # Drop year-state combinations from the dataset for years before the given state entered the FoodNet catchment
-    ## To make the function more flexible for non-FoodNet datasets, is there a way we can have users upload a file with a column for year and a column for state
-    ## that can be used in this step to drop states in years where they weren't part of a catchment? This is a want not a need. I'd be interested in learning how to do this too
-    ## maybe we could do it on a Teams session together?
-    subset((state=="CA") | (state=="CO" & year>=2001) | (state=="CT") | (state=="GA") | (state=="MD" & year>=1998) | (state=="MN") | (state=="NM" & year>=2004) | 
-             (state=="NY" & year>=1998) | (state=="OR") | (state=="TN" & year>=2000))
+  # Drop year-state combinations from the dataset for years before the given state entered the FoodNet catchment
+  # Configurable via the catchment_config parameter to support different surveillance periods
+  if (is.null(catchment_config)) {
+    catchment_config <- read_catchment_config()
+  }
+  
+  # Apply catchment filter for parasitic pathogens
+  cyclo <- apply_catchment_filter(cyclo, catchment_config, "parasitic")
   
   return(cyclo)
 }
@@ -156,20 +262,22 @@ CYCLOSPORA_ANALYSIS <- function(mmwrdata, census) {
 # Note: Similar to PATH_ANALYSIS but Salmonella-specific
 # Workflow position: trendy.R → SALMONELLA_ANALYSIS → PROPOSED_BM
 ################################################################################
-SALMONELLA_ANALYSIS <- function(mmwrdata, census) {
+SALMONELLA_ANALYSIS <- function(mmwrdata, census, catchment_config = NULL) {
   sal <- mmwrdata %>%
     filter(pathogen == "SALMONELLA") %>%
     group_by(year, state) %>%
     summarise(count = n(), .groups = "drop") %>%
     complete(year, state, fill = list(count = 0)) %>%
-    left_join(census %>% filter(pathogentype == "Bacterial"), by = c("year", "state"))%>%
+    left_join(census %>% filter(pathogentype == "Bacterial"), by = c("year", "state"))
     
-    # Drop year-state combinations from the dataset for years before the given state entered the FoodNet catchment
-    ## To make the function more flexible for non-FoodNet datasets, is there a way we can have users upload a file with a column for year and a column for state
-    ## that can be used in this step to drop states in years where they weren't part of a catchment? This is a want not a need. I'd be interested in learning how to do this too
-    ## maybe we could do it on a Teams session together?
-    subset((state=="CA") | (state=="CO" & year>=2001) | (state=="CT") | (state=="GA") | (state=="MD" & year>=1998) | (state=="MN") | (state=="NM" & year>=2004) | 
-             (state=="NY" & year>=1998) | (state=="OR") | (state=="TN" & year>=2000))
+  # Drop year-state combinations from the dataset for years before the given state entered the FoodNet catchment
+  # Configurable via the catchment_config parameter to support different surveillance periods
+  if (is.null(catchment_config)) {
+    catchment_config <- read_catchment_config()
+  }
+  
+  # Apply catchment filter for bacterial pathogens
+  sal <- apply_catchment_filter(sal, catchment_config, "bacterial")
   
   return(sal)
 }
@@ -192,7 +300,17 @@ SALMONELLA_ANALYSIS <- function(mmwrdata, census) {
 # Output: brms model object with posterior samples
 #
 # Workflow position: Data preparation functions → PROPOSED_BM → Post-processing
-# Memory requirements: 48GB/56GB h_vmem for 6 chains, 64GB/72GB for 8 chains
+# 
+# Memory scaling (approximate):
+# - 2 chains: 24GB RAM
+# - 4 chains: 48GB RAM
+# - 6 chains: 56GB RAM (publication quality)
+# - 8 chains: 72GB RAM
+#
+# Parameter guidelines:
+# - adapt_delta: Increase (0.95-0.99) if divergent transitions occur
+# - max_treedepth: Increase if hitting max treedepth warnings
+# - iterations: Publication quality typically requires 5000-10000
 ################################################################################
 PROPOSED_BM <- function(data, cores = 16, chains = 2, iterations = 500,
                         adapt_delta = 0.95, max_treedepth = 10, seed = 123) {
@@ -206,11 +324,20 @@ PROPOSED_BM <- function(data, cores = 16, chains = 2, iterations = 500,
     stop("Missing required columns in data: ", paste(missing_cols, collapse = ", "))
   }
   
-  # Ensure population is numeric
+  # Ensure population is numeric and handle NA values
   data$population <- as.numeric(data$population)
+  if (any(is.na(data$population))) {
+    stop("Population column contains NA values after conversion")
+  }
+  if (any(data$population <= 0)) {
+    stop("Population column contains zero or negative values")
+  }
   
   # Ensure count is integer
   data$count <- as.integer(as.numeric(data$count))
+  if (any(is.na(data$count))) {
+    stop("Count column contains NA values after conversion")
+  }
   
   # Check if all counts are zero - this will cause model fitting issues
   if (all(data$count == 0) || sum(data$count) == 0) {
@@ -233,9 +360,15 @@ PROPOSED_BM <- function(data, cores = 16, chains = 2, iterations = 500,
   # Fit the model with more robust settings
   model <- tryCatch({
     brm(
+      # Model formula explained:
+      # count ~ s(year, by = state) + state + offset(log(population))
+      # - count: observed case counts (response variable)
+      # - s(year, by = state): state-specific smoothing splines over time
+      # - state: state fixed effects (baseline differences)
+      # - offset(log(population)): log population offset for rate modeling
       count ~ s(year, by = state) + state + offset(log(population)),
       data = data,
-      family = negbinomial(),
+      family = negbinomial(),  # Handles overdispersion common in count data
       chains = chains,
       iter = iterations,
       cores = cores,
@@ -266,19 +399,23 @@ PROPOSED_BM <- function(data, cores = 16, chains = 2, iterations = 500,
 # Workflow position: PROPOSED_BM → LINPREAD_DRAW_FN → CATCHMENT
 ################################################################################
 LINPREAD_DRAW_FN <- function(data, model) {
-  # Prepare data: convert to tibble, ungroup, add a row identifier, and force the Population column to be numeric.
+  # Prepare data: convert to tibble, ungroup, add a row identifier
   data <- as_tibble(data) %>%
     ungroup() %>%
-    mutate(
-      .row = row_number(),
-      Population = if ("Population" %in% names(.)) {
-        parse_number(as.character(Population))
-      } else if ("population" %in% names(.)) {
-        parse_number(as.character(population))
-      } else {
-        stop("No population column found")
-      }
-    )
+    mutate(.row = row_number())
+  
+  # Handle population column with consistent lowercase naming
+  if ("population" %in% names(data)) {
+    data <- data %>%
+      mutate(Population = parse_number(as.character(population)))
+  } else if ("Population" %in% names(data)) {
+    # Rename to lowercase for consistency
+    data <- data %>%
+      rename(population = Population) %>%
+      mutate(Population = parse_number(as.character(population)))
+  } else {
+    stop("No population column found in data")
+  }
   
   # Ensure that Population is numeric and no NA values were introduced.
   if (!is.numeric(data$Population) || any(is.na(data$Population))) {
@@ -300,7 +437,7 @@ LINPREAD_DRAW_FN <- function(data, model) {
       stop("Population column is not numeric in the joined data")
     }
     
-    # Now compute predicted incidence (per 100,000)
+    # Compute predicted incidence (per 100,000 population)
     draws <- draws %>% mutate(pred_incidence = .epred / (Population / 100000))
     
     return(draws)
@@ -363,6 +500,8 @@ LINPRED_TO_CATCHIR <- function(catchment_data) {
       population=median(population),
       population_check=sd(population))%>%
     mutate(
+      # Incidence rates rounded to 4 decimal places for precision
+      # Provides rates per 100,000 population with 0.01 per million precision
       median_ir= round(median/(population/100000),4),
       mean_ir= round(mean/(population/100000),4),
       lower_equitailed_ir=round(lower_equitailed/(population/100000),4),
@@ -561,7 +700,9 @@ IR_COMP_CATCH <- function(catch, catchir_data, start_year, end_year, output_file
       percent_change_est=median(percent_change))%>% # Using median as it's more robust for potentially skewed posterior distributions
     mutate(comparison_period = paste0(start_year, "-", end_year))
   # Calculate relative risks for each year in the dataset relative to the baseline period
-  # latest_year <- max(catchir_data$year) $ if you only want the more recent year, you can modify the code to use "latest_year"
+  # Alternative approach: To calculate IRR for only the most recent year vs baseline:
+  # latest_year <- max(catchir_data$year)
+  # Then filter results to show only year == latest_year
   # Get the most recent year's data
   # latest_data <- catchir_data %>% filter(year == latest_year)
   

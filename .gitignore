@@ -1,4 +1,6 @@
 # nextflow
+/nf-core/
+
 *.old
 .nextflow/
 .nextflow.log*
@@ -35,3 +37,12 @@ null/
 *.log*
 FoodNetTrends.*
 results/
+
+# R output files
+*.Rout
+
+# Process ID files
+*.pid
+
+# Generated output files in bin
+bin/file_headers_output.txt

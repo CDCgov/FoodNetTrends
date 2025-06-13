@@ -1,0 +1,9 @@
+serotype_value,replacement,pathogen,match_type,notes
+NOT SPECIATED,Missing,all,exact,Default missing value
+UNKNOWN,Missing,all,exact,Default missing value  
+PARTIAL SERO,Missing,all,exact,Default missing value
+NOT SERO,Missing,all,exact,Default missing value
+"",Missing,all,exact,Empty string missing value
+UNDET,Missing,all,contains,Pattern-based rule for undetermined
+ROUGH,Missing,SALMONELLA,exact,Salmonella-specific non-informative value
+NONTYPEABLE,Missing,SALMONELLA,exact,Salmonella-specific non-informative value

@@ -7,7 +7,9 @@ process TRENDY {
     publishDir "${params.outdir}/${projID}/spline_results", mode: 'copy'
 
     input:
-    val pathogen
+    val pathogenGrouping    // Full grouping string (e.g., "SALMONELLA:Enteritidis")
+    val pathogen           // Base pathogen name (e.g., "SALMONELLA")
+    val subgroup          // Subgroup identifier (e.g., "Enteritidis" or "combined")
     path mmwrFile
     path censusFileB
     path censusFileP
@@ -17,28 +19,41 @@ process TRENDY {
     val whichScript
     val preprocessed
     path cleanFile
+    val dataMetrics
+    path catchmentConfig
 
     output:
-    path "${pathogen}_brm.Rds", emit: rds, optional: true
-    path "${pathogen}_IRCatch.csv", emit: csv, optional: true
-    path "${pathogen}*.png", emit: png, optional: true
-    path "${pathogen}*_EstIRRCatch_*.csv", emit: irr, optional: true
-    path "${pathogen}_summary.txt", emit: summary, optional: true
-    path "${pathogen}_error.txt", optional: true, emit: errors
+    path "${pathogenGrouping.replaceAll(':', '_')}_brm.Rds", emit: rds, optional: true
+    path "${pathogenGrouping.replaceAll(':', '_')}_IRCatch.csv", emit: csv, optional: true
+    path "${pathogenGrouping.replaceAll(':', '_')}*.png", emit: png, optional: true
+    path "${pathogenGrouping.replaceAll(':', '_')}*_EstIRRCatch_*.csv", emit: irr, optional: true
+    path "${pathogenGrouping.replaceAll(':', '_')}_summary.txt", emit: summary, optional: true
+    path "${pathogenGrouping.replaceAll(':', '_')}_error.txt", optional: true, emit: errors
 
     errorStrategy { task.exitStatus in [143,137,104,134,139] ? 'retry' : 'finish' }
     maxRetries 3
 
     script:
+    // Set data metrics in task.ext for resource allocation
+    task.ext.dataMetrics = dataMetrics
+    
+    // Log resource allocation for this pathogen
+    log.info "Pathogen: ${pathogen}, Rows: ${dataMetrics?.rows ?: 'unknown'}, " +
+             "Complexity: ${dataMetrics?.complexity ?: 'unknown'}, " +
+             "Allocated CPUs: ${task.cpus}, Memory: ${task.memory}"
+    
     // Properly handle the cleanFile parameter
     def cleanFileParam = ""
     if (preprocessed) {
-        if (cleanFile) {
+        if (cleanFile && cleanFile.name != 'NO_FILE') {
             cleanFileParam = "--cleanFile ${cleanFile}"
         } else {
-            log.warn "Preprocessing enabled but no clean file provided for pathogen: ${pathogen}"
+            error "Preprocessing enabled but no clean file provided for pathogen: ${pathogen}"
         }
     }
+    
+    // Handle catchment config parameter
+    def catchmentConfigArg = catchmentConfig.name != 'NO_FILE' ? "--catchment-config ${catchmentConfig}" : ""
 
     """
     # Copy functions.R to the current directory
@@ -59,6 +74,7 @@ process TRENDY {
       --projID ${projID} \\
       --outDir . \\
       --pathogen ${pathogen} \\
+      --subgroup ${subgroup} \\
       --preprocessed ${preprocessed} \\
       ${cleanFileParam} \\
       --cores ${task.cpus} \\
@@ -67,6 +83,7 @@ process TRENDY {
       --adapt_delta ${params.adapt_delta} \\
       --max_treedepth ${params.max_treedepth} \\
       --seed ${params.seed} \\
+      ${catchmentConfigArg} \\
       --debug FALSE
     """
 }

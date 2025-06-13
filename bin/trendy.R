@@ -6,7 +6,6 @@
 # foodborne illness surveillance data from the FoodNet program. It processes
 # multiple pathogens, fits models, and generates incidence rate estimates.
 
-## Can we also add an explanation for how to run this as a single model and in parallel - can we add this here and in the webpage?
 #
 # Usage:
 #   ...
@@ -89,6 +88,8 @@ parser$add_argument("--outDir", type="character", default="output",
                     help="Base output directory (default: output)")
 parser$add_argument("--pathogen", type="character",
                     help="Specific pathogen to analyze (if not processing all)")
+parser$add_argument("--subgroup", type="character", default="combined",
+                    help="Pathogen subgroup to analyze (e.g., O157, Enteritidis)")
 
 # Preprocessing parameters
 parser$add_argument("--preprocessed", type="logical", default=FALSE,
@@ -109,6 +110,10 @@ parser$add_argument("--max_treedepth", type="integer", default=10,
                     help="Maximum tree depth for MCMC (default: 10)")
 parser$add_argument("--seed", type="integer", default=123,
                     help="Random seed for reproducibility (default: 123)")
+
+# Configuration parameters
+parser$add_argument("--catchment-config", type="character", default=NULL,
+                    help="Path to CSV file with catchment definitions (optional)")
 
 # Debug mode
 parser$add_argument("--debug", type="logical", default=FALSE,
@@ -299,14 +304,22 @@ report_progress("ANALYSIS DETAILS", message=paste0(
 # Import MMWR data
 report_progress("DATA", message="Importing MMWR data")
 tryCatch({
-  # When using Nextflow pipeline, data should always be preprocessed
-  if (!preprocessed || is.null(cleanFile) || !file.exists(cleanFile)) {
-    stop("This script requires preprocessed data. Please ensure preprocess.R has been run first.")
+  # Check if we're using preprocessed data
+  if (preprocessed) {
+    # Validate that cleanFile is provided and exists
+    if (is.null(cleanFile) || cleanFile == "") {
+      stop("preprocessed=TRUE but no cleanFile path provided")
+    }
+    if (!file.exists(cleanFile)) {
+      stop("Preprocessed file not found: ", cleanFile)
+    }
+    report_progress("DATA", message=paste("Using preprocessed data from:", cleanFile))
+    # Read the preprocessed CSV file
+    mmwrdata <- readr::read_csv(cleanFile, show_col_types = FALSE)
+  } else {
+    # This should not happen in the Nextflow pipeline context
+    stop("This script is designed to work with preprocessed data. Please ensure preprocess.R has been run first.")
   }
-  
-  report_progress("DATA", message=paste("Using preprocessed data from:", cleanFile))
-  # Read the preprocessed CSV file
-  mmwrdata <- readr::read_csv(cleanFile, show_col_types = FALSE)
   
   # Apply filters specific to this analysis
   mmwrdata <- mmwrdata %>%
@@ -353,13 +366,31 @@ tryCatch({
 })
 
 ##############################################################
+# Load Catchment Configuration
+##############################################################
+
+# Load catchment configuration if provided
+catchment_config <- NULL
+if (!is.null(opts$`catchment-config`)) {
+  report_progress("CONFIG", message=paste("Loading catchment configuration from:", opts$`catchment-config`))
+  tryCatch({
+    catchment_config <- read_catchment_config(opts$`catchment-config`)
+    report_progress("CONFIG", message=paste("Loaded catchment configuration with", nrow(catchment_config), "sites"))
+  }, error = function(e) {
+    stop("Error loading catchment configuration: ", e$message)
+  })
+} else {
+  report_progress("CONFIG", message="Using default FoodNet catchment definitions")
+}
+
+##############################################################
 # Pathogen Analysis
 ##############################################################
 
 # Process pathogen data
 report_progress("ANALYSIS", message="Processing pathogen data")
 tryCatch({
-  pathDf <- PATH_ANALYSIS(mmwrdata, census)%>%as.data.frame()
+  pathDf <- PATH_ANALYSIS(mmwrdata, census, catchment_config)%>%as.data.frame()
   report_progress("ANALYSIS", message=paste("Processed",
                                             length(unique(pathDf$pathogen)),
                                             "pathogens"))
@@ -367,10 +398,10 @@ tryCatch({
   # Process Cyclospora and Salmonella if CIDT+ is included
   if("CIDT+" %in% cidt) {
     report_progress("ANALYSIS", message="Processing Cyclospora data")
-    cyloDF <- CYCLOSPORA_ANALYSIS(mmwrdata, census)%>%as.data.frame()
+    cyloDF <- CYCLOSPORA_ANALYSIS(mmwrdata, census, catchment_config)%>%as.data.frame()
     
     report_progress("ANALYSIS", message="Processing Salmonella data")
-    salDF <- SALMONELLA_ANALYSIS(mmwrdata, census)%>%as.data.frame()
+    salDF <- SALMONELLA_ANALYSIS(mmwrdata, census, catchment_config)%>%as.data.frame()
     
     # Combine all pathogen data
     bact <- gtools::smartbind(pathDf, cyloDF) %>%
@@ -389,47 +420,69 @@ tryCatch({
   if (!is.null(opts$pathogen)) {
     # If a specific pathogen was requested, filter for it
     bact <- subset(bact, pathogen == opts$pathogen)
+    
+    # Further filter by subgroup if specified
+    if (opts$subgroup != "combined") {
+      # Handle different subgroup types
+      if (opts$pathogen == "STEC" && opts$subgroup %in% c("O157", "nonO157")) {
+        # For STEC, need to create the subgroups based on stec_class
+        if ("stec_class" %in% names(bact)) {
+          if (opts$subgroup == "O157") {
+            bact <- subset(bact, stec_class == "STEC O157")
+          } else if (opts$subgroup == "nonO157") {
+            bact <- subset(bact, stec_class %in% c("STEC NONO157", "STEC O AG UNDET"))
+          }
+        } else {
+          report_progress("WARNING", message="stec_class column not found - cannot filter by STEC subgroup")
+        }
+      } else if (opts$pathogen == "SALMONELLA") {
+        # For Salmonella, filter by serotype
+        if ("serotypesummary" %in% names(bact)) {
+          bact <- subset(bact, serotypesummary == opts$subgroup)
+        } else {
+          report_progress("WARNING", message="serotypesummary column not found - cannot filter by serotype")
+        }
+      }
+    }
+    
     if (nrow(bact) == 0) {
-      # No data found for the requested pathogen
-      report_progress("ERROR", message=paste("No data found for pathogen:", opts$pathogen))
+      # No data found for the requested pathogen/subgroup
+      pathogen_desc <- ifelse(opts$subgroup == "combined", 
+                              opts$pathogen, 
+                              paste(opts$pathogen, opts$subgroup, sep=":"))
+      report_progress("ERROR", message=paste("No data found for:", pathogen_desc))
       
       # Create error file for this pathogen
-      error_file <- paste0(outDir, "/", opts$pathogen, "_error.txt")
+      error_file <- paste0(outDir, "/", opts$pathogen, "_", opts$subgroup, "_error.txt")
       error_content <- c(
-        paste("ERROR: No data found for pathogen:", opts$pathogen),
+        paste("ERROR: No data found for:", pathogen_desc),
         paste("Date:", Sys.time()),
         paste("Project ID:", projID),
         "",
-        "This pathogen had no cases in the dataset after applying the following filters:",
+        "This pathogen/subgroup had no cases in the dataset after applying the following filters:",
+        paste("- Pathogen:", opts$pathogen),
+        paste("- Subgroup:", opts$subgroup),
         paste("- Travel types:", paste(travel, collapse=", ")),
         paste("- CIDT types:", paste(cidt, collapse=", ")),
         paste("- Time period: Check your input data file"),
         "",
         "Please verify:",
         "1. The pathogen name is spelled correctly",
-        "2. The pathogen exists in your MMWR data file",
+        "2. The subgroup/serotype exists in your data",
         "3. The filters (travel, CIDT) are not excluding all cases"
       )
       writeLines(error_content, error_file)
       
-      # Create empty summary file to satisfy pipeline expectations
-      summary_file <- paste0(outDir, "/", opts$pathogen, "_summary.txt")
-      writeLines("No data available for analysis - see error file for details", summary_file)
-      
-      # Create empty CSV files that might be expected by downstream processes
-      ir_file <- paste0(outDir, "/", opts$pathogen, "_IRCatch.csv")
-      write.csv(data.frame(message = "No data available"), ir_file, row.names = FALSE)
-      
-      # Exit gracefully with status 0 so other pathogens can continue
-      quit(save = "no", status = 0)
+      # Exit with error status to indicate failure
+      stop(paste("No data found for:", pathogen_desc, "- see error file for details"))
     }
   } else {
-    # Otherwise use the default filtering from the original code
-    bact <- subset(bact, pathogen == "CAMPYLOBACTER" | pathogen == "CYCLOSPORA")
+    # No specific pathogen requested - analyze all pathogens in the data
+    report_progress("ANALYSIS", message="No specific pathogen requested, analyzing all pathogens in dataset")
     
-    # Check if any data exists for the default pathogens
+    # Check if any data exists
     if (nrow(bact) == 0) {
-      stop("No data found for default pathogens (CAMPYLOBACTER or CYCLOSPORA)")
+      stop("No data found after applying filters")
     }
   }
   
@@ -471,13 +524,18 @@ for (pathogen_name in target_pathogens) {
       seed = seed
     )
     
+    # Construct output filename prefix including subgroup if specified
+    output_prefix <- ifelse(opts$subgroup == "combined", 
+                           pathogen_name, 
+                           paste(pathogen_name, opts$subgroup, sep="_"))
+    
     # Save model
-    saveFile <- paste0(outDir, "/", pathogen_name, "_brm.Rds")
+    saveFile <- paste0(outDir, "/", output_prefix, "_brm.Rds")
     saveRDS(proposed, saveFile)
     report_progress("MODEL", message=paste("Saved model to", saveFile))
     
     # Save model summary
-    summaryFile <- paste0(outDir, "/", pathogen_name, "_summary.txt")
+    summaryFile <- paste0(outDir, "/", output_prefix, "_summary.txt")
     sink(summaryFile)
     print(summary(proposed))
     sink()
@@ -499,7 +557,7 @@ for (pathogen_name in target_pathogens) {
     site$culture <- culture
     
     # Save site-level estimates
-    siteir_file <- paste0(outDir, "/", pathogen_name, "_IRSite.csv")
+    siteir_file <- paste0(outDir, "/", output_prefix, "_IRSite.csv")
     write.csv(site, siteir_file, row.names = FALSE)
     report_progress("OUTPUT", message=paste("Saved site incidence rate estimates to", siteir_file))
     
@@ -517,7 +575,7 @@ for (pathogen_name in target_pathogens) {
     catchir.linpred$culture <- culture
     
     # Save estimates
-    ir_file <- paste0(outDir, "/", pathogen_name, "_IRCatch.csv")
+    ir_file <- paste0(outDir, "/", output_prefix, "_IRCatch.csv")
     write.csv(catchir.linpred, ir_file, row.names = FALSE)
     report_progress("OUTPUT", message=paste("Saved incidence rate estimates to", ir_file))
     
@@ -526,27 +584,40 @@ for (pathogen_name in target_pathogens) {
     
     # Calculate for 2016-2018 (the Healthy People 2030 baseline period)
     hp30<-IR_COMP_CATCH(catch, catchir.linpred, 2016, 2018,
-                  paste0(outDir, "/", pathogen_name, "_EstIRRCatch_2016_2018.csv"))
+                  paste0(outDir, "/", output_prefix, "_EstIRRCatch_2016_2018.csv"))
     
     # Calculate for COVID-19
     IR_COMP_CATCH(catch, catchir.linpred, 2020, 2021,
-                  paste0(outDir, "/", pathogen_name, "_EstIRRCatch_2020_2022.csv"))
+                  paste0(outDir, "/", output_prefix, "_EstIRRCatch_2020_2022.csv"))
     
     # Calculate for earliest years where the FoodNet catchment were stable
     IR_COMP_CATCH(catch, catchir.linpred, 2004, 2006,
-                  paste0(outDir, "/", pathogen_name, "_EstIRRCatch_2004_2006.csv"))
+                  paste0(outDir, "/", output_prefix, "_EstIRRCatch_2004_2006.csv"))
     
     # Calculate for 2006-2008 baseline (the Healthy People 2020 baseline)
     IR_COMP_CATCH(catch, catchir.linpred, 2006, 2008,
-                  paste0(outDir, "/", pathogen_name, "_EstIRRCatch_2006_2008.csv"))
+                  paste0(outDir, "/", output_prefix, "_EstIRRCatch_2006_2008.csv"))
     
     # Create visualizations if enabled
     if (requireNamespace("ggplot2", quietly = TRUE)) {
-      # Site-specific trends plot
-      site_plot <- PLOT_SITE_TRENDS(site, pathogen_name, outDir)
-      
-      # Overall trend plot
-      overall_plot <- PLOT_OVERALL_TREND(catchir.linpred, pathogen_name, outDir)
+      tryCatch({
+        # Check if plotting functions exist before calling them
+        if (exists("PLOT_SITE_TRENDS", mode = "function")) {
+          # Site-specific trends plot
+          site_plot <- PLOT_SITE_TRENDS(site, pathogen_name, outDir)
+          ggsave(paste0(outDir, "/", output_prefix, "_site_trends.png"), site_plot, 
+                 width = 10, height = 8, dpi = 300)
+        }
+        
+        if (exists("PLOT_OVERALL_TREND", mode = "function")) {
+          # Overall trend plot
+          overall_plot <- PLOT_OVERALL_TREND(catchir.linpred, pathogen_name, outDir)
+          ggsave(paste0(outDir, "/", output_prefix, "_overall_trend.png"), overall_plot,
+                 width = 10, height = 6, dpi = 300)
+        }
+      }, error = function(e) {
+        report_progress("WARNING", message=paste("Visualization skipped:", e$message))
+      })
     }
     
     report_progress("COMPLETE", message=paste("Completed analysis for", pathogen_name))
