@@ -93,31 +93,25 @@ workflow SPLINE {
         
         if (resourceProfile.exists()) {
             log.info "Using existing resource profile: ${resourceProfilePath}"
-            // Read the CSV directly
-            metricsChannel = Channel.fromPath(resourceProfilePath)
-                .splitCsv(header: true, sep: ',', strip: true)
-                .map { row ->
-                    // Each row is a map with the CSV columns
-                    tuple(row.pathogen, [
-                        rows: row.rows as Integer,
-                        sites: row.sites as Integer,
-                        years: row.years as Integer,
-                        complexity: row.complexity as Long,
-                        size_category: row.size_category
-                    ])
-                }
-                .collect() // Collect all tuples into a list
-                .map { tupleList ->
-                    // Convert list of tuples into a map
-                    if (tupleList.isEmpty()) {
-                        error "Resource profile is empty - no pathogen data found"
-                    }
-                    def metrics = [:]
-                    tupleList.each { tuple ->
-                        metrics[tuple[0]] = tuple[1]
-                    }
-                    return metrics
-                }
+            // Read the CSV directly and create metrics map
+            def metricsMap = [:]
+            resourceProfile.splitCsv(header: true, sep: ',', strip: true).each { row ->
+                log.debug "CSV row: ${row}"
+                metricsMap[row.pathogen] = [
+                    rows: row.rows as Integer,
+                    sites: row.sites as Integer,
+                    years: row.years as Integer,
+                    complexity: row.complexity as Long,
+                    size_category: row.size_category
+                ]
+            }
+            
+            if (metricsMap.isEmpty()) {
+                error "Resource profile is empty - no pathogen data found"
+            }
+            
+            log.info "Loaded metrics for pathogens: ${metricsMap.keySet().join(', ')}"
+            metricsChannel = Channel.value(metricsMap)
         } else {
             log.info "Generating resource profile for preprocessed data"
             // Run resource profiler
