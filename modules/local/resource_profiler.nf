@@ -11,6 +11,9 @@ process RESOURCE_PROFILER {
 
     output:
     path "resource_profile.csv", emit: profile
+    path "metadata_states.csv", emit: states_metadata
+    path "metadata_cidt.csv", emit: cidt_metadata
+    path "metadata_travel.csv", emit: travel_metadata
 
     script:
     """
@@ -18,6 +21,7 @@ process RESOURCE_PROFILER {
     suppressPackageStartupMessages({
         library(dplyr)
         library(readr)
+        library(tidyr)
     })
 
     # Read the cleaned data
@@ -61,8 +65,48 @@ process RESOURCE_PROFILER {
         stop("No valid pathogens found in the data. Check if the pathogen column contains proper pathogen names.")
     }
     
-    # Write to CSV
+    # Extract state metadata
+    state_metrics <- data %>%
+        filter(!is.na(state)) %>%
+        group_by(state) %>%
+        summarise(
+            first_year = min(year, na.rm = TRUE),
+            last_year = max(year, na.rm = TRUE),
+            total_cases = n(),
+            n_pathogens = n_distinct(pathogen),
+            .groups = 'drop'
+        ) %>%
+        arrange(state)
+    
+    # Extract CIDT metadata
+    cidt_metrics <- data %>%
+        filter(!is.na(cxcidt)) %>%
+        group_by(cxcidt) %>%
+        summarise(
+            count = n(),
+            first_year = min(year, na.rm = TRUE),
+            last_year = max(year, na.rm = TRUE),
+            percentage = round(n() / nrow(data) * 100, 1),
+            .groups = 'drop'
+        ) %>%
+        arrange(desc(count))
+    
+    # Extract travel metadata
+    travel_metrics <- data %>%
+        filter(!is.na(travelint)) %>%
+        group_by(travelint) %>%
+        summarise(
+            count = n(),
+            percentage = round(n() / nrow(data) * 100, 1),
+            .groups = 'drop'
+        ) %>%
+        arrange(desc(count))
+    
+    # Write all CSV files
     write_csv(pathogen_metrics, "resource_profile.csv")
+    write_csv(state_metrics, "metadata_states.csv")
+    write_csv(cidt_metrics, "metadata_cidt.csv")
+    write_csv(travel_metrics, "metadata_travel.csv")
     
     # Print summary for logging
     cat("\\nResource Profile Summary:\\n")
@@ -75,6 +119,37 @@ process RESOURCE_PROFILER {
                     pathogen_metrics\$years[i], 
                     pathogen_metrics\$complexity[i], 
                     pathogen_metrics\$size_category[i]))
+    }
+    
+    # Print state summary
+    cat("\\n\\nState Summary:\\n")
+    cat("==============\\n")
+    for (i in 1:nrow(state_metrics)) {
+        cat(sprintf("%-2s: %4d-%4d, %6d cases\\n", 
+                    state_metrics\$state[i], 
+                    state_metrics\$first_year[i], 
+                    state_metrics\$last_year[i], 
+                    state_metrics\$total_cases[i]))
+    }
+    
+    # Print CIDT summary
+    cat("\\n\\nDiagnostic Method Summary:\\n")
+    cat("=========================\\n")
+    for (i in 1:nrow(cidt_metrics)) {
+        cat(sprintf("%-10s: %6d cases (%.1f%%)\\n", 
+                    cidt_metrics\$cxcidt[i], 
+                    cidt_metrics\$count[i], 
+                    cidt_metrics\$percentage[i]))
+    }
+    
+    # Print travel summary
+    cat("\\n\\nTravel Status Summary:\\n")
+    cat("=====================\\n")
+    for (i in 1:nrow(travel_metrics)) {
+        cat(sprintf("%-7s: %6d cases (%.1f%%)\\n", 
+                    travel_metrics\$travelint[i], 
+                    travel_metrics\$count[i], 
+                    travel_metrics\$percentage[i]))
     }
     """
 }

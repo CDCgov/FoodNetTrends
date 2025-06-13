@@ -196,6 +196,71 @@ handle_pathogen_grouping() {
     echo "$grouping"
 }
 
+# Function to extract states from metadata file
+extract_states_from_data() {
+    local metadata_dir=$1
+    local states_file="${metadata_dir}/metadata_states.csv"
+    
+    if [[ -f "$states_file" ]]; then
+        # Read and format state data
+        awk -F',' 'NR>1 {
+            printf "%s,%d,%d,%d\n", $1, $2, $3, $4
+        }' "$states_file"
+        return 0
+    else
+        return 1
+    fi
+}
+
+# Function to extract CIDT methods from metadata file
+extract_cidt_from_data() {
+    local metadata_dir=$1
+    local cidt_file="${metadata_dir}/metadata_cidt.csv"
+    
+    if [[ -f "$cidt_file" ]]; then
+        # Read and format CIDT data
+        awk -F',' 'NR>1 {
+            printf "%s,%d,%.1f\n", $1, $2, $5
+        }' "$cidt_file"
+        return 0
+    else
+        return 1
+    fi
+}
+
+# Function to extract travel statuses from metadata file
+extract_travel_from_data() {
+    local metadata_dir=$1
+    local travel_file="${metadata_dir}/metadata_travel.csv"
+    
+    if [[ -f "$travel_file" ]]; then
+        # Read and format travel data
+        awk -F',' 'NR>1 {
+            printf "%s,%d,%.1f\n", $1, $2, $3
+        }' "$travel_file"
+        return 0
+    else
+        return 1
+    fi
+}
+
+# Function to display state names
+get_state_name() {
+    case $1 in
+        CA) echo "California" ;;
+        CO) echo "Colorado" ;;
+        CT) echo "Connecticut" ;;
+        GA) echo "Georgia" ;;
+        MD) echo "Maryland" ;;
+        MN) echo "Minnesota" ;;
+        NM) echo "New Mexico" ;;
+        NY) echo "New York" ;;
+        OR) echo "Oregon" ;;
+        TN) echo "Tennessee" ;;
+        *) echo "$1" ;;
+    esac
+}
+
 echo -e "${BLUE}=========================================${NC}"
 echo -e "${BLUE}   FoodNet Trends Analysis Pipeline      ${NC}"
 echo -e "${BLUE}=========================================${NC}"
@@ -754,6 +819,201 @@ if [[ "$flag" != "resume" ]] && [[ "$pathogens" != "AUTO_DISCOVER" ]]; then
     pathogen_grouping="$grouped_pathogens"
 fi
 
+# State selection
+selected_states=""
+if [[ "$flag" != "resume" ]]; then
+    echo ""
+    echo -e "${BLUE}======== State Selection ========${NC}"
+    
+    # Try to get metadata if using preprocessed data
+    metadata_available=false
+    if [[ "$use_preprocessed" == true ]] && [[ -f "$preprocessed_file" ]]; then
+        metadata_dir=$(dirname "$preprocessed_file")
+        if [[ -f "${metadata_dir}/metadata_states.csv" ]]; then
+            metadata_available=true
+        fi
+    fi
+    
+    echo "Select states to analyze:"
+    echo "1) ALL states (default)"
+    echo "2) Select specific states"
+    read -p "Enter selection [1]: " state_mode
+    state_mode=${state_mode:-1}
+    
+    if [[ "$state_mode" == "2" ]]; then
+        if [[ "$metadata_available" == true ]]; then
+            echo ""
+            echo "Available states in data:"
+            echo ""
+            
+            # Read state data and display
+            i=1
+            declare -a state_array
+            while IFS=',' read -r state first_year last_year total_cases; do
+                state_name=$(get_state_name "$state")
+                printf "%2d. %-2s - %-15s (%d-%d, %'d cases)\n" $i "$state" "$state_name" "$first_year" "$last_year" "$total_cases"
+                state_array[$i]=$state
+                ((i++))
+            done < <(extract_states_from_data "$metadata_dir")
+            
+            echo ""
+            echo "Enter state numbers separated by spaces (e.g., 1 3 5), or 'all' for all states:"
+            read -p "Selection: " state_selection
+            
+            if [[ "$state_selection" == "all" ]]; then
+                selected_states=""
+            else
+                # Convert numbers to state codes
+                state_list=""
+                for num in $state_selection; do
+                    if [[ -n "${state_array[$num]}" ]]; then
+                        if [[ -n "$state_list" ]]; then
+                            state_list="${state_list},${state_array[$num]}"
+                        else
+                            state_list="${state_array[$num]}"
+                        fi
+                    fi
+                done
+                selected_states=$state_list
+                echo -e "${GREEN}Selected states: $selected_states${NC}"
+            fi
+        else
+            # Manual entry without metadata
+            echo ""
+            echo "Enter state codes separated by commas (e.g., CA,NY,GA):"
+            echo "Available states: CA, CO, CT, GA, MD, MN, NM, NY, OR, TN"
+            read -p "States: " selected_states
+            # Remove spaces
+            selected_states=$(echo "$selected_states" | tr -d ' ')
+        fi
+    fi
+fi
+
+# CIDT selection
+selected_cidt=""
+if [[ "$flag" != "resume" ]]; then
+    echo ""
+    echo -e "${BLUE}======== Diagnostic Method Selection ========${NC}"
+    
+    # Try to get metadata if using preprocessed data
+    metadata_available=false
+    if [[ "$use_preprocessed" == true ]] && [[ -f "$preprocessed_file" ]]; then
+        metadata_dir=$(dirname "$preprocessed_file")
+        if [[ -f "${metadata_dir}/metadata_cidt.csv" ]]; then
+            metadata_available=true
+        fi
+    fi
+    
+    echo "Select diagnostic methods:"
+    echo "1) ALL methods (default)"
+    
+    if [[ "$metadata_available" == true ]]; then
+        # Read CIDT data to show options
+        cidt_data=$(extract_cidt_from_data "$metadata_dir")
+        if echo "$cidt_data" | grep -q "CX+"; then
+            cx_info=$(echo "$cidt_data" | grep "CX+" | awk -F',' '{printf "%d cases (%.1f%%)", $2, $3}')
+            echo "2) Culture only (CX+) - $cx_info"
+        fi
+        if echo "$cidt_data" | grep -q "CIDT+"; then
+            cidt_info=$(echo "$cidt_data" | grep "CIDT+" | awk -F',' '{printf "%d cases (%.1f%%)", $2, $3}')
+            echo "3) CIDT only (CIDT+) - $cidt_info"
+        fi
+        if echo "$cidt_data" | grep -q "PARASITIC"; then
+            para_info=$(echo "$cidt_data" | grep "PARASITIC" | awk -F',' '{printf "%d cases (%.1f%%)", $2, $3}')
+            echo "4) Parasitic only - $para_info"
+        fi
+        echo "5) Culture + CIDT (CX+,CIDT+)"
+        echo "6) Custom selection"
+    else
+        echo "2) Culture only (CX+)"
+        echo "3) CIDT only (CIDT+)"
+        echo "4) Parasitic only (PARASITIC)"
+        echo "5) Culture + CIDT (CX+,CIDT+)"
+        echo "6) Custom selection"
+    fi
+    
+    read -p "Enter selection [1]: " cidt_mode
+    cidt_mode=${cidt_mode:-1}
+    
+    case $cidt_mode in
+        1) selected_cidt="" ;;  # Use default (all)
+        2) selected_cidt="CX+" ;;
+        3) selected_cidt="CIDT+" ;;
+        4) selected_cidt="PARASITIC" ;;
+        5) selected_cidt="CX+,CIDT+" ;;
+        6) 
+            echo "Enter diagnostic methods separated by commas (e.g., CX+,CIDT+):"
+            read -p "Methods: " selected_cidt
+            selected_cidt=$(echo "$selected_cidt" | tr -d ' ')
+            ;;
+    esac
+    
+    if [[ -n "$selected_cidt" ]]; then
+        echo -e "${GREEN}Selected diagnostic methods: $selected_cidt${NC}"
+    fi
+fi
+
+# Travel selection
+selected_travel=""
+if [[ "$flag" != "resume" ]]; then
+    echo ""
+    echo -e "${BLUE}======== Travel Status Selection ========${NC}"
+    
+    # Try to get metadata if using preprocessed data
+    metadata_available=false
+    if [[ "$use_preprocessed" == true ]] && [[ -f "$preprocessed_file" ]]; then
+        metadata_dir=$(dirname "$preprocessed_file")
+        if [[ -f "${metadata_dir}/metadata_travel.csv" ]]; then
+            metadata_available=true
+        fi
+    fi
+    
+    echo "Select travel statuses:"
+    echo "1) ALL statuses (default)"
+    
+    if [[ "$metadata_available" == true ]]; then
+        # Read travel data to show percentages
+        travel_data=$(extract_travel_from_data "$metadata_dir")
+        if echo "$travel_data" | grep -q "NO"; then
+            no_info=$(echo "$travel_data" | grep "NO" | awk -F',' '{printf "%d cases (%.1f%%)", $2, $3}')
+            echo "2) Domestic only (NO) - $no_info"
+        fi
+        if echo "$travel_data" | grep -q "YES"; then
+            yes_info=$(echo "$travel_data" | grep "YES" | awk -F',' '{printf "%d cases (%.1f%%)", $2, $3}')
+            echo "3) Travel-related only (YES) - $yes_info"
+        fi
+        echo "4) Domestic + Unknown (NO,UNKNOWN)"
+        echo "5) Travel + Unknown (YES,UNKNOWN)"
+        echo "6) Custom selection"
+    else
+        echo "2) Domestic only (NO)"
+        echo "3) Travel-related only (YES)"
+        echo "4) Domestic + Unknown (NO,UNKNOWN)"
+        echo "5) Travel + Unknown (YES,UNKNOWN)"
+        echo "6) Custom selection"
+    fi
+    
+    read -p "Enter selection [1]: " travel_mode
+    travel_mode=${travel_mode:-1}
+    
+    case $travel_mode in
+        1) selected_travel="" ;;  # Use default (all)
+        2) selected_travel="NO" ;;
+        3) selected_travel="YES" ;;
+        4) selected_travel="NO,UNKNOWN" ;;
+        5) selected_travel="YES,UNKNOWN" ;;
+        6) 
+            echo "Enter travel statuses separated by commas (NO,YES,UNKNOWN):"
+            read -p "Statuses: " selected_travel
+            selected_travel=$(echo "$selected_travel" | tr -d ' ')
+            ;;
+    esac
+    
+    if [[ -n "$selected_travel" ]]; then
+        echo -e "${GREEN}Selected travel statuses: $selected_travel${NC}"
+    fi
+fi
+
 # Build the base command
 cmd="nextflow run main.nf -profile singularity -entry SPLINE \
   --mmwrFile \"$dataDir/mmwr9624_May2025.sas7bdat\" \
@@ -802,6 +1062,18 @@ fi
 if [[ -n "$pathogen_grouping" ]] && [[ -n "${pathogen_grouping// }" ]]; then
     cmd="$cmd --pathogen_grouping \"$pathogen_grouping\""
 fi
+# Add state filter if specified
+if [[ -n "$selected_states" ]]; then
+    cmd="$cmd --states \"$selected_states\""
+fi
+# Add CIDT filter if specified
+if [[ -n "$selected_cidt" ]]; then
+    cmd="$cmd --cidt \"$selected_cidt\""
+fi
+# Add travel filter if specified
+if [[ -n "$selected_travel" ]]; then
+    cmd="$cmd --travel \"$selected_travel\""
+fi
 
 # Add background option if requested
 if [[ $background == true ]]; then
@@ -820,6 +1092,22 @@ if [[ "$pathogens" == "AUTO_DISCOVER" ]]; then
     echo -e "Pathogens: ${GREEN}All pathogens found in data (auto-discovery)${NC}"
 else
     echo -e "Pathogens: ${GREEN}$pathogens${NC}"
+fi
+# Show selected filters
+if [[ -n "$selected_states" ]]; then
+    echo -e "States: ${GREEN}$selected_states${NC}"
+else
+    echo -e "States: ${GREEN}ALL states${NC}"
+fi
+if [[ -n "$selected_cidt" ]]; then
+    echo -e "Diagnostic methods: ${GREEN}$selected_cidt${NC}"
+else
+    echo -e "Diagnostic methods: ${GREEN}ALL methods (CIDT+,CX+,PARASITIC)${NC}"
+fi
+if [[ -n "$selected_travel" ]]; then
+    echo -e "Travel status: ${GREEN}$selected_travel${NC}"
+else
+    echo -e "Travel status: ${GREEN}ALL statuses (NO,UNKNOWN,YES)${NC}"
 fi
 
 if [[ "$flag" != "resume" ]]; then

@@ -65,6 +65,7 @@ workflow SPLINE {
     Project ID    : ${params.projID}
     MMWR File     : ${params.mmwrFile}
     Census Files  : ${params.censusFileB}, ${params.censusFileP}
+    States        : ${params.states ?: 'all'}
     Travel        : ${params.travel}
     CIDT          : ${params.cidt}
     Pathogens     : ${params.pathogen ?: 'default (CAMPYLOBACTER,CYCLOSPORA)'}
@@ -219,6 +220,7 @@ workflow SPLINE {
             censusFileP,
             params.travel,
             params.cidt,
+            params.states,
             params.projID,
             params.trendyScript,
             params.preprocessed,
@@ -348,6 +350,7 @@ workflow SPLINE {
             censusFileP,
             params.travel,
             params.cidt,
+            params.states,
             params.projID,
             params.trendyScript,
             true,

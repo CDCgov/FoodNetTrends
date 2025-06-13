@@ -13,6 +13,7 @@ process TRENDY {
     path censusFileP
     val travel
     val cidt
+    val states
     val projID
     val whichScript
     val preprocessed
@@ -51,6 +52,9 @@ process TRENDY {
     
     // Handle catchment config parameter
     def catchmentConfigArg = catchmentConfig.name != 'NO_FILE' ? "--catchment-config ${catchmentConfig}" : ""
+    
+    // Handle states parameter (empty string means all states)
+    def statesArg = states ? "--states ${states}" : ""
 
     """
     # Copy functions.R to the current directory
@@ -68,6 +72,7 @@ process TRENDY {
       --censusFileP ${censusFileP} \\
       --travel ${travel} \\
       --cidt ${cidt} \\
+      ${statesArg} \\
       --projID ${projID} \\
       --outDir . \\
       --pathogen ${pathogen} \\

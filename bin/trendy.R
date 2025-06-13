@@ -76,6 +76,8 @@ parser$add_argument("--censusFileP", type="character",
                     help="Path to census file for parasitic pathogens")
 
 # Filtering parameters
+parser$add_argument("--states", type="character", default=NULL,
+                    help="List of states to include (default: all states)")
 parser$add_argument("--travel", type="character", default="NO,UNKNOWN,YES",
                     help="List of travel types to include (default: NO,UNKNOWN,YES)")
 parser$add_argument("--cidt", type="character", default="CIDT+,CX+,PARASITIC",
@@ -327,6 +329,14 @@ tryCatch({
     filter((cxcidt %in% cidt) & (travelint %in% travel)) %>%
     # Exclude invalid counties (if not already done in preprocessing)
     filter(!county %in% c("OUT OF STATE", "UNKNOWN", "99997"))
+  
+  # Apply state filter if specified
+  if (!is.null(opts$states) && opts$states != "") {
+    states_list <- CLEAN_LIST(opts$states)
+    mmwrdata <- mmwrdata %>%
+      filter(state %in% states_list)
+    report_progress("DATA", message=paste("Filtered to states:", paste(states_list, collapse=", ")))
+  }
   
   # Ensure required columns exist
   required_cols <- c("pathogen", "year", "state", "pathogentype")
