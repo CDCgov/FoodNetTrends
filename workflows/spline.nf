@@ -85,6 +85,7 @@ workflow SPLINE {
                 def metrics = new groovy.json.JsonSlurper().parseText(json_text)
                 return metrics
             }
+            .first()  // Get the single metrics object
 
         // Parse pathogen groupings and combine with metrics
         pathogenGroupingWithMetrics = pathogenGrouping
@@ -137,6 +138,7 @@ workflow SPLINE {
                 def metrics = new groovy.json.JsonSlurper().parseText(json_text)
                 return metrics
             }
+            .first()  // Get the single metrics object
 
         // Parse pathogen groupings and combine with metrics
         pathogenGroupingWithMetrics = pathogenGrouping

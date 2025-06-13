@@ -36,14 +36,14 @@ handle_pathogen_grouping() {
     
     case "$pathogen" in
         STEC)
-            echo ""
-            echo -e "${BLUE}STEC Grouping Options:${NC}"
-            echo "STEC can be analyzed as:"
-            echo "1) Combined - All STEC together"
-            echo "2) O157 only - Just STEC O157" 
-            echo "3) Non-O157 only - Just non-O157 STEC"
-            echo "4) Both separately - O157 and non-O157 as separate analyses"
-            echo ""
+            echo "" >&2
+            echo -e "${BLUE}STEC Grouping Options:${NC}" >&2
+            echo "STEC can be analyzed as:" >&2
+            echo "1) Combined - All STEC together" >&2
+            echo "2) O157 only - Just STEC O157" >&2
+            echo "3) Non-O157 only - Just non-O157 STEC" >&2
+            echo "4) Both separately - O157 and non-O157 as separate analyses" >&2
+            echo "" >&2
             read -p "Select STEC grouping option [1]: " stec_choice
             stec_choice=${stec_choice:-1}
             
@@ -53,25 +53,25 @@ handle_pathogen_grouping() {
                 3) grouping="STEC:nonO157" ;;
                 4) grouping="STEC:O157|STEC:nonO157" ;;
                 *) 
-                    echo -e "${YELLOW}Invalid choice. Using combined.${NC}"
+                    echo -e "${YELLOW}Invalid choice. Using combined.${NC}" >&2
                     grouping="STEC:combined" 
                     ;;
             esac
             ;;
         
         SALMONELLA)
-            echo ""
-            echo -e "${BLUE}Salmonella Grouping Options:${NC}"
-            echo "1) Combined - All serotypes together"
-            echo "2) Custom selection - Choose specific serotypes"
-            echo ""
+            echo "" >&2
+            echo -e "${BLUE}Salmonella Grouping Options:${NC}" >&2
+            echo "1) Combined - All serotypes together" >&2
+            echo "2) Custom selection - Choose specific serotypes" >&2
+            echo "" >&2
             read -p "Select Salmonella grouping option [1]: " sal_choice
             sal_choice=${sal_choice:-1}
             
             if [[ "$sal_choice" == "2" ]]; then
                 # Extract and rank serotypes
-                echo ""
-                echo "Analyzing serotypes in data..."
+                echo "" >&2
+                echo "Analyzing serotypes in data..." >&2
                 
                 # Extract serotypes with counts from preprocessed data
                 # This command extracts the serotypesummary column and counts occurrences
@@ -99,32 +99,32 @@ handle_pathogen_grouping() {
                 ' "$preprocessed_file" | sort -rn)
                 
                 if [[ -z "$serotype_data" ]]; then
-                    echo -e "${YELLOW}No serotype data found. Using combined analysis.${NC}"
+                    echo -e "${YELLOW}No serotype data found. Using combined analysis.${NC}" >&2
                     grouping="SALMONELLA:combined"
                 else
                     # Display ranked serotypes
-                    echo -e "${GREEN}Top serotypes found:${NC}"
+                    echo -e "${GREEN}Top serotypes found:${NC}" >&2
                     echo "$serotype_data" | head -20 | nl -nln -w3 | while read num count serotype; do
-                        printf "[%s] %-30s (n=%s)\n" "$num" "$serotype" "$count"
+                        printf "[%s] %-30s (n=%s)\n" "$num" "$serotype" "$count" >&2
                     done
                     
                     # Check if there are more
                     total_serotypes=$(echo "$serotype_data" | wc -l)
                     if [[ $total_serotypes -gt 20 ]]; then
-                        echo ""
-                        echo "... and $((total_serotypes - 20)) more serotypes"
+                        echo "" >&2
+                        echo "... and $((total_serotypes - 20)) more serotypes" >&2
                         read -p "Show all serotypes? (y/n) [n]: " show_all
                         show_all=${show_all:-n}
                         if [[ "$show_all" =~ ^[Yy]$ ]]; then
                             echo "$serotype_data" | tail -n +21 | nl -nln -w3 -v 21 | while read num count serotype; do
-                                printf "[%s] %-30s (n=%s)\n" "$num" "$serotype" "$count"
+                                printf "[%s] %-30s (n=%s)\n" "$num" "$serotype" "$count" >&2
                             done
                         fi
                     fi
                     
-                    echo ""
-                    echo "Enter serotype numbers to analyze (comma-separated, e.g., 1,2,5)"
-                    echo "Or press Enter to analyze all serotypes combined"
+                    echo "" >&2
+                    echo "Enter serotype numbers to analyze (comma-separated, e.g., 1,2,5)" >&2
+                    echo "Or press Enter to analyze all serotypes combined" >&2
                     read -p "Selection: " serotype_selection
                     
                     if [[ -z "$serotype_selection" ]]; then
@@ -145,7 +145,7 @@ handle_pathogen_grouping() {
                         done
                         # Check if any valid serotypes were selected
                         if [[ -z "$selected_serotypes" ]]; then
-                            echo -e "${YELLOW}No valid serotypes selected. Using combined analysis.${NC}"
+                            echo -e "${YELLOW}No valid serotypes selected. Using combined analysis.${NC}" >&2
                             grouping="SALMONELLA:combined"
                         else
                             grouping="$selected_serotypes"
@@ -278,8 +278,26 @@ pathogen_mode=${pathogen_mode:-2}
 
 if [[ "$pathogen_mode" == "1" ]]; then
     # Use all pathogens
-    pathogens=$ALL_PATHOGENS
-    echo -e "${GREEN}Selected: ALL pathogens (${ALL_PATHOGENS})${NC}"
+    if [[ "$use_preprocessed" == true ]] && [[ -f "$preprocessed_file" ]]; then
+        # Extract all pathogens from preprocessed data
+        echo "Extracting all pathogens from preprocessed data..."
+        all_from_data=$(cut -d',' -f1 "$preprocessed_file" | tail -n +2 | \
+            sed 's/^"//;s/"$//' | \
+            grep '^[A-Z][A-Z]*$' | \
+            sort -u | \
+            tr '\n' ',' | sed 's/,$//')
+        if [[ -n "$all_from_data" ]]; then
+            pathogens=$all_from_data
+            echo -e "${GREEN}Selected: ALL pathogens found in data (${pathogens})${NC}"
+        else
+            pathogens=$ALL_PATHOGENS
+            echo -e "${YELLOW}Could not extract pathogens from data. Using default list.${NC}"
+            echo -e "${GREEN}Selected: ALL pathogens (${ALL_PATHOGENS})${NC}"
+        fi
+    else
+        pathogens=$ALL_PATHOGENS
+        echo -e "${GREEN}Selected: ALL pathogens (${ALL_PATHOGENS})${NC}"
+    fi
 else
     # Ask for specific pathogens
     echo ""
@@ -288,13 +306,12 @@ else
     if [[ "$use_preprocessed" == true ]] && [[ -f "$preprocessed_file" ]]; then
         echo "Analyzing preprocessed data for available pathogens..."
         # More robust pathogen extraction that handles quoted CSV fields
-        available_pathogens=$(awk -F',' '
-            BEGIN { OFS="," }
-            NR>1 {
-                # Handle quoted fields by looking for pathogen column (usually first)
-                gsub(/^[ \t]*"?|"?[ \t]*$/, "", $1)
-                if ($1 ~ /^[A-Z][A-Z]+/) print $1
-            }' "$preprocessed_file" | sort -u | tr '\n' ',' | sed 's/,$//')
+        # Use cut to get first column, then clean and filter
+        available_pathogens=$(cut -d',' -f1 "$preprocessed_file" | tail -n +2 | \
+            sed 's/^"//;s/"$//' | \
+            grep '^[A-Z][A-Z]*$' | \
+            sort -u | \
+            tr '\n' ',' | sed 's/,$//')
         
         if [[ -n "$available_pathogens" ]]; then
             echo -e "${GREEN}Found pathogens in preprocessed data:${NC}"
@@ -603,9 +620,9 @@ if [[ "$flag" != "resume" ]]; then
                     grouping=$(handle_pathogen_grouping "$pathogen" "")
                 else
                     # For Salmonella without data, default to combined
-                    echo ""
-                    echo -e "${YELLOW}Note: Salmonella serotype selection requires preprocessed data.${NC}"
-                    echo -e "${YELLOW}Using combined analysis for all Salmonella serotypes.${NC}"
+                    echo "" >&2
+                    echo -e "${YELLOW}Note: Salmonella serotype selection requires preprocessed data.${NC}" >&2
+                    echo -e "${YELLOW}Using combined analysis for all Salmonella serotypes.${NC}" >&2
                     grouping="SALMONELLA:combined"
                 fi
             fi
