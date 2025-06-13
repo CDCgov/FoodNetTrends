@@ -220,7 +220,7 @@ workflow SPLINE {
             censusFileP,
             params.travel,
             params.cidt,
-            params.states,
+            params.states ?: '',  // Use empty string if null
             params.projID,
             params.trendyScript,
             params.preprocessed,
@@ -350,7 +350,7 @@ workflow SPLINE {
             censusFileP,
             params.travel,
             params.cidt,
-            params.states,
+            params.states ?: '',  // Use empty string if null
             params.projID,
             params.trendyScript,
             true,
