@@ -328,39 +328,50 @@ pathogen_mode=${pathogen_mode:-2}
 if [[ "$pathogen_mode" == "1" ]]; then
     # Use all pathogens
     if [[ "$use_preprocessed" == true ]] && [[ -f "$preprocessed_file" ]]; then
-        # Extract all pathogens from preprocessed data
-        echo "Extracting all pathogens from preprocessed data..."
-        all_from_data=$(awk -F',' '
-            function unquote(s) {
-                gsub(/^"/, "", s)
-                gsub(/"$/, "", s)
-                gsub(/""/, "\"", s)  # Handle escaped quotes
-                return s
-            }
-            NR>1 {
-                # Get first field, handling quoted values
-                field1 = $1
-                # If the field starts with a quote, we need to handle embedded commas
-                if (substr(field1, 1, 1) == "\"") {
-                    # Find the closing quote
-                    full_field = field1
-                    for (i = 2; i <= NF; i++) {
-                        full_field = full_field "," $i
-                        if (substr($i, length($i), 1) == "\"" && substr($i, length($i)-1, 1) != "\"") {
-                            break
-                        }
+        # Look for resource profile first
+        resource_profile_dir=$(dirname "$preprocessed_file")
+        resource_profile_file="${resource_profile_dir}/resource_profile.csv"
+        
+        if [[ -f "$resource_profile_file" ]]; then
+            echo "Extracting pathogens from resource profile..."
+            all_from_data=$(awk -F',' '
+                NR>1 {
+                    # Get pathogen column (first column) from resource profile
+                    gsub(/^"/, "", $1)
+                    gsub(/"$/, "", $1)
+                    if ($1 ~ /^[A-Z][A-Z0-9]*$/ && length($1) > 0) {
+                        print $1
                     }
-                    field1 = full_field
+                }' "$resource_profile_file" | sort -u | tr '\n' ',' | sed 's/,$//')
+        else
+            # Fall back to extracting from clean_mmwr.csv - but look for pathogen column
+            echo "Resource profile not found, extracting from preprocessed data..."
+            # First, find which column contains pathogen data by looking at headers
+            pathogen_col=$(head -1 "$preprocessed_file" | awk -F',' '{
+                for(i=1; i<=NF; i++) {
+                    gsub(/^"/, "", $i)
+                    gsub(/"$/, "", $i)
+                    if(tolower($i) == "pathogen") {
+                        print i
+                        exit
+                    }
                 }
-                pathogen = unquote(field1)
-                # Only include valid pathogen names (starts with letter, allows letters, numbers, dots, hyphens, spaces)
-                # Must be primarily uppercase but allow some flexibility
-                if (pathogen ~ /^[A-Za-z][A-Za-z0-9. -]*$/ && length(pathogen) > 0) {
-                    # Convert to uppercase for consistency
-                    pathogen = toupper(pathogen)
-                    print pathogen
-                }
-            }' "$preprocessed_file" | sort -u | tr '\n' ',' | sed 's/,$//')
+            }')
+            
+            if [[ -n "$pathogen_col" ]]; then
+                all_from_data=$(awk -F',' -v col="$pathogen_col" '
+                    NR>1 {
+                        # Get the pathogen column value
+                        gsub(/^"/, "", $col)
+                        gsub(/"$/, "", $col)
+                        pathogen = toupper($col)
+                        # Only include valid pathogen names
+                        if (pathogen ~ /^[A-Z][A-Z0-9]*$/ && length(pathogen) > 0) {
+                            print pathogen
+                        }
+                    }' "$preprocessed_file" | sort -u | tr '\n' ',' | sed 's/,$//')
+            fi
+        fi
         if [[ -n "$all_from_data" ]]; then
             pathogens=$all_from_data
             echo -e "${GREEN}Selected: ALL pathogens found in data (${pathogens})${NC}"
