@@ -391,10 +391,6 @@ if [[ "$pathogen_mode" == "1" ]]; then
             echo -e "${YELLOW}Could not extract pathogens from data. Using default list.${NC}"
             echo -e "${GREEN}Selected: ALL pathogens (${ALL_PATHOGENS})${NC}"
         fi
-    else
-        # Not using preprocessed data - use AUTO_DISCOVER
-        pathogens="AUTO_DISCOVER"
-        echo -e "${GREEN}Selected: ALL pathogens (will discover from data during preprocessing)${NC}"
     fi
 else
     # Ask for specific pathogens
