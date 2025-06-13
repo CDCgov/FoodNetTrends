@@ -338,59 +338,10 @@ if [[ "$pathogen_mode" == "1" ]]; then
         pathogens=$ALL_PATHOGENS
         echo -e "${GREEN}Selected: ALL pathogens (${ALL_PATHOGENS})${NC}"
     else
-        # Not using preprocessed data, extract from the data that will be processed
-        # Look for resource profile first
-        resource_profile_dir=$(dirname "$preprocessed_file")
-        resource_profile_file="${resource_profile_dir}/resource_profile.csv"
-        
-        if [[ -f "$resource_profile_file" ]]; then
-            echo "Extracting pathogens from resource profile..."
-            all_from_data=$(awk -F',' '
-                NR>1 {
-                    # Get pathogen column (first column) from resource profile
-                    gsub(/^"/, "", $1)
-                    gsub(/"$/, "", $1)
-                    if ($1 ~ /^[A-Z][A-Z0-9]*$/ && length($1) > 0) {
-                        print $1
-                    }
-                }' "$resource_profile_file" | sort -u | tr '\n' ',' | sed 's/,$//')
-        else
-            # Fall back to extracting from clean_mmwr.csv - but look for pathogen column
-            echo "Resource profile not found, extracting from preprocessed data..."
-            # First, find which column contains pathogen data by looking at headers
-            pathogen_col=$(head -1 "$preprocessed_file" | awk -F',' '{
-                for(i=1; i<=NF; i++) {
-                    gsub(/^"/, "", $i)
-                    gsub(/"$/, "", $i)
-                    if(tolower($i) == "pathogen") {
-                        print i
-                        exit
-                    }
-                }
-            }')
-            
-            if [[ -n "$pathogen_col" ]]; then
-                all_from_data=$(awk -F',' -v col="$pathogen_col" '
-                    NR>1 {
-                        # Get the pathogen column value
-                        gsub(/^"/, "", $col)
-                        gsub(/"$/, "", $col)
-                        pathogen = toupper($col)
-                        # Only include valid pathogen names
-                        if (pathogen ~ /^[A-Z][A-Z0-9]*$/ && length(pathogen) > 0) {
-                            print pathogen
-                        }
-                    }' "$preprocessed_file" | sort -u | tr '\n' ',' | sed 's/,$//')
-            fi
-        fi
-        if [[ -n "$all_from_data" ]]; then
-            pathogens=$all_from_data
-            echo -e "${GREEN}Selected: ALL pathogens found in data (${pathogens})${NC}"
-        else
-            pathogens=$ALL_PATHOGENS
-            echo -e "${YELLOW}Could not extract pathogens from data. Using default list.${NC}"
-            echo -e "${GREEN}Selected: ALL pathogens (${ALL_PATHOGENS})${NC}"
-        fi
+        # Not using preprocessed data - use AUTO_DISCOVER
+        echo -e "${GREEN}Using AUTO_DISCOVER mode for fresh data processing${NC}"
+        pathogens="AUTO_DISCOVER"
+        pathogen_grouping=""  # Clear any grouping - will be handled by workflow
     fi
 else
     # Ask for specific pathogens

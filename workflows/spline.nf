@@ -149,7 +149,22 @@ workflow SPLINE {
         // Parse pathogen groupings and combine with metrics
         // Handle case where pathogenGrouping might be null (AUTO_DISCOVER)
         if (!pathogenGrouping) {
-            error "Pathogen grouping is not defined. This should not happen for preprocessed data."
+            // This happens when using AUTO_DISCOVER with preprocessed data
+            if (params.pathogen == 'AUTO_DISCOVER') {
+                log.info "Creating pathogen groupings from discovered pathogens"
+                pathogenGrouping = metricsChannel
+                    .flatMap { metrics ->
+                        def pathogenList = metrics.keySet().toList()
+                        if (pathogenList.isEmpty()) {
+                            error "No pathogens found in metrics. Check if preprocessing completed successfully."
+                        }
+                        log.info "Auto-discovered pathogens: ${pathogenList.join(', ')}"
+                        return pathogenList
+                    }
+                    .map { p -> "${p}:combined" }
+            } else {
+                error "Pathogen grouping is not defined. This should not happen for preprocessed data."
+            }
         }
         
         pathogenGroupingWithMetrics = pathogenGrouping
