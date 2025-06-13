@@ -258,6 +258,12 @@ if [[ ${#preprocessed_files[@]} -gt 0 ]]; then
         if [[ -f "$report_file" ]]; then
             echo "    ✓ Preprocessing report available"
         fi
+        
+        # Check if resource profile exists
+        resource_profile="$(dirname "$file")/resource_profile.csv"
+        if [[ -f "$resource_profile" ]]; then
+            echo "    ✓ Resource profile available"
+        fi
         echo ""
     done
     

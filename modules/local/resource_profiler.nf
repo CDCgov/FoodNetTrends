@@ -1,21 +1,22 @@
-process ANALYZE_DATA_SIZE {
-    tag "Analyzing data size for resource allocation"
+process RESOURCE_PROFILER {
+    tag "Profiling resources for pathogen analysis"
     label 'process_low'
     shell "/bin/bash"
     container 'foodnet.sif'
+
+    publishDir "${params.outdir}/${params.projID}/preprocessed", mode: 'copy'
 
     input:
     path cleanFile
 
     output:
-    path "pathogen_metrics.json", emit: metrics
+    path "resource_profile.csv", emit: profile
 
     script:
     """
     #!/usr/bin/env Rscript
     suppressPackageStartupMessages({
         library(dplyr)
-        library(jsonlite)
         library(readr)
     })
 
@@ -47,29 +48,20 @@ process ANALYZE_DATA_SIZE {
             )
         )
     
-    # Convert to named list for JSON output
-    metrics_list <- list()
+    # Write to CSV
+    write_csv(pathogen_metrics, "resource_profile.csv")
+    
+    # Print summary for logging
+    cat("\\nResource Profile Summary:\\n")
+    cat("========================\\n")
     for (i in 1:nrow(pathogen_metrics)) {
-        p <- pathogen_metrics\$pathogen[i]
-        metrics_list[[p]] <- list(
-            rows = pathogen_metrics\$rows[i],
-            sites = pathogen_metrics\$sites[i],
-            years = pathogen_metrics\$years[i],
-            complexity = pathogen_metrics\$complexity[i],
-            size_category = pathogen_metrics\$size_category[i]
-        )
-    }
-    
-    # Write to JSON
-    write_json(metrics_list, "pathogen_metrics.json", pretty = TRUE)
-    
-    # Also print summary for logging
-    cat("\\nPathogen Data Size Analysis:\\n")
-    cat("============================\\n")
-    for (p in names(metrics_list)) {
-        m <- metrics_list[[p]]
         cat(sprintf("%-15s: %6d rows, %2d sites, %2d years (complexity: %d, category: %s)\\n", 
-                    p, m\$rows, m\$sites, m\$years, m\$complexity, m\$size_category))
+                    pathogen_metrics\$pathogen[i], 
+                    pathogen_metrics\$rows[i], 
+                    pathogen_metrics\$sites[i], 
+                    pathogen_metrics\$years[i], 
+                    pathogen_metrics\$complexity[i], 
+                    pathogen_metrics\$size_category[i]))
     }
     """
 }

@@ -3,7 +3,7 @@
 // Import modules
 include { TRENDY } from '../modules/local/trendy'
 include { PREPROCESS } from '../modules/local/preprocess'
-include { ANALYZE_DATA_SIZE } from '../modules/local/analyze_data_size'
+include { RESOURCE_PROFILER } from '../modules/local/resource_profiler'
 
 workflow SPLINE {
     // Define input channels
@@ -86,16 +86,50 @@ workflow SPLINE {
             error "Preprocessed file not found: ${params.cleanFile}"
         }
 
-        // Analyze data size for resource allocation
-        ANALYZE_DATA_SIZE(cleanFile)
+        // Check for existing resource profile
+        def resourceProfilePath = cleanFile.parent.resolve("resource_profile.csv")
+        def resourceProfile = file(resourceProfilePath)
         
-        // Read the metrics and create a map
-        metricsChannel = ANALYZE_DATA_SIZE.out.metrics
-            .map { metrics_file ->
-                def json_text = metrics_file.text
-                def metrics = new groovy.json.JsonSlurper().parseText(json_text)
-                return metrics
-            }
+        if (resourceProfile.exists()) {
+            log.info "Using existing resource profile: ${resourceProfilePath}"
+            // Read the CSV directly
+            metricsChannel = Channel.fromPath(resourceProfilePath)
+                .splitCsv(header: true)
+                .collect { rows ->
+                    def metrics = [:]
+                    rows.each { row ->
+                        metrics[row.pathogen] = [
+                            rows: row.rows as Integer,
+                            sites: row.sites as Integer,
+                            years: row.years as Integer,
+                            complexity: row.complexity as Long,
+                            size_category: row.size_category
+                        ]
+                    }
+                    return metrics
+                }
+        } else {
+            log.info "Generating resource profile for preprocessed data"
+            // Run resource profiler
+            RESOURCE_PROFILER(cleanFile)
+            
+            // Read the CSV output
+            metricsChannel = RESOURCE_PROFILER.out.profile
+                .splitCsv(header: true)
+                .collect { rows ->
+                    def metrics = [:]
+                    rows.each { row ->
+                        metrics[row.pathogen] = [
+                            rows: row.rows as Integer,
+                            sites: row.sites as Integer,
+                            years: row.years as Integer,
+                            complexity: row.complexity as Long,
+                            size_category: row.size_category
+                        ]
+                    }
+                    return metrics
+                }
+        }
         
         // Parse pathogen groupings and combine with metrics
         // Handle case where pathogenGrouping might be null (AUTO_DISCOVER)
@@ -110,10 +144,28 @@ workflow SPLINE {
                 def parts = grouping.split(':')
                 def pathogen = parts[0]
                 def subgroup = parts.length > 1 ? parts[1] : 'combined'
-                def pathogenMetrics = metrics[pathogen] ?: [rows: 0, complexity: 0]
+                // Ensure we get a proper map, not just a value
+                def rawMetrics = metrics[pathogen]
+                def pathogenMetrics
+                if (rawMetrics instanceof Map) {
+                    pathogenMetrics = rawMetrics
+                } else if (rawMetrics instanceof List && rawMetrics.size() > 0) {
+                    // If it's a list, try to extract values
+                    log.warn "Metrics for ${pathogen} is a list, not a map: ${rawMetrics}"
+                    pathogenMetrics = [rows: rawMetrics[0], complexity: 0]
+                } else if (rawMetrics) {
+                    // Single value, assume it's rows
+                    log.warn "Metrics for ${pathogen} is a single value: ${rawMetrics}"
+                    pathogenMetrics = [rows: rawMetrics, complexity: 0]
+                } else {
+                    // No data
+                    pathogenMetrics = [rows: 0, complexity: 0]
+                }
                 if (pathogenMetrics.rows == 0) {
                     log.warn "No data found for pathogen: ${pathogen}. Using default metrics."
                 }
+                // Debug: log what we're passing
+                log.debug "Creating tuple for ${pathogen}: grouping=${grouping}, subgroup=${subgroup}, metrics=${pathogenMetrics}"
                 tuple(grouping, pathogen, subgroup, pathogenMetrics)
             }
 
@@ -144,14 +196,23 @@ workflow SPLINE {
         // Create a proper channel from the preprocessed file
         processedFile = PREPROCESS.out.cleanFile
 
-        // Analyze data size for resource allocation
-        ANALYZE_DATA_SIZE(processedFile)
+        // Generate resource profile for new data
+        RESOURCE_PROFILER(processedFile)
         
-        // Read the metrics and create a map
-        metricsChannel = ANALYZE_DATA_SIZE.out.metrics
-            .map { metrics_file ->
-                def json_text = metrics_file.text
-                def metrics = new groovy.json.JsonSlurper().parseText(json_text)
+        // Read the CSV output
+        metricsChannel = RESOURCE_PROFILER.out.profile
+            .splitCsv(header: true)
+            .collect { rows ->
+                def metrics = [:]
+                rows.each { row ->
+                    metrics[row.pathogen] = [
+                        rows: row.rows as Integer,
+                        sites: row.sites as Integer,
+                        years: row.years as Integer,
+                        complexity: row.complexity as Long,
+                        size_category: row.size_category
+                    ]
+                }
                 return metrics
             }
         
@@ -198,10 +259,28 @@ workflow SPLINE {
                 def parts = grouping.split(':')
                 def pathogen = parts[0]
                 def subgroup = parts.length > 1 ? parts[1] : 'combined'
-                def pathogenMetrics = metrics[pathogen] ?: [rows: 0, complexity: 0]
+                // Ensure we get a proper map, not just a value
+                def rawMetrics = metrics[pathogen]
+                def pathogenMetrics
+                if (rawMetrics instanceof Map) {
+                    pathogenMetrics = rawMetrics
+                } else if (rawMetrics instanceof List && rawMetrics.size() > 0) {
+                    // If it's a list, try to extract values
+                    log.warn "Metrics for ${pathogen} is a list, not a map: ${rawMetrics}"
+                    pathogenMetrics = [rows: rawMetrics[0], complexity: 0]
+                } else if (rawMetrics) {
+                    // Single value, assume it's rows
+                    log.warn "Metrics for ${pathogen} is a single value: ${rawMetrics}"
+                    pathogenMetrics = [rows: rawMetrics, complexity: 0]
+                } else {
+                    // No data
+                    pathogenMetrics = [rows: 0, complexity: 0]
+                }
                 if (pathogenMetrics.rows == 0) {
                     log.warn "No data found for pathogen: ${pathogen}. Using default metrics."
                 }
+                // Debug: log what we're passing
+                log.debug "Creating tuple for ${pathogen}: grouping=${grouping}, subgroup=${subgroup}, metrics=${pathogenMetrics}"
                 tuple(grouping, pathogen, subgroup, pathogenMetrics)
             }
 
