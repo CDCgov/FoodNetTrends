@@ -189,6 +189,9 @@ PATH_ANALYSIS <- function(mmwrdata, census, catchment_config = NULL) {
     stop("No pathogens found in the MMWR data")
   }
   
+  # Define parasitic pathogens
+  parasitic_pathogens <- c("CRYPTOSPORIDIUM", "CYCLOSPORA")
+  
   selectDf <- mmwrdata %>%
     filter(pathogen %in% all_pathogens) %>%
     group_by(year, state, pathogen) %>%
@@ -197,13 +200,37 @@ PATH_ANALYSIS <- function(mmwrdata, census, catchment_config = NULL) {
     # This is intentional - FoodNet is an active surveillance system where all cases 
     # in participating sites are reported. Absence of reported cases in a 
     # participating state-year represents true zeros, not missing data
-    complete(year, state, pathogen = unique(pathogen), fill = list(count = 0)) %>%
-    left_join(census %>% filter(pathogentype == "Bacterial"), by = c("year", "state")) %>%
+    complete(year, state, pathogen = unique(pathogen), fill = list(count = 0))
+  
+  # Join with appropriate census data based on pathogen type
+  bacterial_data <- selectDf %>%
+    filter(!pathogen %in% parasitic_pathogens) %>%
+    left_join(census %>% filter(pathogentype == "Bacterial"), by = c("year", "state"))
+  
+  parasitic_data <- selectDf %>%
+    filter(pathogen %in% parasitic_pathogens) %>%
+    left_join(census %>% filter(pathogentype == "Parasitic"), by = c("year", "state"))
+  
+  # Combine the data
+  selectDf <- bind_rows(bacterial_data, parasitic_data) %>%
     mutate(year = as.numeric(as.character(year)))
   
   # Check if the join produced any data with population
   if (all(is.na(selectDf$population))) {
     stop("No population data found after joining with census data. Check that census data contains 'Bacterial' pathogentype.")
+  }
+  
+  # Remove rows with missing population data
+  rows_before <- nrow(selectDf)
+  selectDf <- selectDf %>% filter(!is.na(population))
+  rows_after <- nrow(selectDf)
+  
+  if (rows_before > rows_after) {
+    warning(paste("Removed", rows_before - rows_after, "rows with missing population data"))
+  }
+  
+  if (nrow(selectDf) == 0) {
+    stop("No data remaining after removing rows with missing population")
   }
     
   # Drop year-state combinations from the dataset for years before the given state entered the FoodNet catchment
@@ -237,6 +264,9 @@ CYCLOSPORA_ANALYSIS <- function(mmwrdata, census, catchment_config = NULL) {
     summarise(count = n(), .groups = "drop") %>%
     complete(year, state, fill = list(count = 0)) %>%
     left_join(census %>% filter(pathogentype == "Parasitic"), by = c("year", "state"))
+  
+  # Remove rows with missing population data
+  cyclo <- cyclo %>% filter(!is.na(population))
     
   # Drop year-state combinations from the dataset for years before the given state entered the FoodNet catchment
   # Configurable via the catchment_config parameter to support different surveillance periods
@@ -269,6 +299,9 @@ SALMONELLA_ANALYSIS <- function(mmwrdata, census, catchment_config = NULL) {
     summarise(count = n(), .groups = "drop") %>%
     complete(year, state, fill = list(count = 0)) %>%
     left_join(census %>% filter(pathogentype == "Bacterial"), by = c("year", "state"))
+  
+  # Remove rows with missing population data
+  sal <- sal %>% filter(!is.na(population))
     
   # Drop year-state combinations from the dataset for years before the given state entered the FoodNet catchment
   # Configurable via the catchment_config parameter to support different surveillance periods
