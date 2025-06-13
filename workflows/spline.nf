@@ -95,19 +95,25 @@ workflow SPLINE {
             // Read the CSV directly
             metricsChannel = Channel.fromPath(resourceProfilePath)
                 .splitCsv(header: true)
-                .collect { rowList ->
-                    if (rowList.isEmpty()) {
+                .map { row ->
+                    // Each row is a map with the CSV columns
+                    tuple(row.pathogen, [
+                        rows: row.rows as Integer,
+                        sites: row.sites as Integer,
+                        years: row.years as Integer,
+                        complexity: row.complexity as Long,
+                        size_category: row.size_category
+                    ])
+                }
+                .collect() // Collect all tuples into a list
+                .map { tupleList ->
+                    // Convert list of tuples into a map
+                    if (tupleList.isEmpty()) {
                         error "Resource profile is empty - no pathogen data found"
                     }
                     def metrics = [:]
-                    rowList.each { row ->
-                        metrics[row.pathogen] = [
-                            rows: row.rows as Integer,
-                            sites: row.sites as Integer,
-                            years: row.years as Integer,
-                            complexity: row.complexity as Long,
-                            size_category: row.size_category
-                        ]
+                    tupleList.each { pathogen, data ->
+                        metrics[pathogen] = data
                     }
                     return metrics
                 }
@@ -119,19 +125,25 @@ workflow SPLINE {
             // Read the CSV output
             metricsChannel = RESOURCE_PROFILER.out.profile
                 .splitCsv(header: true)
-                .collect { rowList ->
-                    if (rowList.isEmpty()) {
+                .map { row ->
+                    // Each row is a map with the CSV columns
+                    tuple(row.pathogen, [
+                        rows: row.rows as Integer,
+                        sites: row.sites as Integer,
+                        years: row.years as Integer,
+                        complexity: row.complexity as Long,
+                        size_category: row.size_category
+                    ])
+                }
+                .collect() // Collect all tuples into a list
+                .map { tupleList ->
+                    // Convert list of tuples into a map
+                    if (tupleList.isEmpty()) {
                         error "Resource profile is empty - no pathogen data found"
                     }
                     def metrics = [:]
-                    rowList.each { row ->
-                        metrics[row.pathogen] = [
-                            rows: row.rows as Integer,
-                            sites: row.sites as Integer,
-                            years: row.years as Integer,
-                            complexity: row.complexity as Long,
-                            size_category: row.size_category
-                        ]
+                    tupleList.each { pathogen, data ->
+                        metrics[pathogen] = data
                     }
                     return metrics
                 }
@@ -215,16 +227,22 @@ workflow SPLINE {
         // Read the CSV output
         metricsChannel = RESOURCE_PROFILER.out.profile
             .splitCsv(header: true)
-            .collect { rowList ->
+            .map { row ->
+                // Each row is a map with the CSV columns
+                tuple(row.pathogen, [
+                    rows: row.rows as Integer,
+                    sites: row.sites as Integer,
+                    years: row.years as Integer,
+                    complexity: row.complexity as Long,
+                    size_category: row.size_category
+                ])
+            }
+            .collect() // Collect all tuples into a list
+            .map { tupleList ->
+                // Convert list of tuples into a map
                 def metrics = [:]
-                rowList.each { row ->
-                    metrics[row.pathogen] = [
-                        rows: row.rows as Integer,
-                        sites: row.sites as Integer,
-                        years: row.years as Integer,
-                        complexity: row.complexity as Long,
-                        size_category: row.size_category
-                    ]
+                tupleList.each { pathogen, data ->
+                    metrics[pathogen] = data
                 }
                 return metrics
             }
