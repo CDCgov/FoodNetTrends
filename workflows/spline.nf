@@ -94,7 +94,7 @@ workflow SPLINE {
             log.info "Using existing resource profile: ${resourceProfilePath}"
             // Read the CSV directly
             metricsChannel = Channel.fromPath(resourceProfilePath)
-                .splitCsv(header: true)
+                .splitCsv(header: true, sep: ',', strip: true)
                 .map { row ->
                     // Each row is a map with the CSV columns
                     tuple(row.pathogen, [
@@ -124,27 +124,24 @@ workflow SPLINE {
             
             // Read the CSV output
             metricsChannel = RESOURCE_PROFILER.out.profile
-                .splitCsv(header: true)
-                .map { row ->
-                    // Each row is a map with the CSV columns
-                    tuple(row.pathogen, [
-                        rows: row.rows as Integer,
-                        sites: row.sites as Integer,
-                        years: row.years as Integer,
-                        complexity: row.complexity as Long,
-                        size_category: row.size_category
-                    ])
-                }
-                .collect() // Collect all tuples into a list
-                .map { tupleList ->
-                    // Convert list of tuples into a map
-                    if (tupleList.isEmpty()) {
+                .map { csvFile -> 
+                    // Read the CSV file content and parse it
+                    def metrics = [:]
+                    csvFile.splitCsv(header: true, sep: ',', strip: true).each { row ->
+                        log.debug "CSV row: ${row}"
+                        // Convert row values to appropriate types
+                        metrics[row.pathogen] = [
+                            rows: row.rows as Integer,
+                            sites: row.sites as Integer, 
+                            years: row.years as Integer,
+                            complexity: row.complexity as Long,
+                            size_category: row.size_category
+                        ]
+                    }
+                    if (metrics.isEmpty()) {
                         error "Resource profile is empty - no pathogen data found"
                     }
-                    def metrics = [:]
-                    tupleList.each { tuple ->
-                        metrics[tuple[0]] = tuple[1]
-                    }
+                    log.info "Parsed metrics for ${metrics.size()} pathogens: ${metrics.keySet().join(', ')}"
                     return metrics
                 }
         }
@@ -224,26 +221,23 @@ workflow SPLINE {
         // Generate resource profile for new data
         RESOURCE_PROFILER(processedFile)
         
-        // Read the CSV output
+        // Read the CSV output - need to read file content first
         metricsChannel = RESOURCE_PROFILER.out.profile
-            .splitCsv(header: true)
-            .map { row ->
-                // Each row is a map with the CSV columns
-                tuple(row.pathogen, [
-                    rows: row.rows as Integer,
-                    sites: row.sites as Integer,
-                    years: row.years as Integer,
-                    complexity: row.complexity as Long,
-                    size_category: row.size_category
-                ])
-            }
-            .collect() // Collect all tuples into a list
-            .map { tupleList ->
-                // Convert list of tuples into a map
+            .map { csvFile -> 
+                // Read the CSV file content and parse it
                 def metrics = [:]
-                tupleList.each { tuple ->
-                    metrics[tuple[0]] = tuple[1]
+                csvFile.splitCsv(header: true, sep: ',', strip: true).each { row ->
+                    log.debug "CSV row: ${row}"
+                    // Convert row values to appropriate types
+                    metrics[row.pathogen] = [
+                        rows: row.rows as Integer,
+                        sites: row.sites as Integer, 
+                        years: row.years as Integer,
+                        complexity: row.complexity as Long,
+                        size_category: row.size_category
+                    ]
                 }
+                log.info "Parsed metrics for ${metrics.size()} pathogens: ${metrics.keySet().join(', ')}"
                 return metrics
             }
         

@@ -26,8 +26,16 @@ process RESOURCE_PROFILER {
     # Ensure column names are lowercase (matching preprocess.R output)
     names(data) <- tolower(names(data))
     
+    # Debug: Print column names and first few rows
+    cat("\\nColumn names:", paste(names(data), collapse=", "), "\\n")
+    cat("Number of rows:", nrow(data), "\\n")
+    if (nrow(data) > 0) {
+        cat("First few pathogens:", paste(head(unique(data\$pathogen), 10), collapse=", "), "\\n")
+    }
+    
     # Calculate metrics for each pathogen
     pathogen_metrics <- data %>%
+        filter(!is.na(pathogen)) %>%  # Filter out NA values only
         group_by(pathogen) %>%
         summarise(
             rows = n(),
@@ -47,6 +55,11 @@ process RESOURCE_PROFILER {
                 TRUE ~ "tiny"
             )
         )
+    
+    # Check if we have any valid pathogens
+    if (nrow(pathogen_metrics) == 0) {
+        stop("No valid pathogens found in the data. Check if the pathogen column contains proper pathogen names.")
+    }
     
     # Write to CSV
     write_csv(pathogen_metrics, "resource_profile.csv")
