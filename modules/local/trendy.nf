@@ -7,9 +7,7 @@ process TRENDY {
     publishDir "${params.outdir}/${projID}/spline_results", mode: 'copy'
 
     input:
-    val pathogenGrouping    // Full grouping string (e.g., "SALMONELLA:Enteritidis")
-    val pathogen           // Base pathogen name (e.g., "SALMONELLA")
-    val subgroup          // Subgroup identifier (e.g., "Enteritidis" or "combined")
+    tuple val(pathogenGrouping), val(pathogen), val(subgroup), val(dataMetrics)
     path mmwrFile
     path censusFileB
     path censusFileP
@@ -19,7 +17,6 @@ process TRENDY {
     val whichScript
     val preprocessed
     path cleanFile
-    val dataMetrics
     path catchmentConfig
 
     output:

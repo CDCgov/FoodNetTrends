@@ -102,9 +102,7 @@ workflow SPLINE {
 
         // Run TRENDY with preprocessed data and metrics
         TRENDY(
-            pathogenGroupingWithMetrics.map { it[0] }, // full grouping string (e.g., "SALMONELLA:Enteritidis")
-            pathogenGroupingWithMetrics.map { it[1] }, // base pathogen (e.g., "SALMONELLA")
-            pathogenGroupingWithMetrics.map { it[2] }, // subgroup (e.g., "Enteritidis")
+            pathogenGroupingWithMetrics,
             mmwrFile,
             censusFileB,
             censusFileP,
@@ -114,7 +112,6 @@ workflow SPLINE {
             params.trendyScript,
             params.preprocessed,
             cleanFile,
-            pathogenGroupingWithMetrics.map { it[3] },  // metrics
             catchmentConfig
         )
     } else {
@@ -157,9 +154,7 @@ workflow SPLINE {
 
         // Run TRENDY with processed data and metrics
         TRENDY(
-            pathogenGroupingWithMetrics.map { it[0] }, // full grouping string
-            pathogenGroupingWithMetrics.map { it[1] }, // base pathogen
-            pathogenGroupingWithMetrics.map { it[2] }, // subgroup
+            pathogenGroupingWithMetrics,
             mmwrFile,
             censusFileB,
             censusFileP,
@@ -169,7 +164,6 @@ workflow SPLINE {
             params.trendyScript,
             true,
             processedFile,
-            pathogenGroupingWithMetrics.map { it[3] },  // metrics
             catchmentConfig
         )
     }
