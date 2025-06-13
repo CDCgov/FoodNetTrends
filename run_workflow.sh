@@ -47,19 +47,21 @@ handle_pathogen_grouping() {
             echo "3) Non-O157 only - Just non-O157 STEC" >&2
             echo "4) Both separately - O157 and non-O157 as separate analyses" >&2
             echo "" >&2
-            read -p "Select STEC grouping option [1]: " stec_choice
-            stec_choice=${stec_choice:-1}
             
-            case "$stec_choice" in
-                1) grouping="STEC:combined" ;;
-                2) grouping="STEC:O157" ;;
-                3) grouping="STEC:nonO157" ;;
-                4) grouping="STEC:O157|STEC:nonO157" ;;
-                *) 
-                    echo -e "${YELLOW}Invalid choice. Using combined.${NC}" >&2
-                    grouping="STEC:combined" 
-                    ;;
-            esac
+            while true; do
+                read -p "Select STEC grouping option [1]: " stec_choice
+                stec_choice=${stec_choice:-1}
+                
+                case "$stec_choice" in
+                    1) grouping="STEC:combined"; break ;;
+                    2) grouping="STEC:O157"; break ;;
+                    3) grouping="STEC:nonO157"; break ;;
+                    4) grouping="STEC:O157|STEC:nonO157"; break ;;
+                    *) 
+                        echo -e "${RED}Invalid choice: '$stec_choice'. Please enter 1-4.${NC}" >&2
+                        ;;
+                esac
+            done
             ;;
         
         SALMONELLA)
@@ -68,8 +70,17 @@ handle_pathogen_grouping() {
             echo "1) Combined - All serotypes together" >&2
             echo "2) Custom selection - Choose specific serotypes" >&2
             echo "" >&2
-            read -p "Select Salmonella grouping option [1]: " sal_choice
-            sal_choice=${sal_choice:-1}
+            
+            while true; do
+                read -p "Select Salmonella grouping option [1]: " sal_choice
+                sal_choice=${sal_choice:-1}
+                
+                if [[ "$sal_choice" =~ ^[12]$ ]]; then
+                    break
+                else
+                    echo -e "${RED}Invalid choice: '$sal_choice'. Please enter 1 or 2.${NC}" >&2
+                fi
+            done
             
             if [[ "$sal_choice" == "2" ]]; then
                 # Extract and rank serotypes
@@ -116,8 +127,18 @@ handle_pathogen_grouping() {
                     if [[ $total_serotypes -gt 20 ]]; then
                         echo "" >&2
                         echo "... and $((total_serotypes - 20)) more serotypes" >&2
-                        read -p "Show all serotypes? (y/n) [n]: " show_all
-                        show_all=${show_all:-n}
+                        
+                        while true; do
+                            read -p "Show all serotypes? (y/n) [n]: " show_all
+                            show_all=${show_all:-n}
+                            
+                            if [[ "$show_all" =~ ^[YyNn]$ ]]; then
+                                break
+                            else
+                                echo -e "${RED}Invalid input: '$show_all'. Please enter y or n.${NC}" >&2
+                            fi
+                        done
+                        
                         if [[ "$show_all" =~ ^[Yy]$ ]]; then
                             echo "$serotype_data" | tail -n +21 | nl -nln -w3 -v 21 | while read num count serotype; do
                                 printf "[%s] %-30s (n=%s)\n" "$num" "$serotype" "$count" >&2
@@ -181,20 +202,24 @@ echo -e "${BLUE}=========================================${NC}"
 echo ""
 
 # Ask for run mode
-echo -e "Select run mode:"
-echo "1) Test"
-echo "2) Publication" 
-echo "3) Max"
-echo "4) Custom"
-echo "5) Resume previous run"
-read -p "Enter selection [1]: " run_mode
-run_mode=${run_mode:-1}
-
-# Validate run mode
-if [[ ! "$run_mode" =~ ^[1-5]$ ]]; then
-    echo -e "${RED}Invalid selection. Using default (Test).${NC}"
-    run_mode=1
-fi
+while true; do
+    echo -e "Select run mode:"
+    echo "1) Test"
+    echo "2) Publication" 
+    echo "3) Max"
+    echo "4) Custom"
+    echo "5) Resume previous run"
+    read -p "Enter selection [1]: " run_mode
+    run_mode=${run_mode:-1}
+    
+    # Validate run mode
+    if [[ "$run_mode" =~ ^[1-5]$ ]]; then
+        break
+    else
+        echo -e "${RED}Invalid selection: '$run_mode'. Please enter 1-5.${NC}"
+        echo ""
+    fi
+done
 
 # Convert run mode to flag
 case $run_mode in
@@ -207,8 +232,17 @@ esac
 
 # Ask if user wants to run in background
 echo ""
-read -p "Run in background? (y/n) [n]: " bg_choice
-bg_choice=${bg_choice:-n}
+while true; do
+    read -p "Run in background? (y/n) [n]: " bg_choice
+    bg_choice=${bg_choice:-n}
+    
+    if [[ "$bg_choice" =~ ^[YyNn]$ ]]; then
+        break
+    else
+        echo -e "${RED}Invalid input: '$bg_choice'. Please enter y or n.${NC}"
+    fi
+done
+
 if [[ "$bg_choice" =~ ^[Yy]$ ]]; then
     background=true
 else
@@ -427,36 +461,47 @@ else
         pathogens=${pathogens:-"CAMPYLOBACTER,CYCLOSPORA"}
     fi
 
-    # Validate pathogens
+    # Validate and normalize pathogen names
     if [[ "$use_preprocessed" == false ]]; then
         # Strict validation when not using preprocessed data
         valid_pathogens=("CAMPYLOBACTER" "CYCLOSPORA" "SALMONELLA" "SHIGELLA" "STEC" "VIBRIO" "YERSINIA")
         IFS=',' read -ra pathogen_array <<< "$pathogens"
+        normalized_pathogens=""
         invalid_found=false
 
         for p in "${pathogen_array[@]}"; do
+            # Convert to uppercase and trim whitespace
+            p_upper=$(echo "$p" | tr '[:lower:]' '[:upper:]' | xargs)
             valid=false
+            
             for vp in "${valid_pathogens[@]}"; do
-                if [[ "$p" == "$vp" ]]; then
+                if [[ "$p_upper" == "$vp" ]]; then
                     valid=true
+                    # Add to normalized list
+                    if [[ -n "$normalized_pathogens" ]]; then
+                        normalized_pathogens="${normalized_pathogens},${vp}"
+                    else
+                        normalized_pathogens="${vp}"
+                    fi
                     break
                 fi
             done
             
             if [[ "$valid" == false ]]; then
-                echo -e "${YELLOW}Warning: '$p' is not a recognized pathogen and may cause errors.${NC}"
+                echo -e "${RED}Error: '$p' is not a recognized pathogen.${NC}"
+                echo -e "${YELLOW}Valid pathogens are: ${valid_pathogens[*]}${NC}"
                 invalid_found=true
             fi
         done
 
         if [[ "$invalid_found" == true ]]; then
             echo ""
-            read -p "Continue anyway? (y/n) [n]: " continue_choice
-            continue_choice=${continue_choice:-n}
-            if [[ ! "$continue_choice" =~ ^[Yy]$ ]]; then
-                echo -e "${RED}Exiting.${NC}"
-                exit 1
-            fi
+            echo "Please enter valid pathogen names."
+            # Loop back to pathogen entry
+            continue
+        else
+            # Update pathogens with normalized values
+            pathogens="$normalized_pathogens"
         fi
     else
         # More lenient validation when using preprocessed data
@@ -478,8 +523,17 @@ echo "These are optional CSV files for custom analysis settings."
 echo ""
 
 # Serotype configuration
-read -p "Use custom serotype configuration? (y/n) [n]: " use_serotype_config
-use_serotype_config=${use_serotype_config:-n}
+while true; do
+    read -p "Use custom serotype configuration? (y/n) [n]: " use_serotype_config
+    use_serotype_config=${use_serotype_config:-n}
+    
+    if [[ "$use_serotype_config" =~ ^[YyNn]$ ]]; then
+        break
+    else
+        echo -e "${RED}Invalid input: '$use_serotype_config'. Please enter y or n.${NC}"
+    fi
+done
+
 serotype_config=""
 if [[ "$use_serotype_config" =~ ^[Yy]$ ]]; then
     echo "Enter path to serotype configuration CSV file"
@@ -493,8 +547,17 @@ fi
 
 # Catchment configuration
 echo ""
-read -p "Use custom catchment configuration? (y/n) [n]: " use_catchment_config
-use_catchment_config=${use_catchment_config:-n}
+while true; do
+    read -p "Use custom catchment configuration? (y/n) [n]: " use_catchment_config
+    use_catchment_config=${use_catchment_config:-n}
+    
+    if [[ "$use_catchment_config" =~ ^[YyNn]$ ]]; then
+        break
+    else
+        echo -e "${RED}Invalid input: '$use_catchment_config'. Please enter y or n.${NC}"
+    fi
+done
+
 catchment_config=""
 if [[ "$use_catchment_config" =~ ^[Yy]$ ]]; then
     echo "Enter path to catchment configuration CSV file"
@@ -516,13 +579,19 @@ if [[ "$use_preprocessed" == false ]]; then
     echo "  MEDIUM  - Exact + prefix matching + fuzzy (1 char diff)"
     echo "  RELAXED - All matching methods + fuzzy (2 char diff)"
     echo ""
-    read -p "Matching sensitivity [MEDIUM]: " matching_sensitivity
-    matching_sensitivity=${matching_sensitivity:-MEDIUM}
-    # Validate input
-    if [[ ! "$matching_sensitivity" =~ ^(STRICT|MEDIUM|RELAXED)$ ]]; then
-        echo -e "${YELLOW}Invalid input. Using default (MEDIUM).${NC}"
-        matching_sensitivity="MEDIUM"
-    fi
+    while true; do
+        read -p "Matching sensitivity [MEDIUM]: " matching_sensitivity
+        matching_sensitivity=${matching_sensitivity:-MEDIUM}
+        # Convert to uppercase for comparison
+        matching_sensitivity_upper="${matching_sensitivity^^}"
+        
+        if [[ "$matching_sensitivity_upper" =~ ^(STRICT|MEDIUM|RELAXED)$ ]]; then
+            matching_sensitivity="$matching_sensitivity_upper"
+            break
+        else
+            echo -e "${RED}Invalid input: '$matching_sensitivity'. Please enter STRICT, MEDIUM, or RELAXED.${NC}"
+        fi
+    done
 fi
 
 # Set MCMC parameters based on the run mode
@@ -816,8 +885,16 @@ echo -e "Command to run:"
 echo -e "${YELLOW}$final_cmd${NC}"
 echo ""
 
-read -p "Proceed with analysis? (y/n) [y]: " proceed
-proceed=${proceed:-y}
+while true; do
+    read -p "Proceed with analysis? (y/n) [y]: " proceed
+    proceed=${proceed:-y}
+    
+    if [[ "$proceed" =~ ^[YyNn]$ ]]; then
+        break
+    else
+        echo -e "${RED}Invalid input: '$proceed'. Please enter y or n.${NC}"
+    fi
+done
 
 if [[ "$proceed" =~ ^[Yy]$ ]]; then
     echo -e "${GREEN}Starting analysis...${NC}"

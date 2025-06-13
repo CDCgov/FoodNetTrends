@@ -95,9 +95,12 @@ workflow SPLINE {
             // Read the CSV directly
             metricsChannel = Channel.fromPath(resourceProfilePath)
                 .splitCsv(header: true)
-                .collect { rows ->
+                .collect { rowList ->
+                    if (rowList.isEmpty()) {
+                        error "Resource profile is empty - no pathogen data found"
+                    }
                     def metrics = [:]
-                    rows.each { row ->
+                    rowList.each { row ->
                         metrics[row.pathogen] = [
                             rows: row.rows as Integer,
                             sites: row.sites as Integer,
@@ -116,9 +119,12 @@ workflow SPLINE {
             // Read the CSV output
             metricsChannel = RESOURCE_PROFILER.out.profile
                 .splitCsv(header: true)
-                .collect { rows ->
+                .collect { rowList ->
+                    if (rowList.isEmpty()) {
+                        error "Resource profile is empty - no pathogen data found"
+                    }
                     def metrics = [:]
-                    rows.each { row ->
+                    rowList.each { row ->
                         metrics[row.pathogen] = [
                             rows: row.rows as Integer,
                             sites: row.sites as Integer,
@@ -168,6 +174,13 @@ workflow SPLINE {
                 log.debug "Creating tuple for ${pathogen}: grouping=${grouping}, subgroup=${subgroup}, metrics=${pathogenMetrics}"
                 tuple(grouping, pathogen, subgroup, pathogenMetrics)
             }
+            .filter { grouping, pathogen, subgroup, pathogenMetrics ->
+                if (pathogenMetrics.rows == 0) {
+                    log.warn "Skipping ${pathogen} - no data available in preprocessed file"
+                    return false
+                }
+                return true
+            }
 
         // Run TRENDY with preprocessed data and metrics
         TRENDY(
@@ -202,9 +215,9 @@ workflow SPLINE {
         // Read the CSV output
         metricsChannel = RESOURCE_PROFILER.out.profile
             .splitCsv(header: true)
-            .collect { rows ->
+            .collect { rowList ->
                 def metrics = [:]
-                rows.each { row ->
+                rowList.each { row ->
                     metrics[row.pathogen] = [
                         rows: row.rows as Integer,
                         sites: row.sites as Integer,
@@ -282,6 +295,13 @@ workflow SPLINE {
                 // Debug: log what we're passing
                 log.debug "Creating tuple for ${pathogen}: grouping=${grouping}, subgroup=${subgroup}, metrics=${pathogenMetrics}"
                 tuple(grouping, pathogen, subgroup, pathogenMetrics)
+            }
+            .filter { grouping, pathogen, subgroup, pathogenMetrics ->
+                if (pathogenMetrics.rows == 0) {
+                    log.warn "Skipping ${pathogen} - no data available in preprocessed file"
+                    return false
+                }
+                return true
             }
 
         // Run TRENDY with processed data and metrics
