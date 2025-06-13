@@ -159,6 +159,11 @@ workflow SPLINE {
                 def parts = grouping.split(':')
                 def pathogen = parts[0]
                 def subgroup = parts.length > 1 ? parts[1] : 'combined'
+                
+                // Debug: log the metrics map
+                log.debug "Metrics map keys: ${metrics.keySet()}"
+                log.debug "Looking for pathogen: '${pathogen}'"
+                
                 // Ensure we get a proper map, not just a value
                 def rawMetrics = metrics[pathogen]
                 def pathogenMetrics
@@ -283,6 +288,11 @@ workflow SPLINE {
                 def parts = grouping.split(':')
                 def pathogen = parts[0]
                 def subgroup = parts.length > 1 ? parts[1] : 'combined'
+                
+                // Debug: log the metrics map
+                log.debug "Metrics map keys: ${metrics.keySet()}"
+                log.debug "Looking for pathogen: '${pathogen}'"
+                
                 // Ensure we get a proper map, not just a value
                 def rawMetrics = metrics[pathogen]
                 def pathogenMetrics

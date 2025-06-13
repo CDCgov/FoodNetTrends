@@ -328,6 +328,17 @@ pathogen_mode=${pathogen_mode:-2}
 if [[ "$pathogen_mode" == "1" ]]; then
     # Use all pathogens
     if [[ "$use_preprocessed" == true ]] && [[ -f "$preprocessed_file" ]]; then
+        # When using preprocessed data with "ALL pathogens", use AUTO_DISCOVER
+        echo -e "${GREEN}Using AUTO_DISCOVER mode to extract all pathogens from preprocessed data${NC}"
+        pathogens="AUTO_DISCOVER"
+        pathogen_grouping=""  # Clear any grouping - will be handled by workflow
+    elif [[ "$use_preprocessed" == true ]]; then
+        # This shouldn't happen but handle it
+        echo -e "${YELLOW}Preprocessed file not found. Using default pathogen list.${NC}"
+        pathogens=$ALL_PATHOGENS
+        echo -e "${GREEN}Selected: ALL pathogens (${ALL_PATHOGENS})${NC}"
+    else
+        # Not using preprocessed data, extract from the data that will be processed
         # Look for resource profile first
         resource_profile_dir=$(dirname "$preprocessed_file")
         resource_profile_file="${resource_profile_dir}/resource_profile.csv"
