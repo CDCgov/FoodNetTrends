@@ -27,6 +27,9 @@ ALL_PATHOGENS="CAMPYLOBACTER,CYCLOSPORA,SALMONELLA,SHIGELLA,STEC,VIBRIO,YERSINIA
 serotype_config=""
 catchment_config=""
 matching_sensitivity="MEDIUM"
+pathogens=""  # Initialize to prevent undefined variable errors
+use_preprocessed=false
+preprocessed_file=""
 
 # Function to handle pathogen grouping decisions
 handle_pathogen_grouping() {
@@ -163,6 +166,12 @@ handle_pathogen_grouping() {
             ;;
     esac
     
+    # Validate that grouping is not empty
+    if [[ -z "$grouping" ]] || [[ -z "${grouping// }" ]]; then
+        echo -e "${YELLOW}Warning: Empty grouping detected. Using default.${NC}" >&2
+        grouping="${pathogen}:combined"
+    fi
+    
     echo "$grouping"
 }
 
@@ -281,11 +290,37 @@ if [[ "$pathogen_mode" == "1" ]]; then
     if [[ "$use_preprocessed" == true ]] && [[ -f "$preprocessed_file" ]]; then
         # Extract all pathogens from preprocessed data
         echo "Extracting all pathogens from preprocessed data..."
-        all_from_data=$(cut -d',' -f1 "$preprocessed_file" | tail -n +2 | \
-            sed 's/^"//;s/"$//' | \
-            grep '^[A-Z][A-Z]*$' | \
-            sort -u | \
-            tr '\n' ',' | sed 's/,$//')
+        all_from_data=$(awk -F',' '
+            function unquote(s) {
+                gsub(/^"/, "", s)
+                gsub(/"$/, "", s)
+                gsub(/""/, "\"", s)  # Handle escaped quotes
+                return s
+            }
+            NR>1 {
+                # Get first field, handling quoted values
+                field1 = $1
+                # If the field starts with a quote, we need to handle embedded commas
+                if (substr(field1, 1, 1) == "\"") {
+                    # Find the closing quote
+                    full_field = field1
+                    for (i = 2; i <= NF; i++) {
+                        full_field = full_field "," $i
+                        if (substr($i, length($i), 1) == "\"" && substr($i, length($i)-1, 1) != "\"") {
+                            break
+                        }
+                    }
+                    field1 = full_field
+                }
+                pathogen = unquote(field1)
+                # Only include valid pathogen names (starts with letter, allows letters, numbers, dots, hyphens, spaces)
+                # Must be primarily uppercase but allow some flexibility
+                if (pathogen ~ /^[A-Za-z][A-Za-z0-9. -]*$/ && length(pathogen) > 0) {
+                    # Convert to uppercase for consistency
+                    pathogen = toupper(pathogen)
+                    print pathogen
+                }
+            }' "$preprocessed_file" | sort -u | tr '\n' ',' | sed 's/,$//')
         if [[ -n "$all_from_data" ]]; then
             pathogens=$all_from_data
             echo -e "${GREEN}Selected: ALL pathogens found in data (${pathogens})${NC}"
@@ -295,8 +330,9 @@ if [[ "$pathogen_mode" == "1" ]]; then
             echo -e "${GREEN}Selected: ALL pathogens (${ALL_PATHOGENS})${NC}"
         fi
     else
-        pathogens=$ALL_PATHOGENS
-        echo -e "${GREEN}Selected: ALL pathogens (${ALL_PATHOGENS})${NC}"
+        # Not using preprocessed data - use AUTO_DISCOVER
+        pathogens="AUTO_DISCOVER"
+        echo -e "${GREEN}Selected: ALL pathogens (will discover from data during preprocessing)${NC}"
     fi
 else
     # Ask for specific pathogens
@@ -306,12 +342,38 @@ else
     if [[ "$use_preprocessed" == true ]] && [[ -f "$preprocessed_file" ]]; then
         echo "Analyzing preprocessed data for available pathogens..."
         # More robust pathogen extraction that handles quoted CSV fields
-        # Use cut to get first column, then clean and filter
-        available_pathogens=$(cut -d',' -f1 "$preprocessed_file" | tail -n +2 | \
-            sed 's/^"//;s/"$//' | \
-            grep '^[A-Z][A-Z]*$' | \
-            sort -u | \
-            tr '\n' ',' | sed 's/,$//')
+        # Use awk for proper CSV parsing, handling quoted fields
+        available_pathogens=$(awk -F',' '
+            function unquote(s) {
+                gsub(/^"/, "", s)
+                gsub(/"$/, "", s)
+                gsub(/""/, "\"", s)  # Handle escaped quotes
+                return s
+            }
+            NR>1 {
+                # Get first field, handling quoted values
+                field1 = $1
+                # If the field starts with a quote, we need to handle embedded commas
+                if (substr(field1, 1, 1) == "\"") {
+                    # Find the closing quote
+                    full_field = field1
+                    for (i = 2; i <= NF; i++) {
+                        full_field = full_field "," $i
+                        if (substr($i, length($i), 1) == "\"" && substr($i, length($i)-1, 1) != "\"") {
+                            break
+                        }
+                    }
+                    field1 = full_field
+                }
+                pathogen = unquote(field1)
+                # Only include valid pathogen names (starts with letter, allows letters, numbers, dots, hyphens, spaces)
+                # Must be primarily uppercase but allow some flexibility
+                if (pathogen ~ /^[A-Za-z][A-Za-z0-9. -]*$/ && length(pathogen) > 0) {
+                    # Convert to uppercase for consistency
+                    pathogen = toupper(pathogen)
+                    print pathogen
+                }
+            }' "$preprocessed_file" | sort -u | tr '\n' ',' | sed 's/,$//')
         
         if [[ -n "$available_pathogens" ]]; then
             echo -e "${GREEN}Found pathogens in preprocessed data:${NC}"
@@ -324,9 +386,9 @@ else
             echo -e "${YELLOW}Available: $available_pathogens${NC}"
             read -p "Leave blank to analyze all found pathogens: " pathogens
             pathogens=${pathogens:-"$available_pathogens"}
-            # Ensure pathogens is not empty
-            if [[ -z "$pathogens" ]]; then
-                echo -e "${YELLOW}No pathogens specified. Using default.${NC}"
+            # Ensure pathogens is not empty after defaulting
+            if [[ -z "$pathogens" ]] || [[ -z "${pathogens// }" ]]; then
+                echo -e "${YELLOW}No pathogens could be determined. Using default.${NC}"
                 pathogens="CAMPYLOBACTER,CYCLOSPORA"
             fi
         else
@@ -393,7 +455,7 @@ else
     else
         # More lenient validation when using preprocessed data
         # Just check that something was entered
-        if [[ -z "$pathogens" ]]; then
+        if [[ -z "$pathogens" ]] || [[ -z "${pathogens// }" ]]; then
             echo -e "${YELLOW}No pathogens selected. Using default.${NC}"
             pathogens="CAMPYLOBACTER,CYCLOSPORA"
         fi
@@ -593,8 +655,9 @@ fi
 # Handle pathogen grouping for STEC and Salmonella
 # This section processes user preferences for how to analyze pathogen subgroups
 pathogen_grouping=""
-if [[ "$flag" != "resume" ]]; then
-    # Check if STEC or Salmonella are in the selected pathogens
+if [[ "$flag" != "resume" ]] && [[ "$pathogens" != "AUTO_DISCOVER" ]]; then
+    # Only ask about grouping if we have specific pathogens selected
+    # Skip if using AUTO_DISCOVER since we don't know what pathogens exist yet
     IFS=',' read -ra selected_pathogens <<< "$pathogens"
     grouped_pathogens=""
     
@@ -691,8 +754,8 @@ cmd="$cmd --matching_sensitivity \"$matching_sensitivity\""
 if [[ "$use_preprocessed" == true ]]; then
     cmd="$cmd --preprocessed true --cleanFile \"$preprocessed_file\""
 fi
-# Add pathogen grouping if specified
-if [[ -n "$pathogen_grouping" ]]; then
+# Add pathogen grouping if specified and not empty
+if [[ -n "$pathogen_grouping" ]] && [[ -n "${pathogen_grouping// }" ]]; then
     cmd="$cmd --pathogen_grouping \"$pathogen_grouping\""
 fi
 
@@ -709,7 +772,11 @@ fi
 echo ""
 echo -e "${BLUE}========= Analysis Summary ==========${NC}"
 echo -e "Mode: ${GREEN}$([ "$flag" == "test" ] && echo "Test" || [ "$flag" == "publication" ] && echo "Publication" || [ "$flag" == "max" ] && echo "Max" || [ "$flag" == "custom" ] && echo "Custom" || echo "Resume previous run")${NC}"
-echo -e "Pathogens: ${GREEN}$pathogens${NC}"
+if [[ "$pathogens" == "AUTO_DISCOVER" ]]; then
+    echo -e "Pathogens: ${GREEN}All pathogens found in data (auto-discovery)${NC}"
+else
+    echo -e "Pathogens: ${GREEN}$pathogens${NC}"
+fi
 
 if [[ "$flag" != "resume" ]]; then
     echo -e "Chains: ${GREEN}$chains${NC}"
