@@ -591,20 +591,20 @@ for (pathogen_name in target_pathogens) {
     report_progress("ANALYSIS", message="Calculating relative risks and percent changes")
     
     # Calculate for 2016-2018 (the Healthy People 2030 baseline period)
-    hp30<-IR_COMP_CATCH(catch, catchir.linpred, 2016, 2018,
+    hp30<-IR_COMP_CATCH(catch, 2016, 2018,
                   paste0(outDir, "/", output_prefix, "_EstIRRCatch_2016_2018.csv"))
     
     # Calculate for COVID-19
-    IR_COMP_CATCH(catch, catchir.linpred, 2020, 2021,
-                  paste0(outDir, "/", output_prefix, "_EstIRRCatch_2020_2022.csv"))
+    # IR_COMP_CATCH(catch, 2020, 2021,
+    #              paste0(outDir, "/", output_prefix, "_EstIRRCatch_2020_2022.csv"))
     
     # Calculate for earliest years where the FoodNet catchment were stable
-    IR_COMP_CATCH(catch, catchir.linpred, 2004, 2006,
-                  paste0(outDir, "/", output_prefix, "_EstIRRCatch_2004_2006.csv"))
+    # IR_COMP_CATCH(catch, 2004, 2006,
+    #              paste0(outDir, "/", output_prefix, "_EstIRRCatch_2004_2006.csv"))
     
     # Calculate for 2006-2008 baseline (the Healthy People 2020 baseline)
-    IR_COMP_CATCH(catch, catchir.linpred, 2006, 2008,
-                  paste0(outDir, "/", output_prefix, "_EstIRRCatch_2006_2008.csv"))
+    # IR_COMP_CATCH(catch, 2006, 2008,
+    #              paste0(outDir, "/", output_prefix, "_EstIRRCatch_2006_2008.csv"))
     
     # Create visualizations if enabled
     if (requireNamespace("ggplot2", quietly = TRUE)) {
