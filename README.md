@@ -241,3 +241,17 @@ This pipeline uses code and infrastructure developed and maintained by the [nf-c
 
 ## License
 This software is released under the CDC Public Domain License.
+
+## SHARE IT Act Compliance
+ 
+```
+Organization: NCEZID/AMD
+ 
+Contact email: ncezid_shareit@cdc.gov
+ 
+Exemption: NA
+ 
+Exemption Justification: NA
+ 
+Description fields:
+```
