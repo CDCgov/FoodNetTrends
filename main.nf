@@ -31,8 +31,9 @@ if (params.help) {
     System.exit(0)
 }
 
-// Include the SPLINE workflow
+// Include workflows
 include { SPLINE } from './workflows/spline.nf'
+include { PREPROCESS_ONLY } from './workflows/spline.nf'
 
 workflow FoodNetTrends {
     SPLINE()

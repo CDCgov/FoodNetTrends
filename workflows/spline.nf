@@ -194,6 +194,23 @@ workflow SPLINE {
                 if (pathogenMetrics.rows == 0) {
                     log.warn "No data found for pathogen: ${pathogen}. Using default metrics."
                 }
+                // Adjust metrics for serotype subgroups
+                // If analyzing a specific serotype (not 'combined'), estimate smaller resource needs
+                if (subgroup != 'combined' && pathogen == 'SALMONELLA') {
+                    // Rough estimate: individual serotypes are typically 5-20% of total Salmonella
+                    // Use 15% as a reasonable estimate
+                    def adjustedRows = Math.max(1000, (pathogenMetrics.rows * 0.15) as Integer)
+                    def adjustedComplexity = Math.max(10000, (pathogenMetrics.complexity * 0.15) as Long)
+                    pathogenMetrics = [
+                        rows: adjustedRows,
+                        sites: pathogenMetrics.sites,
+                        years: pathogenMetrics.years,
+                        complexity: adjustedComplexity,
+                        size_category: adjustedRows > 20000 ? "large" : adjustedRows > 10000 ? "medium" : "small"
+                    ]
+                    log.info "Adjusted metrics for ${pathogen}:${subgroup} - rows: ${adjustedRows} (from ${rawMetrics.rows})"
+                }
+                
                 // Debug: log what we're passing
                 log.debug "Creating tuple for ${pathogen}: grouping=${grouping}, subgroup=${subgroup}, metrics=${pathogenMetrics}"
                 tuple(grouping, pathogen, subgroup, pathogenMetrics)
@@ -324,6 +341,23 @@ workflow SPLINE {
                 if (pathogenMetrics.rows == 0) {
                     log.warn "No data found for pathogen: ${pathogen}. Using default metrics."
                 }
+                // Adjust metrics for serotype subgroups
+                // If analyzing a specific serotype (not 'combined'), estimate smaller resource needs
+                if (subgroup != 'combined' && pathogen == 'SALMONELLA') {
+                    // Rough estimate: individual serotypes are typically 5-20% of total Salmonella
+                    // Use 15% as a reasonable estimate
+                    def adjustedRows = Math.max(1000, (pathogenMetrics.rows * 0.15) as Integer)
+                    def adjustedComplexity = Math.max(10000, (pathogenMetrics.complexity * 0.15) as Long)
+                    pathogenMetrics = [
+                        rows: adjustedRows,
+                        sites: pathogenMetrics.sites,
+                        years: pathogenMetrics.years,
+                        complexity: adjustedComplexity,
+                        size_category: adjustedRows > 20000 ? "large" : adjustedRows > 10000 ? "medium" : "small"
+                    ]
+                    log.info "Adjusted metrics for ${pathogen}:${subgroup} - rows: ${adjustedRows} (from ${rawMetrics.rows})"
+                }
+                
                 // Debug: log what we're passing
                 log.debug "Creating tuple for ${pathogen}: grouping=${grouping}, subgroup=${subgroup}, metrics=${pathogenMetrics}"
                 tuple(grouping, pathogen, subgroup, pathogenMetrics)
@@ -355,4 +389,60 @@ workflow SPLINE {
 
     // Log completion
     log.info "Pipeline completed successfully"
+}
+
+/*
+========================================================================================
+    PREPROCESSING ONLY WORKFLOW
+========================================================================================
+*/
+
+workflow PREPROCESS_ONLY {
+    // Input validation
+    def mmwrFile = file(params.mmwrFile)
+    if (!mmwrFile.exists()) {
+        error "MMWR file not found: ${params.mmwrFile}"
+    }
+
+    // Log preprocessing start
+    log.info """
+    ==============================================
+    FoodNet Preprocessing Only
+    ==============================================
+    Project ID    : ${params.projID}
+    MMWR File     : ${params.mmwrFile}
+    Matching      : ${params.matching_sensitivity ?: 'MEDIUM'}
+    Output Dir    : ${params.outdir}/${params.projID}
+    ==============================================
+    """
+
+    // Run preprocessing
+    PREPROCESS(
+        mmwrFile,
+        params.serotypeFile
+    )
+
+    // Run resource profiler on preprocessed data
+    RESOURCE_PROFILER(PREPROCESS.out.cleanCsv)
+
+    // Log results
+    log.info """
+    ==============================================
+    Preprocessing Complete!
+    ==============================================
+    
+    Output files generated:
+    - Cleaned data: ${params.outdir}/${params.projID}/preprocessed/clean_mmwr.csv
+    - Resource profile: ${params.outdir}/${params.projID}/preprocessed/resource_profile.csv
+    - State metadata: ${params.outdir}/${params.projID}/preprocessed/metadata_states.csv
+    - CIDT metadata: ${params.outdir}/${params.projID}/preprocessed/metadata_cidt.csv
+    - Travel metadata: ${params.outdir}/${params.projID}/preprocessed/metadata_travel.csv
+    - Preprocessing report: ${params.outdir}/${params.projID}/preprocessed/clean_mmwr_preprocessing_report.csv
+    
+    You can now use these files for:
+    1. Running the full analysis with preprocessed data
+    2. Viewing available pathogens and serotypes
+    3. Understanding data composition (states, years, diagnostic methods)
+    ==============================================
+    """
 }
