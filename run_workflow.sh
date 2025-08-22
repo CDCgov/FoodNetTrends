@@ -274,14 +274,15 @@ while true; do
     echo "3) Max"
     echo "4) Custom"
     echo "5) Resume previous run"
+    echo "6) Preprocessing only"
     read -p "Enter selection [1]: " run_mode
     run_mode=${run_mode:-1}
     
     # Validate run mode
-    if [[ "$run_mode" =~ ^[1-5]$ ]]; then
+    if [[ "$run_mode" =~ ^[1-6]$ ]]; then
         break
     else
-        echo -e "${RED}Invalid selection: '$run_mode'. Please enter 1-5.${NC}"
+        echo -e "${RED}Invalid selection: '$run_mode'. Please enter 1-6.${NC}"
         echo ""
     fi
 done
@@ -293,20 +294,26 @@ case $run_mode in
     3) flag="max" ;;
     4) flag="custom" ;;
     5) flag="resume" ;;
+    6) flag="preprocess" ;;
 esac
 
-# Ask if user wants to run in background
-echo ""
-while true; do
-    read -p "Run in background? (y/n) [n]: " bg_choice
-    bg_choice=${bg_choice:-n}
-    
-    if [[ "$bg_choice" =~ ^[YyNn]$ ]]; then
-        break
-    else
-        echo -e "${RED}Invalid input: '$bg_choice'. Please enter y or n.${NC}"
-    fi
-done
+# Skip background option for preprocessing only
+if [[ "$flag" != "preprocess" ]]; then
+    # Ask if user wants to run in background
+    echo ""
+    while true; do
+        read -p "Run in background? (y/n) [n]: " bg_choice
+        bg_choice=${bg_choice:-n}
+        
+        if [[ "$bg_choice" =~ ^[YyNn]$ ]]; then
+            break
+        else
+            echo -e "${RED}Invalid input: '$bg_choice'. Please enter y or n.${NC}"
+        fi
+    done
+else
+    bg_choice="n"  # Preprocessing always runs in foreground
+fi
 
 if [[ "$bg_choice" =~ ^[Yy]$ ]]; then
     background=true
@@ -367,6 +374,7 @@ if [[ ${#preprocessed_files[@]} -gt 0 ]]; then
     done
     
     echo "0) Skip - run preprocessing again"
+    echo "C) Specify custom path to preprocessed data"
     echo ""
     read -p "Select preprocessed file to use [0]: " selection
     selection=${selection:-0}
@@ -375,20 +383,118 @@ if [[ ${#preprocessed_files[@]} -gt 0 ]]; then
         use_preprocessed=true
         preprocessed_file="${preprocessed_files[$((selection-1))]}"
         echo -e "${GREEN}Using preprocessed data: $preprocessed_file${NC}"
+    elif [[ "${selection^^}" == "C" ]]; then
+        # Custom path option
+        echo ""
+        echo "Enter the full path to the preprocessed directory"
+        echo "(This directory should contain clean_mmwr.csv and resource_profile.csv)"
+        read -p "Path: " custom_path
+        
+        # Validate the custom path
+        if [[ -d "$custom_path" ]]; then
+            # Check for required files
+            custom_clean="${custom_path}/clean_mmwr.csv"
+            custom_resource="${custom_path}/resource_profile.csv"
+            
+            if [[ -f "$custom_clean" ]]; then
+                use_preprocessed=true
+                preprocessed_file="$custom_clean"
+                echo -e "${GREEN}Using custom preprocessed data: $preprocessed_file${NC}"
+                
+                if [[ ! -f "$custom_resource" ]]; then
+                    echo -e "${YELLOW}Warning: resource_profile.csv not found in custom path.${NC}"
+                    echo -e "${YELLOW}Some features may be limited.${NC}"
+                fi
+            else
+                echo -e "${RED}Error: clean_mmwr.csv not found in specified directory.${NC}"
+                echo -e "${YELLOW}Will run preprocessing step instead.${NC}"
+                use_preprocessed=false
+            fi
+        else
+            echo -e "${RED}Error: Directory not found: $custom_path${NC}"
+            echo -e "${YELLOW}Will run preprocessing step instead.${NC}"
+            use_preprocessed=false
+        fi
     else
         echo -e "${YELLOW}Will run preprocessing step${NC}"
     fi
 else
-    echo -e "${YELLOW}No preprocessed data found. Will run preprocessing step.${NC}"
+    echo -e "${YELLOW}No preprocessed data found locally.${NC}"
+    echo ""
+    while true; do
+        read -p "Do you want to specify a custom path to preprocessed data? (y/n) [n]: " custom_choice
+        custom_choice=${custom_choice:-n}
+        
+        if [[ "$custom_choice" =~ ^[YyNn]$ ]]; then
+            break
+        else
+            echo -e "${RED}Invalid input: '$custom_choice'. Please enter y or n.${NC}"
+        fi
+    done
+    
+    if [[ "$custom_choice" =~ ^[Yy]$ ]]; then
+        echo ""
+        echo "Enter the full path to the preprocessed directory"
+        echo "(This directory should contain clean_mmwr.csv and resource_profile.csv)"
+        read -p "Path: " custom_path
+        
+        # Validate the custom path
+        if [[ -d "$custom_path" ]]; then
+            # Check for required files
+            custom_clean="${custom_path}/clean_mmwr.csv"
+            custom_resource="${custom_path}/resource_profile.csv"
+            
+            if [[ -f "$custom_clean" ]]; then
+                use_preprocessed=true
+                preprocessed_file="$custom_clean"
+                echo -e "${GREEN}Using custom preprocessed data: $preprocessed_file${NC}"
+                
+                if [[ ! -f "$custom_resource" ]]; then
+                    echo -e "${YELLOW}Warning: resource_profile.csv not found in custom path.${NC}"
+                    echo -e "${YELLOW}Some features may be limited.${NC}"
+                fi
+            else
+                echo -e "${RED}Error: clean_mmwr.csv not found in specified directory.${NC}"
+                echo -e "${YELLOW}Will run preprocessing step instead.${NC}"
+            fi
+        else
+            echo -e "${RED}Error: Directory not found: $custom_path${NC}"
+            echo -e "${YELLOW}Will run preprocessing step instead.${NC}"
+        fi
+    else
+        echo -e "${YELLOW}Will run preprocessing step.${NC}"
+    fi
 fi
 
-# NOW ask about pathogens (after we know about preprocessed data)
-echo ""
-echo -e "Pathogen selection:"
-echo "1) Run ALL available pathogens"
-echo "2) Select specific pathogens"
-read -p "Enter selection [2]: " pathogen_mode
-pathogen_mode=${pathogen_mode:-2}
+# For preprocessing-only mode, skip all other options
+if [[ "$flag" == "preprocess" ]]; then
+    if [[ "$use_preprocessed" == true ]]; then
+        echo ""
+        echo -e "${YELLOW}Note: Preprocessing-only mode selected but existing preprocessed data was chosen.${NC}"
+        echo -e "${YELLOW}The pipeline will regenerate preprocessing files from the raw data.${NC}"
+        use_preprocessed=false
+        preprocessed_file=""
+    fi
+    
+    # Set defaults for preprocessing-only mode
+    pathogens="AUTO_DISCOVER"
+    pathogen_grouping=""
+    matching_sensitivity="MEDIUM"
+    serotype_config=""
+    catchment_config=""
+    selected_states=""
+    selected_cidt=""
+    selected_travel=""
+    
+    # Skip to command building
+else
+    # NOW ask about pathogens (after we know about preprocessed data)
+    echo ""
+    echo -e "Pathogen selection:"
+    echo "1) Run ALL available pathogens"
+    echo "2) Select specific pathogens"
+    read -p "Enter selection [2]: " pathogen_mode
+    pathogen_mode=${pathogen_mode:-2}
 
 if [[ "$pathogen_mode" == "1" ]]; then
     # Use all pathogens
@@ -415,39 +521,69 @@ else
     # If using preprocessed data, try to extract available pathogens
     if [[ "$use_preprocessed" == true ]] && [[ -f "$preprocessed_file" ]]; then
         echo "Analyzing preprocessed data for available pathogens..."
-        # More robust pathogen extraction that handles quoted CSV fields
-        # Use awk for proper CSV parsing, handling quoted fields
-        available_pathogens=$(awk -F',' '
-            function unquote(s) {
-                gsub(/^"/, "", s)
-                gsub(/"$/, "", s)
-                gsub(/""/, "\"", s)  # Handle escaped quotes
-                return s
-            }
-            NR>1 {
-                # Get first field, handling quoted values
-                field1 = $1
-                # If the field starts with a quote, we need to handle embedded commas
-                if (substr(field1, 1, 1) == "\"") {
-                    # Find the closing quote
-                    full_field = field1
-                    for (i = 2; i <= NF; i++) {
-                        full_field = full_field "," $i
-                        if (substr($i, length($i), 1) == "\"" && substr($i, length($i)-1, 1) != "\"") {
-                            break
+        
+        # First, try to use the resource profile if it exists
+        preprocessed_dir=$(dirname "$preprocessed_file")
+        resource_profile="${preprocessed_dir}/resource_profile.csv"
+        
+        if [[ -f "$resource_profile" ]]; then
+            # Extract pathogens from resource profile (more reliable)
+            available_pathogens=$(awk -F',' 'NR>1 {print $1}' "$resource_profile" | tr '\n' ',' | sed 's/,$//')
+        else
+            # Fall back to extracting from preprocessed data
+            # Find the pathogen column index first
+            pathogen_col=$(head -1 "$preprocessed_file" | tr ',' '\n' | nl -nln | grep -i '"pathogen"' | awk '{print $1}')
+            
+            if [[ -z "$pathogen_col" ]]; then
+                echo -e "${YELLOW}Warning: Could not find pathogen column. Using column 157.${NC}"
+                pathogen_col=157
+            fi
+            
+            # Extract unique pathogen values from the correct column
+            available_pathogens=$(awk -F',' -v col="$pathogen_col" '
+                function unquote(s) {
+                    gsub(/^"/, "", s)
+                    gsub(/"$/, "", s)
+                    gsub(/""/, "\"", s)
+                    return s
+                }
+                NR>1 {
+                    # Handle quoted fields that may contain commas
+                    field_count = 0
+                    in_quotes = 0
+                    current_field = ""
+                    
+                    for (i = 1; i <= length($0); i++) {
+                        char = substr($0, i, 1)
+                        
+                        if (char == "\"") {
+                            in_quotes = !in_quotes
+                        }
+                        
+                        if (char == "," && !in_quotes) {
+                            field_count++
+                            if (field_count == col) {
+                                pathogen = unquote(current_field)
+                                # Only include valid pathogen names
+                                if (pathogen ~ /^[A-Z][A-Z0-9_]*$/ && length(pathogen) > 2) {
+                                    print pathogen
+                                }
+                            }
+                            current_field = ""
+                        } else {
+                            current_field = current_field char
                         }
                     }
-                    field1 = full_field
-                }
-                pathogen = unquote(field1)
-                # Only include valid pathogen names (starts with letter, allows letters, numbers, dots, hyphens, spaces)
-                # Must be primarily uppercase but allow some flexibility
-                if (pathogen ~ /^[A-Za-z][A-Za-z0-9. -]*$/ && length(pathogen) > 0) {
-                    # Convert to uppercase for consistency
-                    pathogen = toupper(pathogen)
-                    print pathogen
-                }
-            }' "$preprocessed_file" | sort -u | tr '\n' ',' | sed 's/,$//')
+                    # Handle last field
+                    field_count++
+                    if (field_count == col) {
+                        pathogen = unquote(current_field)
+                        if (pathogen ~ /^[A-Z][A-Z0-9_]*$/ && length(pathogen) > 2) {
+                            print pathogen
+                        }
+                    }
+                }' "$preprocessed_file" | sort -u | tr '\n' ',' | sed 's/,$//')
+        fi
         
         if [[ -n "$available_pathogens" ]]; then
             echo -e "${GREEN}Found pathogens in preprocessed data:${NC}"
@@ -550,13 +686,15 @@ fi
 
 # The preprocessing selection has been moved earlier in the script
 
-# Ask about data configuration files
-echo ""
-echo -e "${BLUE}======== Data Configuration Options ========${NC}"
-echo "These are optional CSV files for custom analysis settings."
-echo ""
+# Skip data configuration for preprocessing-only mode
+if [[ "$flag" != "preprocess" ]]; then
+    # Ask about data configuration files
+    echo ""
+    echo -e "${BLUE}======== Data Configuration Options ========${NC}"
+    echo "These are optional CSV files for custom analysis settings."
+    echo ""
 
-# Serotype configuration
+    # Serotype configuration
 while true; do
     read -p "Use custom serotype configuration? (y/n) [n]: " use_serotype_config
     use_serotype_config=${use_serotype_config:-n}
@@ -819,6 +957,12 @@ if [[ "$flag" != "resume" ]] && [[ "$pathogens" != "AUTO_DISCOVER" ]]; then
     pathogen_grouping="$grouped_pathogens"
 fi
 
+# Close the else block from preprocessing-only mode check
+fi  # End of non-preprocess mode (pathogen selection)
+
+# Skip all remaining selections for preprocessing-only mode
+if [[ "$flag" != "preprocess" ]]; then
+
 # State selection
 selected_states=""
 if [[ "$flag" != "resume" ]]; then
@@ -1015,18 +1159,28 @@ if [[ "$flag" != "resume" ]]; then
 fi
 
 # Build the base command
-cmd="nextflow run main.nf -profile singularity -entry SPLINE \
-  --mmwrFile \"$dataDir/mmwr9624_May2025.sas7bdat\" \
-  --censusFileB \"$dataDir/cen9624.sas7bdat\" \
-  --censusFileP \"$dataDir/cen9624_para.sas7bdat\" \
-  --iterations $iterations \
-  --chains $chains \
-  --adapt_delta $adapt_delta \
-  --max_treedepth $max_treedepth \
-  --seed 123 \
-  --outdir \"$outDir\" \
-  --pathogen \"$pathogens\" \
-  --projID \"$timestamp\""
+if [[ "$flag" == "preprocess" ]]; then
+    # Preprocessing-only mode - simpler command
+    cmd="nextflow run main.nf -profile singularity -entry PREPROCESS_ONLY \
+      --mmwrFile \"$dataDir/mmwr9624_May2025.sas7bdat\" \
+      --outdir \"$outDir\" \
+      --projID \"$timestamp\" \
+      --matching_sensitivity \"$matching_sensitivity\""
+else
+    # Normal analysis mode
+    cmd="nextflow run main.nf -profile singularity -entry SPLINE \
+      --mmwrFile \"$dataDir/mmwr9624_May2025.sas7bdat\" \
+      --censusFileB \"$dataDir/cen9624.sas7bdat\" \
+      --censusFileP \"$dataDir/cen9624_para.sas7bdat\" \
+      --iterations $iterations \
+      --chains $chains \
+      --adapt_delta $adapt_delta \
+      --max_treedepth $max_treedepth \
+      --seed 123 \
+      --outdir \"$outDir\" \
+      --pathogen \"$pathogens\" \
+      --projID \"$timestamp\""
+fi
 
 # Add resume flag if in resume mode
 if [[ "$flag" == "resume" ]]; then
@@ -1084,10 +1238,13 @@ else
   final_cmd="$cmd"
 fi
 
+# Close the remaining selections block
+fi  # End of non-preprocess mode (all selections)
+
 # Review and confirm
 echo ""
 echo -e "${BLUE}========= Analysis Summary ==========${NC}"
-echo -e "Mode: ${GREEN}$([ "$flag" == "test" ] && echo "Test" || [ "$flag" == "publication" ] && echo "Publication" || [ "$flag" == "max" ] && echo "Max" || [ "$flag" == "custom" ] && echo "Custom" || echo "Resume previous run")${NC}"
+echo -e "Mode: ${GREEN}$([ "$flag" == "test" ] && echo "Test" || [ "$flag" == "publication" ] && echo "Publication" || [ "$flag" == "max" ] && echo "Max" || [ "$flag" == "custom" ] && echo "Custom" || [ "$flag" == "resume" ] && echo "Resume previous run" || [ "$flag" == "preprocess" ] && echo "Preprocessing only")${NC}"
 if [[ "$pathogens" == "AUTO_DISCOVER" ]]; then
     echo -e "Pathogens: ${GREEN}All pathogens found in data (auto-discovery)${NC}"
 else
