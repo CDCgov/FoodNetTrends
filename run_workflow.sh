@@ -327,26 +327,36 @@ read -p "Output directory [${outDir}]: " user_outdir
 outDir=${user_outdir:-$outDir}
 
 # Check for existing preprocessed data FIRST (before pathogen selection)
-# This feature allows reusing previously cleaned data to save processing time
-# Searches for clean_mmwr.csv files in output directories from previous runs
-echo ""
-echo -e "${BLUE}======== Preprocessing Options ========${NC}"
-echo "Checking for existing preprocessed data..."
+# Skip preprocessing file selection for preprocessing-only mode
+if [[ "$flag" == "preprocess" ]]; then
+    echo ""
+    echo -e "${BLUE}======== Preprocessing Only Mode ========${NC}"
+    echo -e "${YELLOW}Preprocessing-only mode selected.${NC}"
+    echo -e "${YELLOW}Will generate new preprocessed files from raw data.${NC}"
+    
+    use_preprocessed=false
+    preprocessed_file=""
+else
+    # This feature allows reusing previously cleaned data to save processing time
+    # Searches for clean_mmwr.csv files in output directories from previous runs
+    echo ""
+    echo -e "${BLUE}======== Preprocessing Options ========${NC}"
+    echo "Checking for existing preprocessed data..."
 
-# Search for preprocessed files in output directories
-# Uses find with -print0 for safe handling of filenames with spaces
-# Sorted by path for consistent ordering
-preprocessed_files=()
-if [[ -d "output" ]]; then
-    while IFS= read -r -d '' file; do
-        preprocessed_files+=("$file")
-    done < <(find "output" -name "clean_mmwr.csv" -type f -print0 2>/dev/null | sort -z)
-fi
+    # Search for preprocessed files in output directories
+    # Uses find with -print0 for safe handling of filenames with spaces
+    # Sorted by path for consistent ordering
+    preprocessed_files=()
+    if [[ -d "output" ]]; then
+        while IFS= read -r -d '' file; do
+            preprocessed_files+=("$file")
+        done < <(find "output" -name "clean_mmwr.csv" -type f -print0 2>/dev/null | sort -z)
+    fi
 
-use_preprocessed=false
-preprocessed_file=""
+    use_preprocessed=false
+    preprocessed_file=""
 
-if [[ ${#preprocessed_files[@]} -gt 0 ]]; then
+    if [[ ${#preprocessed_files[@]} -gt 0 ]]; then
     echo ""
     echo -e "${GREEN}Found existing preprocessed data:${NC}"
     echo ""
@@ -464,7 +474,7 @@ else
     else
         echo -e "${YELLOW}Will run preprocessing step.${NC}"
     fi
-fi
+fi  # End of preprocessing options (non-preprocess mode)
 
 # For preprocessing-only mode, skip all other options
 if [[ "$flag" == "preprocess" ]]; then
