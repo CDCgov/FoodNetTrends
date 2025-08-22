@@ -427,7 +427,7 @@ workflow PREPROCESS_ONLY {
     )
 
     // Run resource profiler on preprocessed data
-    RESOURCE_PROFILER(PREPROCESS.out.cleanCsv)
+    RESOURCE_PROFILER(PREPROCESS.out.cleanFile)
 
     // Log results
     log.info """
