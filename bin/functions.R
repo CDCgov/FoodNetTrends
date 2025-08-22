@@ -670,7 +670,7 @@ IR_COMP_CATCH <- function(catch, start_year, end_year, output_file = NULL) {
   
   # Filter data for the comparison period
   period_data <- catch %>%
-    filter(year >= 2016 & end_year <= 2018)%>% group_by(.draw)%>%
+    filter(year >= start_year & year <= end_year)%>% group_by(.draw)%>%
     mutate(ir=.epred/(population/100000))%>%
     summarise(baseline_ir=median(ir),
               baseline_count=median(count))
