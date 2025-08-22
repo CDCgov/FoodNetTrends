@@ -1248,8 +1248,6 @@ else
   final_cmd="$cmd"
 fi
 
-fi
-
 # Review and confirm
 echo ""
 echo -e "${BLUE}========= Analysis Summary ==========${NC}"
