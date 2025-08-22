@@ -1167,6 +1167,7 @@ if [[ "$flag" != "resume" ]]; then
         echo -e "${GREEN}Selected travel statuses: $selected_travel${NC}"
     fi
 fi
+fi
 
 # Build the base command
 if [[ "$flag" == "preprocess" ]]; then
