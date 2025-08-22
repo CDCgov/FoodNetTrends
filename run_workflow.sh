@@ -474,7 +474,8 @@ else
     else
         echo -e "${YELLOW}Will run preprocessing step.${NC}"
     fi
-fi  # End of preprocessing options (non-preprocess mode)
+fi
+fi
 
 # For preprocessing-only mode, skip all other options
 if [[ "$flag" == "preprocess" ]]; then
@@ -554,7 +555,7 @@ else
                 function unquote(s) {
                     gsub(/^"/, "", s)
                     gsub(/"$/, "", s)
-                    gsub(/""/, "\"", s)
+                    gsub(/""/, "\\\"", s)
                     return s
                 }
                 NR>1 {
@@ -694,7 +695,7 @@ else
     fi
 fi
 
-# The preprocessing selection has been moved earlier in the script
+fi
 
 # Skip data configuration for preprocessing-only mode
 if [[ "$flag" != "preprocess" ]]; then
@@ -967,8 +968,7 @@ if [[ "$flag" != "resume" ]] && [[ "$pathogens" != "AUTO_DISCOVER" ]]; then
     pathogen_grouping="$grouped_pathogens"
 fi
 
-# Close the else block from preprocessing-only mode check
-fi  # End of non-preprocess mode (pathogen selection)
+fi
 
 # Skip all remaining selections for preprocessing-only mode
 if [[ "$flag" != "preprocess" ]]; then
@@ -1248,8 +1248,7 @@ else
   final_cmd="$cmd"
 fi
 
-# Close the remaining selections block
-fi  # End of non-preprocess mode (all selections)
+fi
 
 # Review and confirm
 echo ""
