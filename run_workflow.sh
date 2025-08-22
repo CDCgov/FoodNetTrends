@@ -1217,8 +1217,10 @@ fi
 if [[ -n "$catchment_config" ]]; then
     cmd="$cmd --catchment_config \"$catchment_config\""
 fi
-# Add matching sensitivity
-cmd="$cmd --matching_sensitivity \"$matching_sensitivity\""
+# Add matching sensitivity (skip for preprocessing mode as it's already included)
+if [[ "$flag" != "preprocess" ]]; then
+    cmd="$cmd --matching_sensitivity \"$matching_sensitivity\""
+fi
 # Add preprocessed data flags if using
 if [[ "$use_preprocessed" == true ]]; then
     cmd="$cmd --preprocessed true --cleanFile \"$preprocessed_file\""

@@ -403,6 +403,9 @@ workflow PREPROCESS_ONLY {
     if (!mmwrFile.exists()) {
         error "MMWR file not found: ${params.mmwrFile}"
     }
+    
+    // Configuration files (optional)
+    serotypeConfig = params.serotype_config ? file(params.serotype_config) : file('NO_FILE')
 
     // Log preprocessing start
     log.info """
@@ -419,7 +422,8 @@ workflow PREPROCESS_ONLY {
     // Run preprocessing
     PREPROCESS(
         mmwrFile,
-        params.serotypeFile
+        params.projID,
+        serotypeConfig
     )
 
     // Run resource profiler on preprocessed data
