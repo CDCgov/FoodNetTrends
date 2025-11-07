@@ -400,68 +400,105 @@ if (!is.null(opts$`catchment-config`)) {
 # Process pathogen data
 report_progress("ANALYSIS", message="Processing pathogen data")
 tryCatch({
-  pathDf <- PATH_ANALYSIS(mmwrdata, census, catchment_config)%>%as.data.frame()
+  # Apply pathogen and subgroup filtering BEFORE aggregation if specified
+  mmwrdata_filtered <- mmwrdata
+
+  if (!is.null(opts$pathogen)) {
+    # Filter for the specific pathogen
+    mmwrdata_filtered <- mmwrdata_filtered %>%
+      filter(pathogen == opts$pathogen)
+
+    # Apply subgroup filtering if specified
+    if (opts$subgroup != "combined") {
+      if (opts$pathogen == "STEC" && opts$subgroup %in% c("O157", "nonO157")) {
+        # For STEC, filter by stec_class
+        if ("stec_class" %in% names(mmwrdata_filtered)) {
+          if (opts$subgroup == "O157") {
+            mmwrdata_filtered <- mmwrdata_filtered %>%
+              filter(stec_class == "STEC O157")
+          } else if (opts$subgroup == "nonO157") {
+            mmwrdata_filtered <- mmwrdata_filtered %>%
+              filter(stec_class %in% c("STEC NONO157", "STEC O AG UNDET"))
+          }
+          report_progress("ANALYSIS", message=paste("Filtered STEC to subgroup:", opts$subgroup))
+        } else {
+          stop("stec_class column not found - cannot filter by STEC subgroup")
+        }
+      } else if (opts$pathogen == "SALMONELLA") {
+        # For Salmonella, filter by serotype
+        if ("serotypesummary" %in% names(mmwrdata_filtered)) {
+          mmwrdata_filtered <- mmwrdata_filtered %>%
+            filter(serotypesummary == opts$subgroup)
+          report_progress("ANALYSIS", message=paste("Filtered Salmonella to serotype:", opts$subgroup))
+        } else {
+          stop("serotypesummary column not found - cannot filter by serotype")
+        }
+      } else {
+        # For other pathogens with potential subgroups
+        if ("serotypesummary" %in% names(mmwrdata_filtered)) {
+          mmwrdata_filtered <- mmwrdata_filtered %>%
+            filter(serotypesummary == opts$subgroup | is.na(serotypesummary))
+          report_progress("ANALYSIS", message=paste("Filtered", opts$pathogen, "to subgroup:", opts$subgroup))
+        } else if ("serogroup" %in% names(mmwrdata_filtered)) {
+          mmwrdata_filtered <- mmwrdata_filtered %>%
+            filter(serogroup == opts$subgroup | is.na(serogroup))
+          report_progress("ANALYSIS", message=paste("Filtered", opts$pathogen, "to serogroup:", opts$subgroup))
+        }
+      }
+    }
+
+    # Check if we have data after filtering
+    if (nrow(mmwrdata_filtered) == 0) {
+      pathogen_desc <- ifelse(opts$subgroup == "combined",
+                              opts$pathogen,
+                              paste(opts$pathogen, opts$subgroup, sep=":"))
+      stop(paste("No data found for:", pathogen_desc, "after filtering"))
+    }
+
+    report_progress("ANALYSIS", message=paste("Filtered data contains", nrow(mmwrdata_filtered), "records"))
+  }
+
+  # Now run the analysis functions with the filtered data
+  pathDf <- PATH_ANALYSIS(mmwrdata_filtered, census, catchment_config)%>%as.data.frame()
   report_progress("ANALYSIS", message=paste("Processed",
                                             length(unique(pathDf$pathogen)),
                                             "pathogens"))
-  
+
   # Process Cyclospora and Salmonella if CIDT+ is included
   if("CIDT+" %in% cidt) {
     report_progress("ANALYSIS", message="Processing Cyclospora data")
-    cyloDF <- CYCLOSPORA_ANALYSIS(mmwrdata, census, catchment_config)%>%as.data.frame()
-    
+    cyloDF <- CYCLOSPORA_ANALYSIS(mmwrdata_filtered, census, catchment_config)%>%as.data.frame()
+
     report_progress("ANALYSIS", message="Processing Salmonella data")
-    salDF <- SALMONELLA_ANALYSIS(mmwrdata, census, catchment_config)%>%as.data.frame()
-    
+    salDF <- SALMONELLA_ANALYSIS(mmwrdata_filtered, census, catchment_config)%>%as.data.frame()
+
     # Combine all pathogen data
     bact <- gtools::smartbind(pathDf, cyloDF) %>%
       gtools::smartbind(salDF)
   } else {
     bact <- pathDf
   }
-  
+
   # Post-processing
   report_progress("ANALYSIS", message="Post-processing pathogen data")
-  
-  # Clean up memory
-  remove(mmwrdata)
-  
-  # Filter and prepare data for modeling
+
+  # Clean up memory - use mmwrdata_filtered instead of mmwrdata
+  remove(mmwrdata_filtered)
+  if (exists("mmwrdata")) remove(mmwrdata)
+
+  # The filtering has already been done before aggregation, so we just need to verify data exists
   if (!is.null(opts$pathogen)) {
-    # If a specific pathogen was requested, filter for it
+    # Data should already be filtered to the correct pathogen/subgroup
+    # Just verify we have data for the requested pathogen
     bact <- subset(bact, pathogen == opts$pathogen)
-    
-    # Further filter by subgroup if specified
-    if (opts$subgroup != "combined") {
-      # Handle different subgroup types
-      if (opts$pathogen == "STEC" && opts$subgroup %in% c("O157", "nonO157")) {
-        # For STEC, need to create the subgroups based on stec_class
-        if ("stec_class" %in% names(bact)) {
-          if (opts$subgroup == "O157") {
-            bact <- subset(bact, stec_class == "STEC O157")
-          } else if (opts$subgroup == "nonO157") {
-            bact <- subset(bact, stec_class %in% c("STEC NONO157", "STEC O AG UNDET"))
-          }
-        } else {
-          report_progress("WARNING", message="stec_class column not found - cannot filter by STEC subgroup")
-        }
-      } else if (opts$pathogen == "SALMONELLA") {
-        # For Salmonella, filter by serotype
-        if ("serotypesummary" %in% names(bact)) {
-          bact <- subset(bact, serotypesummary == opts$subgroup)
-        } else {
-          report_progress("WARNING", message="serotypesummary column not found - cannot filter by serotype")
-        }
-      }
-    }
-    
+
     if (nrow(bact) == 0) {
       # No data found for the requested pathogen/subgroup
-      pathogen_desc <- ifelse(opts$subgroup == "combined", 
-                              opts$pathogen, 
+      pathogen_desc <- ifelse(opts$subgroup == "combined",
+                              opts$pathogen,
                               paste(opts$pathogen, opts$subgroup, sep=":"))
       report_progress("ERROR", message=paste("No data found for:", pathogen_desc))
-      
+
       # Create error file for this pathogen
       error_file <- paste0(outDir, "/", opts$pathogen, "_", opts$subgroup, "_error.txt")
       error_content <- c(
@@ -482,14 +519,14 @@ tryCatch({
         "3. The filters (travel, CIDT) are not excluding all cases"
       )
       writeLines(error_content, error_file)
-      
+
       # Exit with error status to indicate failure
       stop(paste("No data found for:", pathogen_desc, "- see error file for details"))
     }
   } else {
     # No specific pathogen requested - analyze all pathogens in the data
     report_progress("ANALYSIS", message="No specific pathogen requested, analyzing all pathogens in dataset")
-    
+
     # Check if any data exists
     if (nrow(bact) == 0) {
       stop("No data found after applying filters")
