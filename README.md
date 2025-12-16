@@ -234,3 +234,17 @@ If you would like to contribute to this pipeline, please see the [contributing g
 An extensive list of references for the tools used by the pipeline can be found in the [`CITATIONS.md`](CITATIONS.md) file.
 
 This pipeline uses code and infrastructure developed and maintained by the [nf-core](https://nf-co.re) community, reused here under the [MIT license](https://github.com/nf-core/tools/blob/master/LICENSE).
+
+## SHARE IT Act Compliance
+ 
+```
+Organization: NCEZID/AMD
+ 
+Contact email: ncezid_shareit@cdc.gov
+ 
+Exemption: NA
+ 
+Exemption Justification: NA
+ 
+Description fields: FoodNetTrends is a Bayesian spline model for forecasting and displaying foodborne disease outbreak data. 
+```
