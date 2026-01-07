@@ -41,8 +41,10 @@ The pipeline requires the following input data:
 ### Data Filtering Parameters
 - **travel**: Travel types to include (default: `NO,UNKNOWN,YES`)
 - **cidt**: CIDT types to include (default: `CIDT+,CX+,PARASITIC`)
+- **states**: Comma-separated list of states to include (default: `null` = all states)
 - **preprocessed**: Whether to use preprocessed data (default: `false`)
 - **cleanFile**: Path to cleaned CSV file when using preprocessed data
+- **skip_preprocessing**: Skip the preprocessing step entirely (default: `false`)
 
 ### Data Processing Parameters
 - **matching_sensitivity**: Pathogen name standardization sensitivity (default: `MEDIUM`)
@@ -123,7 +125,22 @@ nextflow run main.nf \
   --outdir "output"
 ```
 
-### 3. Run Profiles
+### 3. Preprocessing Only
+To run only the preprocessing step without the full analysis:
+
+```bash
+nextflow run main.nf \
+  -profile singularity \
+  -entry PREPROCESS_ONLY \
+  --mmwrFile "/path/to/mmwr9623_Jan2024.sas7bdat" \
+  --censusFileB "/path/to/cen9623.sas7bdat" \
+  --censusFileP "/path/to/cen9623_para.sas7bdat" \
+  --outdir "output"
+```
+
+This generates the preprocessed data files without running the Bayesian modeling, useful for data validation or when you want to inspect the cleaned data before full analysis.
+
+### 4. Run Profiles
 The pipeline includes preconfigured profiles:
 
 - **Test Profile**: For quick validation with minimal resources
@@ -179,21 +196,26 @@ The pipeline generates a structured output directory:
 ```
 output/
 └── [projID]/
-    ├── pipeline_info/                        # Execution reports and logs
-    │   ├── execution_report.html             # Pipeline execution report
-    │   ├── execution_trace.txt               # Detailed execution trace
-    │   └── pipeline_dag.html                 # Execution graph
-    ├── preprocessed/                         # Preprocessed data files
-    │   ├── clean_mmwr.csv                    # Cleaned MMWR data
-    │   └── clean_mmwr_preprocessing_report.csv # Pathogen name standardization report
-    └── spline_results/                       # Model results for each pathogen
-        ├── [pathogen]_brm.Rds                # Saved model object
-        ├── [pathogen]_IRCatch.csv            # Incidence rate estimates
-        ├── [pathogen]_summary.txt            # Model summary statistics
-        ├── [pathogen]_site_trends.png        # Site-specific trend plots
-        ├── [pathogen]_overall_trend.png      # Overall trend plot
-        ├── [pathogen]_combined.png           # Combined visualization
-        └── [pathogen]_EstIRRCatch_*.csv      # Relative risk comparisons
+    ├── pipeline_info/                           # Execution reports and logs
+    │   ├── execution_report_*.html              # Pipeline execution report
+    │   ├── execution_trace_*.txt                # Detailed execution trace
+    │   ├── execution_timeline_*.html            # Execution timeline visualization
+    │   └── pipeline_dag_*.html                  # Execution graph
+    ├── preprocessed/                            # Preprocessed data files
+    │   ├── clean_mmwr.csv                       # Cleaned MMWR data
+    │   ├── clean_mmwr_preprocessing_report.csv  # Pathogen name standardization report
+    │   ├── resource_profile.csv                 # Data complexity metrics
+    │   ├── metadata_states.csv                  # State-level summary
+    │   ├── metadata_cidt.csv                    # Diagnostic method summary
+    │   └── metadata_travel.csv                  # Travel status summary
+    └── spline_results/                          # Model results for each pathogen
+        ├── [pathogen]_brm.Rds                   # Saved model object
+        ├── [pathogen]_IRCatch.csv               # Incidence rate estimates
+        ├── [pathogen]_summary.txt               # Model summary statistics
+        ├── [pathogen]_site_trends.png           # Site-specific trend plots
+        ├── [pathogen]_overall_trend.png         # Overall trend plot
+        ├── [pathogen]_combined.png              # Combined visualization
+        └── [pathogen]_EstIRRCatch_*.csv         # Relative risk comparisons
 ```
 
 ## Visualizations
@@ -213,7 +235,8 @@ The pipeline calculates relative risks and percent changes compared to baseline 
 
 ## Performance Considerations
 - For test runs, use `test` mode with reduced parameters (chains=1, iterations=100)
-- For production runs, consider using at least 2 chains with 500+ iterations
+- For production runs, use `-profile production` which sets optimized parameters:
+  - chains=4, iterations=2000, adapt_delta=0.99, max_treedepth=15
 - Running with multiple pathogens will launch parallel jobs on the cluster
 - Background execution is recommended for long-running analyses
 
