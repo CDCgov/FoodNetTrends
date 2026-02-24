@@ -53,10 +53,10 @@ handle_pathogen_grouping() {
                 stec_choice=${stec_choice:-1}
                 
                 case "$stec_choice" in
-                    1) grouping="STEC:combined"; break ;;
-                    2) grouping="STEC:O157"; break ;;
-                    3) grouping="STEC:nonO157"; break ;;
-                    4) grouping="STEC:O157|STEC:nonO157"; break ;;
+                    1) grouping="STEC~combined"; break ;;
+                    2) grouping="STEC~O157"; break ;;
+                    3) grouping="STEC~nonO157"; break ;;
+                    4) grouping="STEC~O157|STEC~nonO157"; break ;;
                     *) 
                         echo -e "${RED}Invalid choice: '$stec_choice'. Please enter 1-4.${NC}" >&2
                         ;;
@@ -89,24 +89,50 @@ handle_pathogen_grouping() {
                 
                 # Extract serotypes with counts from preprocessed data
                 # This command extracts the serotypesummary column and counts occurrences
-                serotype_data=$(awk -F',' -v pathogen="SALMONELLA" '
+                serotype_data=$(awk -v pathogen="SALMONELLA" '
                     BEGIN { OFS="\t" }
-                    NR==1 { 
-                        for(i=1; i<=NF; i++) {
-                            gsub(/^"|"$/, "", $i)
-                            if($i == "pathogen") p_col=i
-                            if($i == "serotypesummary") s_col=i
+                    NR==1 {
+                        # Header is safe to split naively (column names have no commas)
+                        n = split($0, hdr, ",")
+                        for (i = 1; i <= n; i++) {
+                            gsub(/^"|"$/, "", hdr[i])
+                            if (hdr[i] == "pathogen") p_col = i
+                            if (hdr[i] == "serotypesummary") s_col = i
                         }
+                        if (p_col && s_col)
+                            max_col = (p_col > s_col) ? p_col : s_col
                     }
                     NR>1 && p_col && s_col {
-                        gsub(/^"|"$/, "", $p_col)
-                        gsub(/^"|"$/, "", $s_col)
-                        if($p_col == pathogen && $s_col != "") {
-                            serotypes[$s_col]++
+                        # Skip rows that cannot match (fast string search)
+                        if (index($0, pathogen) == 0) next
+
+                        # Quote-aware parse, stop after the last column we need
+                        nf = 0; current = ""; in_q = 0; pval = ""; sval = ""
+                        for (i = 1; i <= length($0); i++) {
+                            c = substr($0, i, 1)
+                            if (c == "\"") { in_q = !in_q }
+                            else if (c == "," && !in_q) {
+                                nf++
+                                if (nf == p_col) pval = current
+                                if (nf == s_col) sval = current
+                                if (nf >= max_col) break
+                                current = ""
+                            } else { current = current c }
+                        }
+                        if (nf < max_col) {
+                            nf++
+                            if (nf == p_col) pval = current
+                            if (nf == s_col) sval = current
+                        }
+
+                        gsub(/^"|"$/, "", pval)
+                        gsub(/^"|"$/, "", sval)
+                        if (pval == pathogen && sval != "") {
+                            serotypes[sval]++
                         }
                     }
                     END {
-                        for(s in serotypes) {
+                        for (s in serotypes) {
                             print serotypes[s], s
                         }
                     }
@@ -114,7 +140,7 @@ handle_pathogen_grouping() {
                 
                 if [[ -z "$serotype_data" ]]; then
                     echo -e "${YELLOW}No serotype data found. Using combined analysis.${NC}" >&2
-                    grouping="SALMONELLA:combined"
+                    grouping="SALMONELLA~combined"
                 else
                     # Display ranked serotypes
                     echo -e "${GREEN}Top serotypes found:${NC}" >&2
@@ -152,7 +178,7 @@ handle_pathogen_grouping() {
                     read -p "Selection: " serotype_selection
                     
                     if [[ -z "$serotype_selection" ]]; then
-                        grouping="SALMONELLA:combined"
+                        grouping="SALMONELLA~combined"
                     else
                         # Convert numbers to serotype names
                         selected_serotypes=""
@@ -161,36 +187,36 @@ handle_pathogen_grouping() {
                             serotype_name=$(echo "$serotype_data" | sed -n "${sel}p" | cut -f2-)
                             if [[ -n "$serotype_name" ]]; then
                                 if [[ -n "$selected_serotypes" ]]; then
-                                    selected_serotypes="${selected_serotypes}|SALMONELLA:${serotype_name}"
+                                    selected_serotypes="${selected_serotypes}|SALMONELLA~${serotype_name}"
                                 else
-                                    selected_serotypes="SALMONELLA:${serotype_name}"
+                                    selected_serotypes="SALMONELLA~${serotype_name}"
                                 fi
                             fi
                         done
                         # Check if any valid serotypes were selected
                         if [[ -z "$selected_serotypes" ]]; then
                             echo -e "${YELLOW}No valid serotypes selected. Using combined analysis.${NC}" >&2
-                            grouping="SALMONELLA:combined"
+                            grouping="SALMONELLA~combined"
                         else
                             grouping="$selected_serotypes"
                         fi
                     fi
                 fi
             else
-                grouping="SALMONELLA:combined"
+                grouping="SALMONELLA~combined"
             fi
             ;;
-            
+
         *)
             # For other pathogens, analyze as single group
-            grouping="${pathogen}:combined"
+            grouping="${pathogen}~combined"
             ;;
     esac
-    
+
     # Validate that grouping is not empty
     if [[ -z "$grouping" ]] || [[ -z "${grouping// }" ]]; then
         echo -e "${YELLOW}Warning: Empty grouping detected. Using default.${NC}" >&2
-        grouping="${pathogen}:combined"
+        grouping="${pathogen}~combined"
     fi
     
     echo "$grouping"
@@ -944,10 +970,10 @@ if [[ "$flag" != "resume" ]] && [[ "$pathogens" != "AUTO_DISCOVER" ]]; then
                     echo "" >&2
                     echo -e "${YELLOW}Note: Salmonella serotype selection requires preprocessed data.${NC}" >&2
                     echo -e "${YELLOW}Using combined analysis for all Salmonella serotypes.${NC}" >&2
-                    grouping="SALMONELLA:combined"
+                    grouping="SALMONELLA~combined"
                 fi
             fi
-            
+
             # Add to grouped pathogens
             if [[ -n "$grouped_pathogens" ]]; then
                 grouped_pathogens="${grouped_pathogens}|$grouping"
@@ -957,9 +983,9 @@ if [[ "$flag" != "resume" ]] && [[ "$pathogens" != "AUTO_DISCOVER" ]]; then
         else
             # Non-grouped pathogens stay as-is
             if [[ -n "$grouped_pathogens" ]]; then
-                grouped_pathogens="${grouped_pathogens}|${pathogen}:combined"
+                grouped_pathogens="${grouped_pathogens}|${pathogen}~combined"
             else
-                grouped_pathogens="${pathogen}:combined"
+                grouped_pathogens="${pathogen}~combined"
             fi
         fi
     done

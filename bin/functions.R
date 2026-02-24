@@ -583,14 +583,17 @@ LINPRED_TO_SITEIR <- function(site_data) {
 #
 # Workflow position: LINPRED_TO_SITEIR → PLOT_SITE_TRENDS → PNG output
 ################################################################################
-PLOT_SITE_TRENDS <- function(site, pathogen, outDir) {
+PLOT_SITE_TRENDS <- function(site, pathogen, outDir, subgroup = "combined") {
+  # Build display title including subgroup when applicable
+  display_name <- if (subgroup != "combined") paste(pathogen, subgroup) else pathogen
+
   # Create a plot for each state showing trends over time
   p <- ggplot(site, aes(x = year, y = median_ir)) +
     geom_line(linewidth = 1) +
     geom_ribbon(aes(ymin = lower_hdi_ir, ymax = upper_hdi_ir), alpha = 0.3) +
     facet_wrap(~ state, scales = "free_y") +
     labs(
-      title = paste("Site-Specific Trends for", pathogen),
+      title = paste("Site-Specific Trends for", display_name),
       subtitle = "Median incidence with 95% HDI intervals",
       y = "Incidence per 100,000 population",
       x = "Year"
@@ -602,11 +605,7 @@ PLOT_SITE_TRENDS <- function(site, pathogen, outDir) {
       plot.subtitle = element_text(hjust = 0.5),
       strip.text = element_text(face = "bold")
     )
-  
-  # Save the plot
-  plot_file <- file.path(outDir, paste0(pathogen, "_site_trends.png"))
-  ggsave(plot_file, p, width = 12, height = 8, dpi = 300)
-  
+
   return(p)
 }
 
@@ -625,14 +624,17 @@ PLOT_SITE_TRENDS <- function(site, pathogen, outDir) {
 #
 # Workflow position: LINPRED_TO_CATCHIR → PLOT_OVERALL_TREND → PNG output
 ################################################################################
-PLOT_OVERALL_TREND <- function(catchir_data, pathogen, outDir) {
-# Create the plot
+PLOT_OVERALL_TREND <- function(catchir_data, pathogen, outDir, subgroup = "combined") {
+  # Build display title including subgroup when applicable
+  display_name <- if (subgroup != "combined") paste(pathogen, subgroup) else pathogen
+
+  # Create the plot
   p <- ggplot(catchir_data, aes(x = year, y = median_ir)) +
     geom_line(linewidth = 1.5) +
     geom_ribbon(aes(ymin = lower_hdi_ir, ymax = upper_hdi_ir), alpha = 0.3) +
     geom_vline(aes(xintercept = 2004), linetype="dashed", color="red")+
     labs(
-      title = paste("Overall Trend for", pathogen),
+      title = paste("Overall Trend for", display_name),
       subtitle = "Median incidence with 95% HDI intervals",
       y = "Incidence per 100,000 population",
       x = "Year"
@@ -642,11 +644,7 @@ PLOT_OVERALL_TREND <- function(catchir_data, pathogen, outDir) {
       plot.title = element_text(hjust = 0.5, face = "bold"),
       plot.subtitle = element_text(hjust = 0.5)
     )
-  
-  # Save the plot
-  plot_file <- file.path(outDir, paste0(pathogen, "_overall_trend.png"))
-  ggsave(plot_file, p, width = 10, height = 6, dpi = 300)
-  
+
   return(p)
 }
 

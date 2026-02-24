@@ -21,12 +21,12 @@ process TRENDY {
     path catchmentConfig
 
     output:
-    path "${pathogenGrouping.replaceAll(':', '_')}_brm.Rds", emit: rds, optional: true
-    path "${pathogenGrouping.replaceAll(':', '_')}_IRCatch.csv", emit: csv, optional: true
-    path "${pathogenGrouping.replaceAll(':', '_')}*.png", emit: png, optional: true
-    path "${pathogenGrouping.replaceAll(':', '_')}*_EstIRRCatch_*.csv", emit: irr, optional: true
-    path "${pathogenGrouping.replaceAll(':', '_')}_summary.txt", emit: summary, optional: true
-    path "${pathogenGrouping.replaceAll(':', '_')}_error.txt", optional: true, emit: errors
+    path "${pathogenGrouping.replaceAll('[^a-zA-Z0-9_-]', '_').replaceAll('_+', '_').replaceAll('_$', '')}_brm.Rds", emit: rds, optional: true
+    path "${pathogenGrouping.replaceAll('[^a-zA-Z0-9_-]', '_').replaceAll('_+', '_').replaceAll('_$', '')}_IRCatch.csv", emit: csv, optional: true
+    path "${pathogenGrouping.replaceAll('[^a-zA-Z0-9_-]', '_').replaceAll('_+', '_').replaceAll('_$', '')}*.png", emit: png, optional: true
+    path "${pathogenGrouping.replaceAll('[^a-zA-Z0-9_-]', '_').replaceAll('_+', '_').replaceAll('_$', '')}*_EstIRRCatch_*.csv", emit: irr, optional: true
+    path "${pathogenGrouping.replaceAll('[^a-zA-Z0-9_-]', '_').replaceAll('_+', '_').replaceAll('_$', '')}_summary.txt", emit: summary, optional: true
+    path "${pathogenGrouping.replaceAll('[^a-zA-Z0-9_-]', '_').replaceAll('_+', '_').replaceAll('_$', '')}_error.txt", optional: true, emit: errors
 
     errorStrategy { task.exitStatus in [143,137,104,134,139] ? 'retry' : 'finish' }
     maxRetries 3
@@ -76,7 +76,7 @@ process TRENDY {
       --projID ${projID} \\
       --outDir . \\
       --pathogen ${pathogen} \\
-      --subgroup ${subgroup} \\
+      --subgroup '${subgroup}' \\
       --preprocessed ${preprocessed} \\
       ${cleanFileParam} \\
       --cores ${task.cpus} \\

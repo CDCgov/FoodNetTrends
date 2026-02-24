@@ -500,7 +500,9 @@ tryCatch({
       report_progress("ERROR", message=paste("No data found for:", pathogen_desc))
 
       # Create error file for this pathogen
-      error_file <- paste0(outDir, "/", opts$pathogen, "_", opts$subgroup, "_error.txt")
+      safe_subgroup <- gsub("[^a-zA-Z0-9_-]", "_", opts$subgroup)
+      safe_subgroup <- gsub("_+", "_", safe_subgroup)
+      error_file <- paste0(outDir, "/", opts$pathogen, "_", safe_subgroup, "_error.txt")
       error_content <- c(
         paste("ERROR: No data found for:", pathogen_desc),
         paste("Date:", Sys.time()),
@@ -573,6 +575,9 @@ for (pathogen_name in target_pathogens) {
     
     # Construct output filename prefix including subgroup if specified
     output_prefix <- paste(pathogen_name, opts$subgroup, sep="_")
+    output_prefix <- gsub("[^a-zA-Z0-9_-]", "_", output_prefix)
+    output_prefix <- gsub("_+", "_", output_prefix)
+    output_prefix <- sub("_$", "", output_prefix)
     
     # Save model
     saveFile <- paste0(outDir, "/", output_prefix, "_brm.Rds")
@@ -649,14 +654,14 @@ for (pathogen_name in target_pathogens) {
         # Check if plotting functions exist before calling them
         if (exists("PLOT_SITE_TRENDS", mode = "function")) {
           # Site-specific trends plot
-          site_plot <- PLOT_SITE_TRENDS(site, pathogen_name, outDir)
-          ggsave(paste0(outDir, "/", output_prefix, "_site_trends.png"), site_plot, 
+          site_plot <- PLOT_SITE_TRENDS(site, pathogen_name, outDir, opts$subgroup)
+          ggsave(paste0(outDir, "/", output_prefix, "_site_trends.png"), site_plot,
                  width = 10, height = 8, dpi = 300)
         }
-        
+
         if (exists("PLOT_OVERALL_TREND", mode = "function")) {
           # Overall trend plot
-          overall_plot <- PLOT_OVERALL_TREND(catchir.linpred, pathogen_name, outDir)
+          overall_plot <- PLOT_OVERALL_TREND(catchir.linpred, pathogen_name, outDir, opts$subgroup)
           ggsave(paste0(outDir, "/", output_prefix, "_overall_trend.png"), overall_plot,
                  width = 10, height = 6, dpi = 300)
         }

@@ -21,7 +21,7 @@ if (params.help) {
         --preprocessed          TRUE/FALSE indicating if using preprocessed CSV data
         --cleanFile             Path to cleaned CSV file (if preprocessed is TRUE)
         --pathogen              Comma-separated list of pathogens to analyze (e.g., CAMPYLOBACTER,SALMONELLA)
-        --pathogen_grouping     Pipe-separated pathogen groupings (e.g., STEC:O157|STEC:nonO157)
+        --pathogen_grouping     Pipe-separated pathogen groupings (e.g., STEC~O157|STEC~nonO157)
         --chains                Number of MCMC chains
         --iterations            Number of MCMC iterations
         --adapt_delta           Adaptation parameter for MCMC

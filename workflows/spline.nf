@@ -21,7 +21,7 @@ workflow SPLINE {
     
     // Handle pathogen grouping if specified
     if (params.pathogen_grouping && params.pathogen_grouping.trim()) {
-        // Parse pathogen:subgroup format using pipe delimiter
+        // Parse pathogen~subgroup format using pipe delimiter
         def groupingList = params.pathogen_grouping.tokenize('|')
         pathogenGrouping = Channel.fromList(groupingList)
     } else if (params.pathogen == 'AUTO_DISCOVER') {
@@ -29,12 +29,12 @@ workflow SPLINE {
         pathogenGrouping = null
     } else if (pathogens) {
         // If no grouping specified, use simple pathogen list
-        pathogenGrouping = pathogens.map { p -> "${p}:combined" }
+        pathogenGrouping = pathogens.map { p -> "${p}~combined" }
     } else {
         // Fallback to default pathogens if nothing specified
         log.warn "No pathogens specified, using defaults: CAMPYLOBACTER, CYCLOSPORA"
         pathogens = Channel.of('CAMPYLOBACTER', 'CYCLOSPORA')
-        pathogenGrouping = pathogens.map { p -> "${p}:combined" }
+        pathogenGrouping = pathogens.map { p -> "${p}~combined" }
     }
 
     // Input files
@@ -156,7 +156,7 @@ workflow SPLINE {
                         log.info "Auto-discovered pathogens: ${pathogenList.join(', ')}"
                         return pathogenList
                     }
-                    .map { p -> "${p}:combined" }
+                    .map { p -> "${p}~combined" }
             } else {
                 error "Pathogen grouping is not defined. This should not happen for preprocessed data."
             }
@@ -165,8 +165,8 @@ workflow SPLINE {
         pathogenGroupingWithMetrics = pathogenGrouping
             .combine(metricsChannel)
             .map { grouping, metrics ->
-                // Parse pathogen:subgroup format
-                def parts = grouping.split(':')
+                // Parse pathogen~subgroup format
+                def parts = grouping.split('~')
                 def pathogen = parts[0]
                 def subgroup = parts.length > 1 ? parts[1] : 'combined'
                 
@@ -286,11 +286,11 @@ workflow SPLINE {
                     log.info "Auto-discovered pathogens: ${pathogenList.join(', ')}"
                     return pathogenList
                 }
-                .map { p -> "${p}:combined" }
+                .map { p -> "${p}~combined" }
             
             // Create pathogens channel for consistency
             pathogens = pathogenGrouping.map { grouping ->
-                grouping.split(':')[0]
+                grouping.split('~')[0]
             }
         }
         
@@ -300,7 +300,7 @@ workflow SPLINE {
             if (!pathogens) {
                 pathogens = Channel.of('CAMPYLOBACTER', 'CYCLOSPORA')
             }
-            pathogenGrouping = pathogens.map { p -> "${p}:combined" }
+            pathogenGrouping = pathogens.map { p -> "${p}~combined" }
         }
 
         // Parse pathogen groupings and combine with metrics
@@ -312,8 +312,8 @@ workflow SPLINE {
         pathogenGroupingWithMetrics = pathogenGrouping
             .combine(metricsChannel)
             .map { grouping, metrics ->
-                // Parse pathogen:subgroup format
-                def parts = grouping.split(':')
+                // Parse pathogen~subgroup format
+                def parts = grouping.split('~')
                 def pathogen = parts[0]
                 def subgroup = parts.length > 1 ? parts[1] : 'combined'
                 
